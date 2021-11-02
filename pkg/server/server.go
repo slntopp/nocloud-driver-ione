@@ -29,6 +29,7 @@ type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 }
 
-func NewDriverServiceServer() DriverServiceServer {
-	return DriverServiceServer{}
+func NewDriverServiceServer() *DriverServiceServer {
+	return &DriverServiceServer{}
+}
 }
