@@ -16,6 +16,8 @@ limitations under the License.
 package server
 
 import (
+	"context"
+
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/proto"
 )
 
@@ -32,4 +34,11 @@ type DriverServiceServer struct {
 func NewDriverServiceServer() *DriverServiceServer {
 	return &DriverServiceServer{}
 }
+
+func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
+	return &pb.GetTypeResponse{Type: DRIVER_NAME}, nil
+}
+
+func (s *DriverServiceServer) ValidateConfigSyntax(ctx context.Context, request *pb.ValidateConfigSyntaxRequest) (*pb.ValidateConfigSyntaxResponse, error) {
+	return &pb.ValidateConfigSyntaxResponse{Result: true}, nil
 }
