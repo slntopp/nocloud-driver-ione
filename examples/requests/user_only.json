@@ -1,0 +1,8 @@
+{
+    "group": {
+        "type": "ione"
+    },
+    "services_provider": {
+        "secrets": "{\"host\": \"https://ione-api.your.host\",\"cred\": \"oneadmin:secret\"}"
+    }
+}
