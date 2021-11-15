@@ -18,6 +18,8 @@ package server
 import (
 	"context"
 
+	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
+	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"go.uber.org/zap"
 )
 
@@ -40,6 +42,11 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 	return &pb.GetTypeResponse{Type: DRIVER_NAME}, nil
 }
 
-func (s *DriverServiceServer) ValidateConfigSyntax(ctx context.Context, request *pb.ValidateConfigSyntaxRequest) (*pb.ValidateConfigSyntaxResponse, error) {
-	return &pb.ValidateConfigSyntaxResponse{Result: true}, nil
+func (s *DriverServiceServer) ValidateConfigSyntax(ctx context.Context, request *instpb.ValidateInstancesGroupConfigRequest) (*instpb.ValidateInstancesGroupConfigResponse, error) {
+	return &instpb.ValidateInstancesGroupConfigResponse{Result: true}, nil
+}
+
+func (s *DriverServiceServer) Deploy(ctx context.Context, service *instpb.InstancesGroup) (*instpb.InstancesGroup, error) {
+	s.log.Debug("Deploy request received", zap.Any("service", service))
+	return service, nil
 }
