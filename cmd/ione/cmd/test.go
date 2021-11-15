@@ -28,8 +28,6 @@ var testCmd = &cobra.Command{
 	Use:   "test",
 	Short: "Test connection",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("test called")
-
 		h, err := cmd.Flags().GetString("hostname")
 		if err != nil {
 			return err
@@ -49,7 +47,7 @@ var testCmd = &cobra.Command{
 		}
 
 		c := ione.NewIONeClient(h, u + ":" + p)
-		c.Ping()
+		fmt.Printf("IONe resolved: %t\n", c.Ping())
 		return nil
 	},
 }
