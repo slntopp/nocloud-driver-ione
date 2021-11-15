@@ -16,7 +16,6 @@ limitations under the License.
 package server
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -26,7 +25,6 @@ import (
 	ione "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -46,20 +44,6 @@ type DriverServiceServer struct {
 
 func NewDriverServiceServer(log *zap.Logger) *DriverServiceServer {
 	return &DriverServiceServer{log: log}
-}
-
-func MakeConfiguration(conf string) (res *viper.Viper, err error) {
-	res = viper.New()
-	res.SetConfigType("json")
-	err = res.ReadConfig(bytes.NewBufferString(conf))
-	if err != nil {
-		return nil, err
-	}
-
-	// Default settings
-	res.SetDefault("group_id", 1)
-
-	return res, err
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
@@ -91,21 +75,17 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
     hasher.Write([]byte(id.String() + time.Now().String()))
     userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 	
-	secrets, err := MakeConfiguration(sp.GetSecrets())
-	if err != nil {
-		s.log.Error("Can't read config", zap.String("config", sp.GetSecrets()), zap.Error(err))
-		return nil, status.Error(codes.InvalidArgument, "Can't read config")
-	}
-	host := secrets.GetString("host")
-	cred := secrets.GetString("cred")
-	group := secrets.GetInt64("group_id")
+	secrets := sp.GetSecrets()
+	host := secrets["host"].GetStringValue()
+	cred := secrets["cred"].GetStringValue()
+	group := secrets["group"].GetNumberValue()
 
 	client := ione.NewIONeClient(host, cred)
-	oneID, err := client.UserCreate(id.String(), userPass, group)
+	oneID, err := client.UserCreate(id.String(), userPass, int64(group))
 	if err != nil {
 		s.log.Debug("Couldn't create OpenNebula user",
 			zap.Error(err), zap.String("login", id.String()),
-			zap.String("pass", userPass), zap.Int64("group", group) )
+			zap.String("pass", userPass), zap.Int64("group", int64(group)) )
 		return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
 	}
 

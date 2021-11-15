@@ -282,8 +282,8 @@ github.com/sagikazarmark/crypt v0.1.0/go.mod h1:B/mN0msZuINBtQ1zZLEQcegFJJf9vnYI
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
-github.com/slntopp/nocloud v0.0.0-20211115180531-f149fb240da3 h1:yf42T5i3uf6trMTIVyIkpC0KZYI+MLQS/iu6qHIgfFo=
-github.com/slntopp/nocloud v0.0.0-20211115180531-f149fb240da3/go.mod h1:IsV4Xf/jCJf3ihgSalvanH1qmWqs1SjU7BrhiPmTWg0=
+github.com/slntopp/nocloud v0.0.0-20211115203413-cead8671cb19 h1:V9eZZiZOUs5gPO4xKxlPiVAYhU+jKzDGQ8dXAk3EWOs=
+github.com/slntopp/nocloud v0.0.0-20211115203413-cead8671cb19/go.mod h1:IsV4Xf/jCJf3ihgSalvanH1qmWqs1SjU7BrhiPmTWg0=
 github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d/go.mod h1:OnSkiWE9lh6wB0YB77sQom3nweQdgAjqCqsofrRNTgc=
 github.com/smartystreets/goconvey v1.6.4/go.mod h1:syvi0/a8iFYH4r/RixwvyeAJjdLS9QV7WQ/tjFTllLA=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
