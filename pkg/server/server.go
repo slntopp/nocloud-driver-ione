@@ -20,6 +20,7 @@ import (
 
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -36,6 +37,20 @@ type DriverServiceServer struct {
 
 func NewDriverServiceServer(log *zap.Logger) *DriverServiceServer {
 	return &DriverServiceServer{log: log}
+}
+
+func MakeConfiguration(conf string) (res *viper.Viper, err error) {
+	res = viper.New()
+	res.SetConfigType("json")
+	err = res.ReadConfig(bytes.NewBufferString(conf))
+	if err != nil {
+		return nil, err
+	}
+
+	// Default settings
+	res.SetDefault("group_id", 1)
+
+	return res, err
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
