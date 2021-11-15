@@ -19,13 +19,18 @@ import (
 	"fmt"
 	"os"
 
+	ione "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	"github.com/spf13/cobra"
 
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
-
+var (
+	cfgFile string
+	host, user, pass string
+	client *ione.IONe
+)
+	
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "ione",
@@ -55,9 +60,9 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ione.yaml)")
-	rootCmd.PersistentFlags().String("hostname", "", "IONe Host")
-	rootCmd.PersistentFlags().StringP("username", "u", "", "Username for IONe")
-	rootCmd.PersistentFlags().StringP("password", "p", "", "Password or Token for IONe")
+	rootCmd.PersistentFlags().StringVar(&host, "hostname", "", "IONe Host")
+	rootCmd.PersistentFlags().StringVarP(&user, "username", "u", "", "Username for IONe")
+	rootCmd.PersistentFlags().StringVarP(&pass, "password", "p", "", "Password or Token for IONe")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -82,4 +87,10 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+
+	if host == "" || user == "" || pass == "" {
+		panic("Hostname, Username or Password not given")
+	}
+
+	client = ione.NewIONeClient(host, user + ":" + pass)
 }

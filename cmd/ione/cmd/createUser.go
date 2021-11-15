@@ -17,20 +17,36 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
 
-// testCmd represents the test command
-var testCmd = &cobra.Command{
-	Use:   "test",
-	Short: "Test connection",
+// createUserCmd represents the createUser command
+var createUserCmd = &cobra.Command{
+	Use:   "create [login] [password] [group ID]",
+	Short: "Create User",
+	Args: cobra.MinimumNArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("IONe resolved: %t\n", client.Ping())
+		fmt.Println("createUser called")
+		login  := args[0]
+		passwd := args[1]
+		group, err := strconv.Atoi(args[2])
+
+		if err != nil {
+			return err
+		}
+
+		user, err := client.UserCreate(login, passwd, int64(group))
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("User '%s' created. ID: %d\n", login, user)
 		return nil
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(testCmd)
+	userCmd.AddCommand(createUserCmd)
 }

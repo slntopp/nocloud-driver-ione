@@ -92,3 +92,16 @@ func (ione *IONe) Ping() bool {
 	}
 	return r.Response.(string) == "PONG"
 }
+
+func (ione *IONe) UserCreate(login, passwd string, group int64) (int64, error) {
+	r, err := ione.Call(IONeRequest{
+		Method: "ione/UserCreate",
+		Params: []interface{}{
+			login, passwd, group,
+		},
+	})
+	if err != nil {
+		return -1, err
+	}
+	return int64(r.Response.(float64)), nil
+}
