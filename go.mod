@@ -3,11 +3,13 @@ module github.com/slntopp/nocloud-driver-ione
 go 1.17
 
 require (
-	github.com/slntopp/nocloud v0.0.0-20211115170915-2446d5501dce
+	github.com/gofrs/uuid v4.1.0+incompatible
+	github.com/slntopp/nocloud v0.0.0-20211115180531-f149fb240da3
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
 	go.uber.org/zap v1.19.1
 	google.golang.org/grpc v1.42.0
+	google.golang.org/protobuf v1.27.1
 )
 
 require (
@@ -29,7 +31,6 @@ require (
 	golang.org/x/sys v0.0.0-20211113001501-0c823b97ae02 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20211115160612-a5da7257a6f7 // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/ini.v1 v1.64.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
