@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
-	pb "github.com/slntopp/nocloud/pkg/drivers/instance/proto"
+	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 )
 
 var (
@@ -58,7 +58,7 @@ func main() {
 
 	s := grpc.NewServer()
 	server.SetDriverName(type_key)
-	srv := server.NewDriverServiceServer()
+	srv := server.NewDriverServiceServer(log.Named("IONe Driver"))
 
 	pb.RegisterDriverServiceServer(s, srv)
 

@@ -18,7 +18,7 @@ package server
 import (
 	"context"
 
-	pb "github.com/slntopp/nocloud/pkg/drivers/instance/proto"
+	"go.uber.org/zap"
 )
 
 var DRIVER_NAME string
@@ -29,10 +29,11 @@ func SetDriverName(name string) {
 
 type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
+	log *zap.Logger
 }
 
-func NewDriverServiceServer() *DriverServiceServer {
-	return &DriverServiceServer{}
+func NewDriverServiceServer(log *zap.Logger) *DriverServiceServer {
+	return &DriverServiceServer{log: log}
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
