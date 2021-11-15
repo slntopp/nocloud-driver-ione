@@ -57,7 +57,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	server.SetDriverName(type_key)
+	server.SetDriverType(type_key)
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"))
 
 	pb.RegisterDriverServiceServer(s, srv)

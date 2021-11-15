@@ -23,10 +23,10 @@ import (
 	"go.uber.org/zap"
 )
 
-var DRIVER_NAME string
+var DRIVER_TYPE string
 
-func SetDriverName(name string) {
-	DRIVER_NAME = name
+func SetDriverType(_type string) {
+	DRIVER_TYPE = _type
 }
 
 type DriverServiceServer struct {
@@ -39,7 +39,7 @@ func NewDriverServiceServer(log *zap.Logger) *DriverServiceServer {
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
-	return &pb.GetTypeResponse{Type: DRIVER_NAME}, nil
+	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
 }
 
 func (s *DriverServiceServer) ValidateConfigSyntax(ctx context.Context, request *instpb.ValidateInstancesGroupConfigRequest) (*instpb.ValidateInstancesGroupConfigResponse, error) {
