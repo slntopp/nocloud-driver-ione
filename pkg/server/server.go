@@ -91,6 +91,12 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 
 	DATA["user_id"] = structpb.NewNumberValue(float64(oneID))
 
+	// Reserve public addresses
+
+	for _, instance := range igroup.GetInstances() {
+		client.TemplateInstantiate(instance)
+	}
+
 	return &pb.DeployResponse{
 		Group: igroup, GroupData: DATA,
 	}, nil
