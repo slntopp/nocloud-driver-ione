@@ -55,11 +55,11 @@ func NewIONeClient(host, cred string, vars map[string]*sppb.Var) (*IONe) {
 	return &IONe{host, cred, auth, vars, http.Client{}}
 }
 
-func (ione *IONe) Call(req IONeRequest) (r *IONeResponse, err error) {
-	body, _ := json.Marshal(req)
+func (ione *IONe) Call(method string, params ...interface{}) (r *IONeResponse, err error) {
+	body, _ := json.Marshal(IONeRequest{Params: params})
 	reqBody := bytes.NewBuffer(body)
 
-	url := fmt.Sprintf("%s/%s", ione.Host, req.Method)
+	url := fmt.Sprintf("%s/%s", ione.Host, method)
 	request, err := http.NewRequest("POST", url, reqBody)
 	if err != nil {
 		return nil, err
@@ -89,10 +89,7 @@ func (ione *IONe) Call(req IONeRequest) (r *IONeResponse, err error) {
 
 
 func (ione *IONe) Ping() bool {
-	r, err := ione.Call(IONeRequest{
-		Method: "ione/Test",
-		Params: []interface{}{"PING"},
-	})
+	r, err := ione.Call("ione/Test","PING")
 	if err != nil {
 		return false
 	}
@@ -100,12 +97,7 @@ func (ione *IONe) Ping() bool {
 }
 
 func (ione *IONe) UserCreate(login, passwd string, group int64) (int64, error) {
-	r, err := ione.Call(IONeRequest{
-		Method: "ione/UserCreate",
-		Params: []interface{}{
-			login, passwd, group,
-		},
-	})
+	r, err := ione.Call("ione/UserCreate", login, passwd, group)
 	if err != nil {
 		return -1, err
 	}
@@ -113,10 +105,7 @@ func (ione *IONe) UserCreate(login, passwd string, group int64) (int64, error) {
 }
 
 func (ione *IONe) UserDelete(id int64) (error) {
-	r, err := ione.Call(IONeRequest{
-		Method: "ione/Delete",
-		Params: []interface{}{id},
-	})
+	r, err := ione.Call("ione/Delete", id)
 	if err != nil {
 		return err
 	}
@@ -132,9 +121,7 @@ type VNet struct {
 }
 
 func (ione *IONe) GetUserNetworks() (res []VNet, err error) {
-	r, err := ione.Call(IONeRequest{
-		Method: "ione/get_user_vnets",
-	})
+	r, err := ione.Call("ione/get_user_vnets")
 	if err != nil {
 		return nil, err
 	}
