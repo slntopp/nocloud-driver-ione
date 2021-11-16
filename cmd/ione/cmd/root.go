@@ -92,5 +92,5 @@ func initConfig() {
 		panic("Hostname, Username or Password not given")
 	}
 
-	client = ione.NewIONeClient(host, user + ":" + pass)
+	client = ione.NewIONeClient(host, user + ":" + pass, nil)
 }
