@@ -105,3 +105,17 @@ func (ione *IONe) UserCreate(login, passwd string, group int64) (int64, error) {
 	}
 	return int64(r.Response.(float64)), nil
 }
+
+func (ione *IONe) UserDelete(id int64) (error) {
+	r, err := ione.Call(IONeRequest{
+		Method: "ione/Delete",
+		Params: []interface{}{id},
+	})
+	if err != nil {
+		return err
+	}
+	if r.Error != "" {
+		return errors.New(r.Error)
+	}
+	return nil
+}
