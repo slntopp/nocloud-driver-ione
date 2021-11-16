@@ -24,12 +24,18 @@ import (
 
 	"encoding/base64"
 	"encoding/json"
+
+	"github.com/OpenNebula/goca"
+	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 )
 
 type IONe struct {
 	Host string
 	Credentials string
 	Authorization string
+
+	Vars map[string]*sppb.Var
 
 	Client http.Client
 }
@@ -44,9 +50,9 @@ type IONeResponse struct {
 	Error string `json:"error"`
 }
 
-func NewIONeClient(host, cred string) (*IONe) {
+func NewIONeClient(host, cred string, vars map[string]*sppb.Var) (*IONe) {
 	auth := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(cred)))
-	return &IONe{host, cred, auth, http.Client{}}
+	return &IONe{host, cred, auth, vars, http.Client{}}
 }
 
 func (ione *IONe) Call(req IONeRequest) (r *IONeResponse, err error) {
@@ -118,4 +124,41 @@ func (ione *IONe) UserDelete(id int64) (error) {
 		return errors.New(r.Error)
 	}
 	return nil
+}
+
+func (ione *IONe) TemplateInstantiate(instance *instpb.Instance) (int64, error) {
+	resources := instance.GetResources()
+	tmpl := goca.NewTemplateBuilder()
+
+	if resources["vcpu"] == nil {
+		tmpl.AddValue("vcpu", 1)
+	} else {
+		tmpl.AddValue("vcpu", resources["vcpu"].GetNumberValue())
+	}
+
+	if resources["cpu"] == nil {
+		return 0, errors.New("Amount of CPU is not given")
+	}
+	tmpl.AddValue("cpu", resources["cpu"].GetNumberValue())
+
+	if resources["ram"] == nil {
+		return 0, errors.New("Amount of RAM is not given")
+	}
+	tmpl.AddValue("ram", resources["ram"].GetNumberValue())
+
+	tmpl.AddValue("SCHED_REQUIREMENTS", ione.Vars["sched"].GetValue()["default"])
+	
+	datastores := ione.Vars["sched_ds"].GetValue()
+	ds_type := "default"
+	if resources["drive_type"] != nil {
+		ds_type = resources["drive_type"].GetStringValue()
+	}
+	
+	if datastores[ds_type] != nil {
+		tmpl.AddValue("SCHED_DS_REQUIREMENTS", datastores[ds_type].GetStringValue())
+	} else {
+		tmpl.AddValue("SCHED_DS_REQUIREMENTS", datastores["default"].GetStringValue())
+	}
+
+	return 0, nil
 }

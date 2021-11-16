@@ -80,7 +80,7 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 	cred := secrets["cred"].GetStringValue()
 	group := secrets["group"].GetNumberValue()
 
-	client := ione.NewIONeClient(host, cred)
+	client := ione.NewIONeClient(host, cred, sp.GetVars())
 	oneID, err := client.UserCreate(id.String(), userPass, int64(group))
 	if err != nil {
 		s.log.Debug("Couldn't create OpenNebula user",

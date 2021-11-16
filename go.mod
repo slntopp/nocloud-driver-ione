@@ -3,8 +3,9 @@ module github.com/slntopp/nocloud-driver-ione
 go 1.17
 
 require (
+	github.com/OpenNebula/goca v0.0.0-20200804130700-01b992cfbddd
 	github.com/gofrs/uuid v4.1.0+incompatible
-	github.com/slntopp/nocloud v0.0.0-20211116190345-9e08775e55c7
+	github.com/slntopp/nocloud v0.0.0-20211116195257-e397adef2e88
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
 	go.uber.org/zap v1.19.1
@@ -17,6 +18,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/kolo/xmlrpc v0.0.0-20201022064351-38db28db192b // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mitchellh/mapstructure v1.4.2 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
@@ -32,5 +34,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20211115160612-a5da7257a6f7 // indirect
 	gopkg.in/ini.v1 v1.64.0 // indirect
+	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
