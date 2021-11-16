@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/gofrs/uuid v4.1.0+incompatible
-	github.com/slntopp/nocloud v0.0.0-20211115203413-cead8671cb19
+	github.com/slntopp/nocloud v0.0.0-20211116190345-9e08775e55c7
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
 	go.uber.org/zap v1.19.1
