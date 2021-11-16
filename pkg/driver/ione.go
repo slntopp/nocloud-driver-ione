@@ -126,6 +126,35 @@ func (ione *IONe) UserDelete(id int64) (error) {
 	return nil
 }
 
+type VNet struct {
+	Id string
+	Type string
+}
+
+func (ione *IONe) GetUserNetworks() (res []VNet, err error) {
+	r, err := ione.Call(IONeRequest{
+		Method: "ione/get_user_vnets",
+	})
+	if err != nil {
+		return nil, err
+	}
+	if r.Error != "" {
+		return nil, errors.New(r.Error)
+	}
+	pool := r.Response.([]interface{})
+
+	for _, vnet_obj := range pool {
+		ivnet := vnet_obj.(map[string]interface{})["VNET"].(map[string]interface{})
+		vnet := VNet{Id: ivnet["ID"].(string)}
+
+		vnet_tmpl := ivnet["TEMPLATE"].(map[string]interface{})
+		vnet.Type = vnet_tmpl["TYPE"].(string)
+		
+		res = append(res, vnet)
+	}
+	return res, nil
+}
+
 func (ione *IONe) TemplateInstantiate(instance *instpb.Instance) (int64, error) {
 	resources := instance.GetResources()
 	tmpl := goca.NewTemplateBuilder()
