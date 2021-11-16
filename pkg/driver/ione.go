@@ -142,7 +142,25 @@ func (ione *IONe) GetUserNetworks() (res []VNet, err error) {
 	return res, nil
 }
 
-func (ione *IONe) TemplateInstantiate(instance *instpb.Instance) (int64, error) {
+func (ione *IONe) ReservePublicIP(user, amount int64) (vn string, err error) {
+	r, err := ione.Call(
+		"ione/reserve_public_ip",
+		map[string]int64{
+			"u": user, "n": amount,
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+	if r.Error != "" {
+		return "", errors.New(r.Error)
+	}
+
+	fmt.Println(r)
+
+	return "", nil
+}
+
 	resources := instance.GetResources()
 	tmpl := goca.NewTemplateBuilder()
 

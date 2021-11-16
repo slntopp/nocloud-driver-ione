@@ -91,10 +91,20 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 
 	DATA["user_id"] = structpb.NewNumberValue(float64(oneID))
 
-	// Reserve public addresses
+	resources := igroup.GetResources()
+	var public_ips_amount int64 = 0
+	if resources["ips_public"] != nil {
+		public_ips_amount = int64(resources["ips_public"].GetNumberValue())
+	}
 
-	for _, instance := range igroup.GetInstances() {
-		client.TemplateInstantiate(instance)
+	if public_ips_amount > 0 {
+		public_ips_pool_id, err := client.ReservePublicIP(oneID, public_ips_amount)
+		if err != nil {
+			s.log.Debug("Couldn't reserve Public IP addresses",
+			zap.Error(err), zap.Int64("amount", public_ips_amount), zap.Int64("user", oneID))
+			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
+		}
+		DATA["public_vn"] = structpb.NewStringValue(public_ips_pool_id)
 	}
 
 	return &pb.DeployResponse{
