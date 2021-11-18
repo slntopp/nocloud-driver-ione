@@ -25,9 +25,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/OpenNebula/goca"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
+	"github.com/gofrs/uuid"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type IONe struct {
@@ -42,6 +46,7 @@ type IONe struct {
 
 type IONeRequest struct {
 	Method string
+	OID int `json:"oid,omitempty"`
 	Params []interface{} `json:"params"`
 }
 
@@ -166,38 +171,82 @@ func (ione *IONe) ReservePublicIP(user, amount float64) (vn float64, err error) 
 	return r.Response.(float64), nil
 }
 
+func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[string]*structpb.Value) (map[string]*structpb.Value, error) {
 	resources := instance.GetResources()
-	tmpl := goca.NewTemplateBuilder()
+	tmpl := vm.NewTemplate()
+	data := make(map[string]*structpb.Value)
 
-	if resources["vcpu"] == nil {
-		tmpl.AddValue("vcpu", 1)
-	} else {
-		tmpl.AddValue("vcpu", resources["vcpu"].GetNumberValue())
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, errors.New("Couldn't generate UUID")
 	}
+	vmname := id.String()
+	data["vm_name"] = structpb.NewStringValue(vmname)
 
+	// Set VCPU, is 1 by default
+	vcpu := 1
+	if resources["vcpu"] != nil {
+		vcpu = int(resources["vcpu"].GetNumberValue())
+	}
+	tmpl.VCPU(vcpu)
+
+	// Set CPU, must be provided by instance resources config
 	if resources["cpu"] == nil {
-		return 0, errors.New("Amount of CPU is not given")
+		return data, errors.New("Amount of CPU is not given")
 	}
-	tmpl.AddValue("cpu", resources["cpu"].GetNumberValue())
+	tmpl.CPU(resources["cpu"].GetNumberValue())
 
+	// Set RAM, must be provided by instance resources config
 	if resources["ram"] == nil {
-		return 0, errors.New("Amount of RAM is not given")
+		return data, errors.New("Amount of RAM is not given")
 	}
-	tmpl.AddValue("ram", resources["ram"].GetNumberValue())
+	tmpl.Memory(int(resources["ram"].GetNumberValue()))
 
-	tmpl.AddValue("SCHED_REQUIREMENTS", ione.Vars["sched"].GetValue()["default"])
-	
+	// Set Host(s) to deploy Instance to
+	tmpl.Placement(keys.SchedRequirements, 
+		ione.Vars["sched"].GetValue()["default"].GetStringValue(),
+	)
+
+	// Getting datastores types(like SSD, HDD, etc)
 	datastores := ione.Vars["sched_ds"].GetValue()
 	ds_type := "default"
 	if resources["drive_type"] != nil {
 		ds_type = resources["drive_type"].GetStringValue()
 	}
-	
+	// Getting Datastores scheduler requirements
+	ds_req := datastores["default"].GetStringValue()
 	if datastores[ds_type] != nil {
-		tmpl.AddValue("SCHED_DS_REQUIREMENTS", datastores[ds_type].GetStringValue())
-	} else {
-		tmpl.AddValue("SCHED_DS_REQUIREMENTS", datastores["default"].GetStringValue())
+		ds_req = datastores[ds_type].GetStringValue()
+	}
+	// Setting Datastore(s) to deploy Instance to
+	tmpl.Placement(keys.SchedDSRequirements, ds_req)
+
+	public_vn := int(group_data["public_vn"].GetNumberValue())
+	for i := 0; i < int(resources["ips_public"].GetNumberValue()); i++ {
+		nic := tmpl.AddNIC()
+		nic.Add(shared.NetworkID, public_vn)
 	}
 
-	return 0, nil
+
+	conf := instance.GetConfig()
+	var template_id int
+	if conf["template_id"] != nil {
+		template_id = int(conf["template_id"].GetNumberValue())
+	} else {
+		return nil, errors.New("Template ID isn't given")
+	}
+
+	r, err := ione.ONeCall("one.t.instantiate", template_id, vmname, false, tmpl.String())
+	if err != nil {
+		return nil, err
+	}
+
+	switch r.Response.(type) {
+	case map[string]interface{}:
+		return nil, errors.New(r.Response.(map[string]interface{})["error"].(string))
+	}
+	vm_id := r.Response.(float64)
+	data["vm_id"] = structpb.NewNumberValue(vm_id)
+
+	return data, nil
 }
