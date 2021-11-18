@@ -172,14 +172,14 @@ func (ione *IONe) ReservePublicIP(user, amount float64) (vn float64, err error) 
 	return r.Response.(float64), nil
 }
 
-func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[string]*structpb.Value) (map[string]*structpb.Value, error) {
+func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[string]*structpb.Value) (error) {
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
 	data := make(map[string]*structpb.Value)
 
 	id, err := uuid.NewV4()
 	if err != nil {
-		return nil, errors.New("Couldn't generate UUID")
+		return errors.New("Couldn't generate UUID")
 	}
 	vmname := id.String()
 	data["vm_name"] = structpb.NewStringValue(vmname)
@@ -193,13 +193,13 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 
 	// Set CPU, must be provided by instance resources config
 	if resources["cpu"] == nil {
-		return data, errors.New("Amount of CPU is not given")
+		return errors.New("Amount of CPU is not given")
 	}
 	tmpl.CPU(resources["cpu"].GetNumberValue())
 
 	// Set RAM, must be provided by instance resources config
 	if resources["ram"] == nil {
-		return data, errors.New("Amount of RAM is not given")
+		return errors.New("Amount of RAM is not given")
 	}
 	tmpl.Memory(int(resources["ram"].GetNumberValue()))
 
@@ -234,20 +234,21 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 	if conf["template_id"] != nil {
 		template_id = int(conf["template_id"].GetNumberValue())
 	} else {
-		return nil, errors.New("Template ID isn't given")
+		return errors.New("Template ID isn't given")
 	}
 
 	r, err := ione.ONeCall("one.t.instantiate", template_id, vmname, false, tmpl.String())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	switch r.Response.(type) {
 	case map[string]interface{}:
-		return nil, errors.New(r.Response.(map[string]interface{})["error"].(string))
+		return errors.New(r.Response.(map[string]interface{})["error"].(string))
 	}
 	vm_id := r.Response.(float64)
 	data["vm_id"] = structpb.NewNumberValue(vm_id)
 
-	return data, nil
+	instance.Data = data
+	return nil
 }
