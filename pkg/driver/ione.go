@@ -156,9 +156,7 @@ func (ione *IONe) ReservePublicIP(user, amount int64) (vn string, err error) {
 		return "", errors.New(r.Error)
 	}
 
-	fmt.Println(r)
-
-	return "", nil
+	return r.Response.(string), nil
 }
 
 	resources := instance.GetResources()
