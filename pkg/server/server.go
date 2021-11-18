@@ -54,42 +54,34 @@ func (s *DriverServiceServer) ValidateConfigSyntax(ctx context.Context, request 
 	return &instpb.ValidateInstancesGroupConfigResponse{Result: true}, nil
 }
 
-func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployRequest) (*pb.DeployResponse, error) {
-	igroup := input.GetGroup()
-	sp := input.GetServicesProvider()
-	s.log.Debug("Deploy request received", zap.Any("instances_group", igroup))
-	
-	if igroup.GetType() != DRIVER_TYPE {
-		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
-	}
-
+func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb.InstancesGroup, client *ione.IONe, group float64) (map[string]*structpb.Value, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Couldn't generate UUID")
 	}
 
-	DATA := make(map[string]*structpb.Value, 2)
-	DATA["username"] = structpb.NewStringValue(id.String())
+	data := igroup.GetData()
+	if data["username"] == nil {
+		data["username"] = structpb.NewStringValue(id.String())
+	}
+	username := data["username"].GetStringValue()
 
 	hasher := sha256.New()
-    hasher.Write([]byte(id.String() + time.Now().String()))
+    hasher.Write([]byte(username + time.Now().String()))
     userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
-	
-	secrets := sp.GetSecrets()
-	host := secrets["host"].GetStringValue()
-	cred := secrets["cred"].GetStringValue()
-	group := secrets["group"].GetNumberValue()
 
-	client := ione.NewIONeClient(host, cred, sp.GetVars())
-	oneID, err := client.UserCreate(id.String(), userPass, int64(group))
-	if err != nil {
-		s.log.Debug("Couldn't create OpenNebula user",
-			zap.Error(err), zap.String("login", id.String()),
+	if data["user_id"] == nil {
+		oneID, err := client.UserCreate(username, userPass, int64(group))
+		if err != nil {
+			s.log.Debug("Couldn't create OpenNebula user",
+			zap.Error(err), zap.String("login", username),
 			zap.String("pass", userPass), zap.Int64("group", int64(group)) )
-		return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
+			return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
+		}
+		
+		data["user_id"] = structpb.NewNumberValue(float64(oneID))
 	}
-
-	DATA["user_id"] = structpb.NewNumberValue(float64(oneID))
+	oneID := int64(data["user_id"].GetNumberValue())
 
 	resources := igroup.GetResources()
 	var public_ips_amount int64 = 0
@@ -104,10 +96,45 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 			zap.Error(err), zap.Int64("amount", public_ips_amount), zap.Int64("user", oneID))
 			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
 		}
-		DATA["public_vn"] = structpb.NewStringValue(public_ips_pool_id)
+		data["public_vn"] = structpb.NewNumberValue(public_ips_pool_id)
 	}
 
+	return data, nil
+}
+
+func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployRequest) (*pb.DeployResponse, error) {
+	igroup := input.GetGroup()
+	sp := input.GetServicesProvider()
+	s.log.Debug("Deploy request received", zap.Any("instances_group", igroup))
+	
+	if igroup.GetType() != DRIVER_TYPE {
+		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
+	}
+
+	secrets := sp.GetSecrets()
+	host := secrets["host"].GetStringValue()
+	cred := secrets["cred"].GetStringValue()
+	group := secrets["group"].GetNumberValue()
+
+	client := ione.NewIONeClient(host, cred, sp.GetVars())
+
+	
+	data := igroup.GetData()
+	if data == nil {
+		data = make(map[string]*structpb.Value)
+	}
+
+	data, err := s.PrepareService(ctx, igroup, client, group)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, instance := range igroup.GetInstances() {
+		client.TemplateInstantiate(instance)
+	}
+
+	igroup.Data = data
 	return &pb.DeployResponse{
-		Group: igroup, GroupData: DATA,
+		Group: igroup,
 	}, nil
 }
