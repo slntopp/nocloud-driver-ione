@@ -55,8 +55,8 @@ func NewIONeClient(host, cred string, vars map[string]*sppb.Var) (*IONe) {
 	return &IONe{host, cred, auth, vars, http.Client{}}
 }
 
-func (ione *IONe) Call(method string, params ...interface{}) (r *IONeResponse, err error) {
-	body, _ := json.Marshal(IONeRequest{Params: params})
+func (ione *IONe) Invoke(method string, req IONeRequest) (r *IONeResponse, err error) {
+	body, _ := json.Marshal(req)
 	reqBody := bytes.NewBuffer(body)
 
 	url := fmt.Sprintf("%s/%s", ione.Host, method)
@@ -87,6 +87,13 @@ func (ione *IONe) Call(method string, params ...interface{}) (r *IONeResponse, e
 	return r, nil
 }
 
+func (ione *IONe) Call(method string, params ...interface{}) (r *IONeResponse, err error) {
+	return ione.Invoke(method, IONeRequest{Params: params})
+}
+
+func (ione *IONe) ONeCall(method string, oid int, params ...interface{}) (r *IONeResponse, err error) {
+	return ione.Invoke(method, IONeRequest{OID: oid, Params: params})
+}
 
 func (ione *IONe) Ping() bool {
 	r, err := ione.Call("ione/Test","PING")
