@@ -84,12 +84,17 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 	oneID := data["user_id"].GetNumberValue()
 
 	resources := igroup.GetResources()
-	var public_ips_amount int64 = 0
+	var public_ips_amount float64 = 0
 	if resources["ips_public"] != nil {
-		public_ips_amount = int64(resources["ips_public"].GetNumberValue())
+		public_ips_amount = resources["ips_public"].GetNumberValue()
 	}
 
-	if public_ips_amount > 0 {
+	var free float64 = 0
+	if data["public_ips_free"] != nil {
+		free = data["public_ips_free"].GetNumberValue()
+	}
+	if public_ips_amount > 0 && public_ips_amount > free {
+		public_ips_amount -= free
 		public_ips_pool_id, err := client.ReservePublicIP(oneID, public_ips_amount)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Public IP addresses",
@@ -97,6 +102,13 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
 		}
 		data["public_vn"] = structpb.NewNumberValue(public_ips_pool_id)
+		total := float64(public_ips_amount)
+		if data["public_ips_total"] != nil {
+			total += data["public_ips_total"].GetNumberValue()
+		}
+		data["public_ips_total"] = structpb.NewNumberValue(total)
+
+		data["public_ips_free"] = structpb.NewNumberValue(free + public_ips_amount)
 	}
 
 	return data, nil
@@ -131,7 +143,7 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 	}
 
 	for _, instance := range igroup.GetInstances() {
-		client.TemplateInstantiate(instance)
+		client.TemplateInstantiate(instance, data)
 	}
 
 	igroup.Data = data
