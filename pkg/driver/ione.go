@@ -142,10 +142,10 @@ func (ione *IONe) GetUserNetworks() (res []VNet, err error) {
 	return res, nil
 }
 
-func (ione *IONe) ReservePublicIP(user, amount int64) (vn float64, err error) {
+func (ione *IONe) ReservePublicIP(user, amount float64) (vn float64, err error) {
 	r, err := ione.Call(
 		"ione/reserve_public_ip",
-		map[string]int64{
+		map[string]float64{
 			"u": user, "n": amount,
 		},
 	)

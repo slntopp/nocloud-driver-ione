@@ -81,7 +81,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 		
 		data["user_id"] = structpb.NewNumberValue(float64(oneID))
 	}
-	oneID := int64(data["user_id"].GetNumberValue())
+	oneID := data["user_id"].GetNumberValue()
 
 	resources := igroup.GetResources()
 	var public_ips_amount int64 = 0
@@ -93,7 +93,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 		public_ips_pool_id, err := client.ReservePublicIP(oneID, public_ips_amount)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Public IP addresses",
-			zap.Error(err), zap.Int64("amount", public_ips_amount), zap.Int64("user", oneID))
+			zap.Error(err), zap.Float64("amount", public_ips_amount), zap.Float64("user", oneID))
 			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
 		}
 		data["public_vn"] = structpb.NewNumberValue(public_ips_pool_id)
