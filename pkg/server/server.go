@@ -122,6 +122,7 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 	data := igroup.GetData()
 	if data == nil {
 		data = make(map[string]*structpb.Value)
+		igroup.Data = data
 	}
 
 	data, err := s.PrepareService(ctx, igroup, client, group)
