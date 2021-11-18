@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"encoding/base64"
 	"encoding/json"
@@ -202,10 +203,10 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 	}
 	tmpl.Memory(int(resources["ram"].GetNumberValue()))
 
+	req := ione.Vars["sched"].GetValue()["default"].GetStringValue()
+	req = strings.ReplaceAll(req, "\"", "\\\"")
 	// Set Host(s) to deploy Instance to
-	tmpl.Placement(keys.SchedRequirements, 
-		ione.Vars["sched"].GetValue()["default"].GetStringValue(),
-	)
+	tmpl.Placement(keys.SchedRequirements, req)
 
 	// Getting datastores types(like SSD, HDD, etc)
 	datastores := ione.Vars["sched_ds"].GetValue()
@@ -218,6 +219,7 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 	if datastores[ds_type] != nil {
 		ds_req = datastores[ds_type].GetStringValue()
 	}
+	ds_req = strings.ReplaceAll(ds_req, "\"", "\\\"")
 	// Setting Datastore(s) to deploy Instance to
 	tmpl.Placement(keys.SchedDSRequirements, ds_req)
 
@@ -226,7 +228,6 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 		nic := tmpl.AddNIC()
 		nic.Add(shared.NetworkID, public_vn)
 	}
-
 
 	conf := instance.GetConfig()
 	var template_id int
