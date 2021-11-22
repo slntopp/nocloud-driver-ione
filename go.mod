@@ -3,9 +3,9 @@ module github.com/slntopp/nocloud-driver-ione
 go 1.17
 
 require (
-	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20211118114100-ab86d01b9edf
+	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20211122121210-07be714219af
 	github.com/gofrs/uuid v4.1.0+incompatible
-	github.com/slntopp/nocloud v0.0.0-20211122114419-c98de8f5760e
+	github.com/slntopp/nocloud v0.0.0-20211122163138-838bfd9dab9a
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
 	go.uber.org/zap v1.19.1
@@ -28,10 +28,10 @@ require (
 	github.com/subosito/gotenv v1.2.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
-	golang.org/x/sys v0.0.0-20211113001501-0c823b97ae02 // indirect
+	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4 // indirect
+	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	google.golang.org/genproto v0.0.0-20211115160612-a5da7257a6f7 // indirect
+	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
 	gopkg.in/ini.v1 v1.64.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
