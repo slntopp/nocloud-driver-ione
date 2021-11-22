@@ -25,10 +25,14 @@ import (
 
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/group"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
+
 	"github.com/gofrs/uuid"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
@@ -251,4 +255,48 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 
 	instance.Data = data
 	return nil
+}
+
+func (ione *IONe) GetUser(id int64) (res *user.UserShort, err error) {
+	r, err := ione.ONeCall(
+		"one.u.to_xml!", id)
+	if err != nil {
+		return nil, err
+	}
+	if r.Error != "" {
+		return nil, errors.New(r.Error)
+	}
+
+	switch r.Response.(type) {
+	case string:
+		xmlData := r.Response.(string)
+		xml.Unmarshal([]byte(xmlData), &res)
+		return res, nil
+	case map[string]interface{}:
+		r := r.Response.(map[string]interface{})
+		return nil, errors.New(r["error"].(string))
+	}
+	return nil, errors.New("Unexpected error while getting user")
+}
+
+func (ione *IONe) GetGroup(id int64) (res *group.GroupShort, err error) {
+	r, err := ione.ONeCall(
+		"one.g.to_xml!", id)
+	if err != nil {
+		return nil, err
+	}
+	if r.Error != "" {
+		return nil, errors.New(r.Error)
+	}
+
+	switch r.Response.(type) {
+	case string:
+		xmlData := r.Response.(string)
+		xml.Unmarshal([]byte(xmlData), &res)
+		return res, nil
+	case map[string]interface{}:
+		r := r.Response.(map[string]interface{})
+		return nil, errors.New(r["error"].(string))
+	}
+	return nil, errors.New("Unexpected error while getting group")
 }
