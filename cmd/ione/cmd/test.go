@@ -26,7 +26,8 @@ var testCmd = &cobra.Command{
 	Use:   "test",
 	Short: "Test connection",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("IONe resolved: %t\n", client.Ping())
+		r, _ := client.Ping()
+		fmt.Printf("IONe resolved: %t\n", r)
 		return nil
 	},
 }

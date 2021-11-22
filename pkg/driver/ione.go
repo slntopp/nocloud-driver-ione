@@ -105,12 +105,12 @@ func (ione *IONe) ONeCall(method string, oid int64, params ...interface{}) (r *I
 	return ione.Invoke(method, IONeRequest{OID: oid, Params: params})
 }
 
-func (ione *IONe) Ping() bool {
-	r, err := ione.Call("ione/Test","PING")
+func (ione *IONe) Ping() (bool, error) {
+	r, err := ione.Call("ione/Test", "PING")
 	if err != nil {
-		return false
+		return false, err
 	}
-	return r.Response.(string) == "PONG"
+	return r.Response.(string) == "PONG", nil
 }
 
 func (ione *IONe) UserCreate(login, passwd string, group int64) (int64, error) {
