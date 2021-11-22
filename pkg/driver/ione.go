@@ -47,7 +47,7 @@ type IONe struct {
 
 type IONeRequest struct {
 	Method string
-	OID int `json:"oid,omitempty"`
+	OID int64 `json:"oid,omitempty"`
 	Params []interface{} `json:"params"`
 }
 
@@ -97,7 +97,7 @@ func (ione *IONe) Call(method string, params ...interface{}) (r *IONeResponse, e
 	return ione.Invoke(method, IONeRequest{Params: params})
 }
 
-func (ione *IONe) ONeCall(method string, oid int, params ...interface{}) (r *IONeResponse, err error) {
+func (ione *IONe) ONeCall(method string, oid int64, params ...interface{}) (r *IONeResponse, err error) {
 	return ione.Invoke(method, IONeRequest{OID: oid, Params: params})
 }
 
@@ -230,9 +230,9 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 	}
 
 	conf := instance.GetConfig()
-	var template_id int
+	var template_id int64
 	if conf["template_id"] != nil {
-		template_id = int(conf["template_id"].GetNumberValue())
+		template_id = int64(conf["template_id"].GetNumberValue())
 	} else {
 		return errors.New("Template ID isn't given")
 	}
