@@ -64,9 +64,12 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, sp 
 	group := secrets["group"].GetNumberValue()
 
 	client := ione.NewIONeClient(host, cred, sp.GetVars())
-	
-	if !client.Ping() {
-		return &sppb.TestResponse{Result: false, Error: "Ping didn't go through, check host and credentials"}, nil
+	pong, err := client.Ping()
+	if err != nil {
+		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Ping didn't go through, error: %s", err.Error())}, nil
+	}
+	if !pong {
+		return &sppb.TestResponse{Result: false, Error: "Ping didn't go through, check host, credentials and if IONe is running"}, nil
 	}
 
 	me, err := client.GetUser(-1)
