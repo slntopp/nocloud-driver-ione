@@ -19,12 +19,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"time"
 
 	"github.com/gofrs/uuid"
 	ione "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -52,6 +54,39 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 
 func (s *DriverServiceServer) ValidateConfigSyntax(ctx context.Context, request *instpb.ValidateInstancesGroupConfigRequest) (*instpb.ValidateInstancesGroupConfigResponse, error) {
 	return &instpb.ValidateInstancesGroupConfigResponse{Result: true}, nil
+}
+
+func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, sp *sppb.ServicesProvider) (res *sppb.TestResponse, err error) {
+	s.log.Debug("TestServiceProviderConfig request received", zap.Any("sp", sp))
+	secrets := sp.GetSecrets()
+	host  := secrets["host"].GetStringValue()
+	cred  := secrets["cred"].GetStringValue()
+	group := secrets["group"].GetNumberValue()
+
+	client := ione.NewIONeClient(host, cred, sp.GetVars())
+	
+	if !client.Ping() {
+		return &sppb.TestResponse{Result: false, Error: "Ping didn't go through, check host and credentials"}, nil
+	}
+
+	me, err := client.GetUser(-1)
+	if err != nil {
+		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Can't get account: %s", err.Error())}, nil
+	}
+	isAdmin := false
+	for _, g := range me.Groups.ID {
+		isAdmin = isAdmin || g == 0
+	}
+	if !isAdmin {
+		return &sppb.TestResponse{Result: false, Error: "User isn't admin(oneadmin group member)"}, nil
+	}
+
+	_, err = client.GetGroup(int64(group))
+	if err != nil {
+		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Can't get group: %s", err.Error())}, nil
+	}
+
+	return &sppb.TestResponse{Result: true}, nil
 }
 
 func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb.InstancesGroup, client *ione.IONe, group float64) (map[string]*structpb.Value, error) {
