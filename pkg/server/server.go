@@ -52,8 +52,8 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
 }
 
-func (s *DriverServiceServer) TestServiceConfig(ctx context.Context, request *instpb.ValidateInstancesGroupConfigRequest) (*instpb.ValidateInstancesGroupConfigResponse, error) {
-	return &instpb.ValidateInstancesGroupConfigResponse{Result: true}, nil
+func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *instpb.TestInstancesGroupConfigRequest) (*instpb.TestInstancesGroupConfigResponse, error) {
+	return &instpb.TestInstancesGroupConfigResponse{Result: true}, nil
 }
 
 func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, sp *sppb.ServicesProvider) (res *sppb.TestResponse, err error) {
