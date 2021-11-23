@@ -53,6 +53,15 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 }
 
 func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *instpb.TestInstancesGroupConfigRequest) (*instpb.TestInstancesGroupConfigResponse, error) {
+	s.log.Debug("TestInstancesGroupConfig request received", zap.Any("request", request))
+	igroup := request.GetGroup()
+	if igroup.GetType() != DRIVER_TYPE {
+		Errors := []*instpb.TestInstancesGroupConfigError{
+			{Error: fmt.Sprintf("Group type(%s) isn't matching Driver type(%s)", igroup.GetType(), DRIVER_TYPE)},
+		}
+		return &instpb.TestInstancesGroupConfigResponse{Result: false, Errors: Errors}, nil
+	}
+
 	return &instpb.TestInstancesGroupConfigResponse{Result: true}, nil
 }
 
