@@ -1,0 +1,21 @@
+service:
+  version: "1"
+  title: "IONe VDC"
+  context:
+  instances_groups:
+    demo-ione:
+      type: ione
+      resources:
+        ips_public: 1
+      instances:
+        - title: master-vm
+          config:
+            template_id: 4
+            password: sup3rS3cr3tP4$$W0rD
+          resources:
+            cpu: 1
+            ram: 1024
+            drive_type: SSD
+            driver_size: 10000
+            ips_public: 1
+            ips_private: 1
