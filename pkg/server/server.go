@@ -52,7 +52,7 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
 }
 
-func (s *DriverServiceServer) ValidateConfigSyntax(ctx context.Context, request *instpb.ValidateInstancesGroupConfigRequest) (*instpb.ValidateInstancesGroupConfigResponse, error) {
+func (s *DriverServiceServer) TestServiceConfig(ctx context.Context, request *instpb.ValidateInstancesGroupConfigRequest) (*instpb.ValidateInstancesGroupConfigResponse, error) {
 	return &instpb.ValidateInstancesGroupConfigResponse{Result: true}, nil
 }
 
