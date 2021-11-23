@@ -152,10 +152,10 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 	return data, nil
 }
 
-func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployRequest) (*pb.DeployResponse, error) {
+func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.UpResponse, error) {
 	igroup := input.GetGroup()
 	sp := input.GetServicesProvider()
-	s.log.Debug("Deploy request received", zap.Any("instances_group", igroup))
+	s.log.Debug("Up request received", zap.Any("instances_group", igroup))
 	
 	if igroup.GetType() != DRIVER_TYPE {
 		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
@@ -185,7 +185,7 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 	}
 
 	igroup.Data = data
-	return &pb.DeployResponse{
+	return &pb.UpResponse{
 		Group: igroup,
 	}, nil
 }
