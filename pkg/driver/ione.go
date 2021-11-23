@@ -32,6 +32,7 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
+	"go.uber.org/zap"
 
 	"github.com/gofrs/uuid"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -47,6 +48,8 @@ type IONe struct {
 	Vars map[string]*sppb.Var
 
 	Client http.Client
+
+	log *zap.Logger
 }
 
 type IONeRequest struct {
@@ -60,15 +63,16 @@ type IONeResponse struct {
 	Error string `json:"error"`
 }
 
-func NewIONeClient(host, cred string, vars map[string]*sppb.Var) (*IONe) {
+func NewIONeClient(host, cred string, vars map[string]*sppb.Var, log *zap.Logger) (*IONe) {
 	auth := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(cred)))
-	return &IONe{host, cred, auth, vars, http.Client{}}
+	return &IONe{host, cred, auth, vars, http.Client{}, log.Named("IONe")}
 }
 
 func (ione *IONe) Invoke(method string, req IONeRequest) (r *IONeResponse, err error) {
 	body, _ := json.Marshal(req)
 	reqBody := bytes.NewBuffer(body)
 
+	ione.log.Debug("Sending request", zap.String("host", ione.Host), zap.String("method", method), zap.Any("request", req))
 	url := fmt.Sprintf("%s/%s", ione.Host, method)
 	request, err := http.NewRequest("POST", url, reqBody)
 	if err != nil {

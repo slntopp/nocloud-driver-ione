@@ -63,7 +63,7 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, sp 
 	cred  := secrets["cred"].GetStringValue()
 	group := secrets["group"].GetNumberValue()
 
-	client := ione.NewIONeClient(host, cred, sp.GetVars())
+	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
 	pong, err := client.Ping()
 	if err != nil {
 		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Ping didn't go through, error: %s", err.Error())}, nil
@@ -166,7 +166,7 @@ func (s *DriverServiceServer) Deploy(ctx context.Context, input *pb.DeployReques
 	cred := secrets["cred"].GetStringValue()
 	group := secrets["group"].GetNumberValue()
 
-	client := ione.NewIONeClient(host, cred, sp.GetVars())
+	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
 
 	
 	data := igroup.GetData()
