@@ -15,6 +15,6 @@ instances_groups:
           cpu: 1
           ram: 1024
           drive_type: SSD
-          driver_size: 10000
+          drive_size: 10000
           ips_public: 1
           ips_private: 1
