@@ -303,3 +303,14 @@ func (ione *IONe) GetGroup(id int64) (res *group.GroupShort, err error) {
 	}
 	return nil, errors.New("Unexpected error while getting group")
 }
+
+func (ione *IONe) TerminateVM(id int64, hard bool) (error) {
+	r, err := ione.ONeCall("one.vm.terminate", id, hard)
+	if err != nil {
+		return err
+	}
+	if r.Error != "" {
+		return errors.New(r.Error)
+	}
+	return nil
+}
