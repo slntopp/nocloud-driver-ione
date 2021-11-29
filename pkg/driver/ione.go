@@ -53,7 +53,6 @@ type IONe struct {
 }
 
 type IONeRequest struct {
-	Method string
 	OID int64 `json:"oid,omitempty"`
 	Params []interface{} `json:"params"`
 }
