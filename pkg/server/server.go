@@ -194,6 +194,7 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	}
 
 	igroup.Data = data
+	s.log.Debug("Up request completed", zap.Any("instances_group", igroup))
 	return &pb.UpResponse{
 		Group: igroup,
 	}, nil
