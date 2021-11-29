@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20211126122122-c7eba9750c38
 	github.com/gofrs/uuid v4.2.0+incompatible
-	github.com/slntopp/nocloud v0.0.0-20211129174500-714029b95cb1
+	github.com/slntopp/nocloud v0.0.0-20211129190413-39f5926c2c15
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
 	go.uber.org/zap v1.19.1
