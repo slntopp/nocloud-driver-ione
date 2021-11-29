@@ -199,3 +199,40 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		Group: igroup,
 	}, nil
 }
+
+func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (*pb.DownResponse, error) {
+	igroup := input.GetGroup()
+	sp := input.GetServicesProvider()
+	s.log.Debug("Down request received", zap.Any("instances_group", igroup))
+
+	if igroup.GetType() != DRIVER_TYPE {
+		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
+	}
+
+	secrets := sp.GetSecrets()
+	host := secrets["host"].GetStringValue()
+	cred := secrets["cred"].GetStringValue()
+
+	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
+
+	for _, instance := range igroup.GetInstances() {
+		data := instance.GetData()
+		if _, ok := data["vmid"]; !ok {
+			s.log.Error("Instance has no VM ID in data", zap.Any("data", data), zap.String("instance", instance.GetUuid()))
+		}
+		vmid := int64(data["vmid"].GetNumberValue())
+		client.TerminateVM(vmid, true)
+	}
+
+	data := igroup.GetData()
+	if _, ok := data["userid"]; !ok {
+		s.log.Error("InstanceGroup has no User ID in data", zap.Any("data", data), zap.String("group", igroup.GetUuid()))
+	}
+	userid := int64(data["userid"].GetNumberValue())
+	err := client.UserDelete(userid)
+	if err != nil {
+		s.log.Error("Error deleting OpenNebula User", zap.Error(err))
+	}
+	
+	return &pb.DownResponse{}, nil
+}
