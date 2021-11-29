@@ -254,7 +254,7 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 		return errors.New(r.Response.(map[string]interface{})["error"].(string))
 	}
 	vm_id := r.Response.(float64)
-	data["vm_id"] = structpb.NewNumberValue(vm_id)
+	data["vmid"] = structpb.NewNumberValue(vm_id)
 
 	instance.Data = data
 	return nil

@@ -117,7 +117,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
     hasher.Write([]byte(username + time.Now().String()))
     userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
-	if data["user_id"] == nil {
+	if data["userid"] == nil {
 		oneID, err := client.UserCreate(username, userPass, int64(group))
 		if err != nil {
 			s.log.Debug("Couldn't create OpenNebula user",
@@ -126,9 +126,9 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 			return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
 		}
 		
-		data["user_id"] = structpb.NewNumberValue(float64(oneID))
+		data["userid"] = structpb.NewNumberValue(float64(oneID))
 	}
-	oneID := data["user_id"].GetNumberValue()
+	oneID := data["userid"].GetNumberValue()
 
 	resources := igroup.GetResources()
 	var public_ips_amount float64 = 0
