@@ -85,7 +85,8 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, sp 
 	if err != nil {
 		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Can't get account: %s", err.Error())}, nil
 	}
-	isAdmin := false
+	s.log.Debug("Got user", zap.Any("user", me))
+	isAdmin := me.GID == 0
 	for _, g := range me.Groups.ID {
 		isAdmin = isAdmin || g == 0
 	}
