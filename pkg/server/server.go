@@ -178,11 +178,16 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 
 	data, err := s.PrepareService(ctx, igroup, client, group)
 	if err != nil {
+		s.log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
 		return nil, err
 	}
 	userid := int64(data["userid"].GetNumberValue())
 	for _, instance := range igroup.GetInstances() {
 		vmid, err := client.TemplateInstantiate(instance, data)
+		if err != nil {
+			s.log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
+			continue
+		}
 		client.Chown("vm", int64(vmid), userid, int64(group))
 	}
 
