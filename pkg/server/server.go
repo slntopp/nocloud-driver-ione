@@ -189,9 +189,10 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	if err != nil {
 		return nil, err
 	}
-
+	userid := int64(data["userid"].GetNumberValue())
 	for _, instance := range igroup.GetInstances() {
-		client.TemplateInstantiate(instance, data)
+		vmid, err := client.TemplateInstantiate(instance, data)
+		client.Chown("vm", int64(vmid), userid, int64(group))
 	}
 
 	igroup.Data = data
