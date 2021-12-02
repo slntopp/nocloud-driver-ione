@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gofrs/uuid"
 	ione "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -103,16 +102,8 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, sp 
 }
 
 func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb.InstancesGroup, client *ione.IONe, group float64) (map[string]*structpb.Value, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		return nil, status.Error(codes.Internal, "Couldn't generate UUID")
-	}
-
 	data := igroup.GetData()
-	if data["username"] == nil {
-		data["username"] = structpb.NewStringValue(id.String())
-	}
-	username := data["username"].GetStringValue()
+	username := igroup.GetUuid()
 
 	hasher := sha256.New()
     hasher.Write([]byte(username + time.Now().String()))
