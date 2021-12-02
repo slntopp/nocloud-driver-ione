@@ -179,14 +179,14 @@ func (ione *IONe) ReservePublicIP(user, amount float64) (vn float64, err error) 
 	return r.Response.(float64), nil
 }
 
-func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[string]*structpb.Value) (error) {
+func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[string]*structpb.Value) (float64, error) {
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
 	data := make(map[string]*structpb.Value)
 
 	id, err := uuid.NewV4()
 	if err != nil {
-		return errors.New("Couldn't generate UUID")
+		return 0, errors.New("Couldn't generate UUID")
 	}
 	vmname := id.String()
 	data["vm_name"] = structpb.NewStringValue(vmname)
@@ -200,13 +200,13 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 
 	// Set CPU, must be provided by instance resources config
 	if resources["cpu"] == nil {
-		return errors.New("Amount of CPU is not given")
+		return 0, errors.New("Amount of CPU is not given")
 	}
 	tmpl.CPU(resources["cpu"].GetNumberValue())
 
 	// Set RAM, must be provided by instance resources config
 	if resources["ram"] == nil {
-		return errors.New("Amount of RAM is not given")
+		return 0, errors.New("Amount of RAM is not given")
 	}
 	tmpl.Memory(int(resources["ram"].GetNumberValue()))
 
@@ -237,27 +237,30 @@ func (ione *IONe) TemplateInstantiate(instance *instpb.Instance, group_data map[
 	}
 
 	conf := instance.GetConfig()
+
+	tmpl.Add(keys.Template("PASSWORD"), conf["password"].GetStringValue())
+
 	var template_id int64
 	if conf["template_id"] != nil {
 		template_id = int64(conf["template_id"].GetNumberValue())
 	} else {
-		return errors.New("Template ID isn't given")
+		return 0, errors.New("Template ID isn't given")
 	}
 
 	r, err := ione.ONeCall("one.t.instantiate", template_id, vmname, false, tmpl.String())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	switch r.Response.(type) {
 	case map[string]interface{}:
-		return errors.New(r.Response.(map[string]interface{})["error"].(string))
+		return 0, errors.New(r.Response.(map[string]interface{})["error"].(string))
 	}
 	vm_id := r.Response.(float64)
 	data["vmid"] = structpb.NewNumberValue(vm_id)
 
 	instance.Data = data
-	return nil
+	return vm_id, nil
 }
 
 func (ione *IONe) GetUser(id int64) (res *user.UserShort, err error) {
@@ -306,6 +309,17 @@ func (ione *IONe) GetGroup(id int64) (res *group.GroupShort, err error) {
 
 func (ione *IONe) TerminateVM(id int64, hard bool) (error) {
 	r, err := ione.ONeCall("one.vm.terminate", id, hard)
+	if err != nil {
+		return err
+	}
+	if r.Error != "" {
+		return errors.New(r.Error)
+	}
+	return nil
+}
+
+func (ione *IONe) Chown(obj string, oid, user, group int64) (error) {
+	r, err := ione.ONeCall("one." + obj + ".chown", oid, user, group)
 	if err != nil {
 		return err
 	}
