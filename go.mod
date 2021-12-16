@@ -5,11 +5,11 @@ go 1.17
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20211126122122-c7eba9750c38
 	github.com/gofrs/uuid v4.2.0+incompatible
-	github.com/slntopp/nocloud v0.0.0-20211215141106-60c4dbe2a00f
+	github.com/slntopp/nocloud v0.0.0-20211216093457-83516e44f0c2
 	github.com/spf13/cobra v1.2.1
-	github.com/spf13/viper v1.10.0
+	github.com/spf13/viper v1.10.1
 	go.uber.org/zap v1.19.1
-	google.golang.org/grpc v1.42.0
+	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
 )
 
@@ -29,7 +29,7 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
-	golang.org/x/sys v0.0.0-20211205182925-97ca703d548d // indirect
+	golang.org/x/sys v0.0.0-20211210111614-af8b64212486 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect

@@ -62,6 +62,13 @@ type IONeResponse struct {
 	Error string `json:"error"`
 }
 
+func (res *IONeResponse) AsMap() (*structpb.Struct, error) {
+	return structpb.NewStruct(map[string]interface{}{
+		"response": res.Response,
+		"error": res.Error,
+	})
+}
+
 func NewIONeClient(host, cred string, vars map[string]*sppb.Var, log *zap.Logger) (*IONe) {
 	auth := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(cred)))
 	return &IONe{host, cred, auth, vars, http.Client{}, log.Named("IONe")}

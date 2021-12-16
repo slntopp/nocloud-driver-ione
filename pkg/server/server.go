@@ -234,3 +234,36 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	
 	return &pb.DownResponse{}, nil
 }
+
+func (s *DriverServiceServer) Invoke(ctx context.Context, req *sppb.ActionRequest) (res *structpb.Struct, err error) {
+	s.log.Debug("Invoke request received", zap.Any("req", req))
+	sp := req.GetServicesProvider()
+	secrets := sp.GetSecrets()
+	host := secrets["host"].GetStringValue()
+	cred := secrets["cred"].GetStringValue()
+
+	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
+
+	request := req.GetRequest()
+
+	action := request.GetAction().GetStringValue()
+	if len(action) < 5 {
+		return nil, status.Error(codes.InvalidArgument, "Action name length can't be shorter than 5")
+	}
+	var Response *ione.IONeResponse
+	params := make([]interface{}, len(request.GetParams()))
+	for i, el := range request.GetParams() {
+		params[i] = el.AsInterface()
+	}
+	if action[:5] == "ione/" {
+		Response, err = client.Call(action, params...)
+	} else if action[:4] == "one." {
+		oid := request.GetParams()[0].GetNumberValue()
+		Response, err = client.ONeCall(action, int64(oid), params[1:]...)
+	}
+	if err != nil {
+		return nil, err
+	}
+	res, err = Response.AsMap()
+	return res, err
+}
