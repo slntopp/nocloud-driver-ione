@@ -64,14 +64,30 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 	return &instpb.TestInstancesGroupConfigResponse{Result: true}, nil
 }
 
-func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, sp *sppb.ServicesProvider) (res *sppb.TestResponse, err error) {
+func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req *pb.TestServiceProviderConfigRequest) (res *sppb.TestResponse, err error) {
+	sp := req.GetServicesProvider()
 	s.log.Debug("TestServiceProviderConfig request received", zap.Any("sp", sp))
 	secrets := sp.GetSecrets()
 	host  := secrets["host"].GetStringValue()
 	cred  := secrets["cred"].GetStringValue()
 	group := secrets["group"].GetNumberValue()
 
-	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
+	if host == "" || cred == "" {
+		return &sppb.TestResponse{Result: false, Error: "Host or Credentials are empty"}, nil
+	}
+
+	vars := sp.GetVars()
+	_, sched_ok := vars["sched"]
+	_, sched_ds_ok := vars["sched_ds"]
+	if !(sched_ok && sched_ds_ok) {
+		return &sppb.TestResponse{Result: false, Error: "Scheduler requirements unset"}, nil
+	}
+
+	if req.GetSyntaxOnly() {
+		return &sppb.TestResponse{Result: true}, nil
+	}
+
+	client := ione.NewIONeClient(host, cred, vars, s.log)
 	pong, err := client.Ping()
 	if err != nil {
 		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Ping didn't go through, error: %s", err.Error())}, nil
