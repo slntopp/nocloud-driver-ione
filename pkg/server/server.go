@@ -66,7 +66,7 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 
 func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req *pb.TestServiceProviderConfigRequest) (res *sppb.TestResponse, err error) {
 	sp := req.GetServicesProvider()
-	s.log.Debug("TestServiceProviderConfig request received", zap.Any("sp", sp))
+	s.log.Debug("TestServiceProviderConfig request received", zap.Any("sp", sp), zap.Bool("syntax_only", req.GetSyntaxOnly()))
 	secrets := sp.GetSecrets()
 	host  := secrets["host"].GetStringValue()
 	cred  := secrets["cred"].GetStringValue()
