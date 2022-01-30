@@ -8,7 +8,11 @@ import (
 
 // Chown common method
 // 	class - shorthand for entity type, possible values:
-// 		vm, vn, template, image, datastore
+// 		vm - VirtualMachine,
+//		vn - VirtualNetwork,
+//		template - VM Template,
+//		image - Image,
+//		datastore - DataStore
 func (c *ONeClient) Chown(class string, oid, uid, gid int) error {
 	_, err := c.Client.Call(fmt.Sprintf("one.%s.chown", class), oid, uid, gid)
 	return err
@@ -16,7 +20,11 @@ func (c *ONeClient) Chown(class string, oid, uid, gid int) error {
 
 // Chmod common method
 // 	class - shorthand for entity type, possible values:
-// 		vm, vn, template, image, datastore
+// 		vm - VirtualMachine,
+//		vn - VirtualNetwork,
+//		template - VM Template,
+//		image - Image,
+//		datastore - DataStore
 func (c *ONeClient) Chmod(class string, oid, perm *shared.Permissions) error {
 	args := append([]interface{}{oid}, perm.ToArgs()...)
 	_, err := c.Client.Call(fmt.Sprintf("one.%s.chmod", class), args...)
