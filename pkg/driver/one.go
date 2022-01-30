@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	goca "github.com/OpenNebula/one/src/oca/go/src/goca"
+	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 )
 
@@ -41,4 +42,8 @@ func NewClientFromSP(sp *sppb.ServicesProvider, log *zap.Logger) (*ONeClient, er
 		pass = cred[1]
 	}
 	return NewClient(host, user, pass, log), nil
+}
+
+func (c *ONeClient) SetVars(vars map[string]*sppb.Var) {
+	c.vars = vars
 }
