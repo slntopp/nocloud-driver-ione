@@ -25,7 +25,7 @@ func (c *ONeClient) Chown(class string, oid, uid, gid int) error {
 //		template - VM Template,
 //		image - Image,
 //		datastore - DataStore
-func (c *ONeClient) Chmod(class string, oid, perm *shared.Permissions) error {
+func (c *ONeClient) Chmod(class string, oid int, perm *shared.Permissions) error {
 	args := append([]interface{}{oid}, perm.ToArgs()...)
 	_, err := c.Client.Call(fmt.Sprintf("one.%s.chmod", class), args...)
 	return err
