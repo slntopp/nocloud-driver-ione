@@ -26,8 +26,11 @@ var testCmd = &cobra.Command{
 	Use:   "test",
 	Short: "Test connection",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		r, _ := client.Ping()
-		fmt.Printf("IONe resolved: %t\n", r)
+		_, err := client.GetUser(-1)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Success")
 		return nil
 	},
 }
