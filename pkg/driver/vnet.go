@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
 )
 
@@ -37,6 +38,20 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 			return -1, err
 		}
 	}
+
+
+	
+	c.Chown(
+		"vn", user_pub_net_id,
+		u, int(c.secrets["group"].GetNumberValue()) )
+	c.Chmod(
+		"vn", user_pub_net_id,
+		&shared.Permissions{
+			1, 1, 0,
+			0, 0, 0,
+			0, 0, 0 },
+	)
+
 	return user_pub_net_id, nil
 }
 
