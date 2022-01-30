@@ -184,6 +184,7 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
+	client.SetSecrets(sp.GetSecrets())
 	client.SetVars(sp.GetVars())
 
 	secrets := sp.GetSecrets()
