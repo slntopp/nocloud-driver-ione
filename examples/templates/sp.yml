@@ -2,7 +2,8 @@ type: ione
 title: IONe VDC
 secrets:
   host: https://ione-api.example.com
-  cred: "oneadmin:token"
+  user: "oneadmin:token"
+  pass: token
   group: 100
 vars:
   sched:
