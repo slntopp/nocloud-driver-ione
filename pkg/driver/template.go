@@ -43,7 +43,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		return 0, errors.New("couldn't generate UUID")
 	}
 	vmname := id.String()
-	data["vm_name"] = structpb.NewStringValue(vmname)
+	data[DATA_VM_NAME] = structpb.NewStringValue(vmname)
 
 	// Set VCPU, is 1 by default
 	vcpu := 1
@@ -109,7 +109,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	if err != nil {
 		return -1, err
 	}
-	data["vmid"] = structpb.NewNumberValue(float64(vmid))
+	data[DATA_VM_ID] = structpb.NewNumberValue(float64(vmid))
 
 	instance.Data = data
 	return vmid, nil
