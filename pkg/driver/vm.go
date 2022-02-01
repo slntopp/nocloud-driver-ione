@@ -15,10 +15,23 @@ limitations under the License.
 */
 package one
 
+func (c *ONeClient) GetVMByName(name string) (id int, err error) {
+	vmsc := c.ctrl.VMs()
+	return vmsc.ByName(name)
+}
+
 func (c *ONeClient) TerminateVM(id int, hard bool) error {
 	vmc := c.ctrl.VM(id)
 	if hard {
 		return vmc.TerminateHard()
 	}
 	return vmc.Terminate()
+}
+
+func (c *ONeClient) PoweroffVM(id int, hard bool) error {
+	vmc := c.ctrl.VM(id)
+	if hard {
+		return vmc.PoweroffHard()
+	}
+	return vmc.Poweroff()
 }
