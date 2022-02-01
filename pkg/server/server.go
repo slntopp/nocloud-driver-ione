@@ -22,9 +22,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -260,35 +262,29 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	return &pb.DownResponse{Group: igroup}, nil
 }
 
-// func (s *DriverServiceServer) Invoke(ctx context.Context, req *sppb.ActionRequest) (res *structpb.Struct, err error) {
-// 	s.log.Debug("Invoke request received", zap.Any("req", req))
-// 	sp := req.GetServicesProvider()
-// 	secrets := sp.GetSecrets()
-// 	host := secrets["host"].GetStringValue()
-// 	cred := secrets["cred"].GetStringValue()
+func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.PerformActionRequest) (res *srvpb.PerformActionResponse, err error) {
+	s.log.Debug("Invoke request received", zap.Any("req", req))
+	sp := req.GetServicesProvider()
+	igroup := req.GetGroup()
+	client, err := one.NewClientFromSP(sp, s.log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
 
-// 	client := one.NewIONeClient(host, cred, sp.GetVars(), s.log)
+	request := req.GetRequest()
+	var inst *instpb.Instance
+	for _, i := range igroup.GetInstances() {
+		if i.GetUuid() == request.GetInstance() {
+			inst = i
+		}
+	}
+	if inst == nil {
+		return nil, status.Errorf(codes.NotFound, "Instance '%s' not found", request.GetInstance())
+	}
 
-// 	request := req.GetRequest()
-
-// 	action := request.GetAction().GetStringValue()
-// 	if len(action) < 5 {
-// 		return nil, status.Error(codes.InvalidArgument, "Action name length can't be shorter than 5")
-// 	}
-// 	var Response *one.IONeResponse
-// 	params := make([]interface{}, len(request.GetParams()))
-// 	for i, el := range request.GetParams() {
-// 		params[i] = el.AsInterface()
-// 	}
-// 	if action[:5] == "ione/" {
-// 		Response, err = client.Call(action, params...)
-// 	} else if action[:4] == "one." {
-// 		oid := request.GetParams()[0].GetNumberValue()
-// 		Response, err = client.ONeCall(action, int64(oid), params[1:]...)
-// 	}
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	res, err = Response.AsMap()
-// 	return res, err
-// }
+	action, ok := actions.Actions[request.GetAction()]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", request.GetAction(), DRIVER_TYPE)
+	}
+	return action(client, igroup, inst, request.GetData())
+}
