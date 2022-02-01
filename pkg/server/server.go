@@ -232,26 +232,32 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
 
-	for _, instance := range igroup.GetInstances() {
+	for i, instance := range igroup.GetInstances() {
 		data := instance.GetData()
 		if _, ok := data["vmid"]; !ok {
 			s.log.Error("Instance has no VM ID in data", zap.Any("data", data), zap.String("instance", instance.GetUuid()))
 		}
 		vmid := int(data["vmid"].GetNumberValue())
 		client.TerminateVM(vmid, true)
+		instance.Data = make(map[string]*structpb.Value)
+		igroup.Instances[i] = instance
 	}
 
 	data := igroup.GetData()
 	if _, ok := data["userid"]; !ok {
 		s.log.Error("InstanceGroup has no User ID in data", zap.Any("data", data), zap.String("group", igroup.GetUuid()))
+		return &pb.DownResponse{Group: igroup}, nil
 	}
 	userid := int(data["userid"].GetNumberValue())
 	err = client.DeleteUser(userid)
 	if err != nil {
 		s.log.Error("Error deleting OpenNebula User", zap.Error(err))
 	}
+
+	igroup.Data = make(map[string]*structpb.Value)
 	
-	return &pb.DownResponse{}, nil
+	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
+	return &pb.DownResponse{Group: igroup}, nil
 }
 
 // func (s *DriverServiceServer) Invoke(ctx context.Context, req *sppb.ActionRequest) (res *structpb.Struct, err error) {

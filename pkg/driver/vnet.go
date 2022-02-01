@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
 )
@@ -38,8 +39,6 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 			return -1, err
 		}
 	}
-
-
 	
 	c.Chown(
 		"vn", user_pub_net_id,
@@ -51,6 +50,7 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 			0, 0, 0,
 			0, 0, 0 },
 	)
+	c.UpdateVNet(user_pub_net_id, "TYPE=\"PUBLIC\"", parameters.Merge)
 
 	return user_pub_net_id, nil
 }
@@ -63,6 +63,11 @@ func (c *ONeClient) GetVNet(id int) (*vnet.VirtualNetwork, error) {
 func (c *ONeClient) GetUserPublicVNet(user int) (id int, err error) {
 	vnsc := c.ctrl.VirtualNetworks()
 	return vnsc.ByName(fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, user))
+}
+
+func(c *ONeClient) UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error {
+	vnc := c.ctrl.VirtualNetwork(id)
+	return vnc.Update(tmpl, uType)
 }
 
 // Reserve Addresses to the other VNet
