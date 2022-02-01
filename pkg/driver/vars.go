@@ -29,6 +29,11 @@ var (
 	SCHED_DS = "sched_ds"
 	// OpenNebula Super VNet public IP addresses to be reserved from
 	PUBLIC_IP_POOL = "public_ip_pool"
+
+	// OpenNebula VM Name Data Key
+	DATA_VM_NAME = "vm_name"
+	// OpenNebula VM ID Data Key
+	DATA_VM_ID = "vmid"
 )
 
 func GetVarValue(in *proto.Var, key string) (r *structpb.Value, err error) {
