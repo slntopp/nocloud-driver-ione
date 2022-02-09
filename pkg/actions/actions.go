@@ -26,7 +26,19 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type ServiceAction func(*one.ONeClient, *instpb.InstancesGroup, *instpb.Instance, map[string]*structpb.Value) (*srvpb.PerformActionResponse, error)
+type ServiceAction func(
+	*one.ONeClient,
+	*instpb.InstancesGroup,
+	*instpb.Instance,
+	map[string]*structpb.Value,
+) (*srvpb.PerformActionResponse, error)
+
+var Actions = map[string]ServiceAction{
+	"poweroff": Poweroff,
+	"suspend":  Suspend,
+	"reboot":   Reboot,
+	"resume":   Resume,
+}
 
 func GetVMIDFromData(client *one.ONeClient, inst *instpb.Instance) (vmid int, err error) {
 	data := inst.GetData()
@@ -41,7 +53,7 @@ func GetVMIDFromData(client *one.ONeClient, inst *instpb.Instance) (vmid int, er
 	vmid = int(vmidVar.GetNumberValue())
 	return vmid, nil
 
-	try_by_name:
+try_by_name:
 	name, ok := data[one.DATA_VM_NAME]
 	if !ok {
 		return -1, errors.New("VM ID and VM Name aren't set in data")
@@ -53,7 +65,13 @@ func GetVMIDFromData(client *one.ONeClient, inst *instpb.Instance) (vmid int, er
 	return vmid, nil
 }
 
-func Poweroff(client *one.ONeClient, _ *instpb.InstancesGroup, inst *instpb.Instance, data map[string]*structpb.Value) (*srvpb.PerformActionResponse, error) {
+// Powers off a running VM
+func Poweroff(
+	client *one.ONeClient, _ *instpb.InstancesGroup,
+	inst *instpb.Instance,
+	data map[string]*structpb.Value,
+) (*srvpb.PerformActionResponse, error) {
+
 	vmid, err := GetVMIDFromData(client, inst)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
@@ -63,13 +81,76 @@ func Poweroff(client *one.ONeClient, _ *instpb.InstancesGroup, inst *instpb.Inst
 	if v, ok := data["hard"]; ok {
 		hard = v.GetBoolValue()
 	}
+
 	err = client.PoweroffVM(vmid, hard)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
 	}
+
 	return &srvpb.PerformActionResponse{Result: true}, nil
 }
 
-var Actions = map[string]ServiceAction{
-	"poweroff": Poweroff,
+// Saves a running VM
+func Suspend(
+	client *one.ONeClient, _ *instpb.InstancesGroup,
+	inst *instpb.Instance,
+	data map[string]*structpb.Value,
+) (*srvpb.PerformActionResponse, error) {
+
+	vmid, err := GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	err = client.SuspendVM(vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
+	}
+
+	return &srvpb.PerformActionResponse{Result: true}, nil
+}
+
+// Reboots an already deployed VM
+func Reboot(
+	client *one.ONeClient, _ *instpb.InstancesGroup,
+	inst *instpb.Instance,
+	data map[string]*structpb.Value,
+) (*srvpb.PerformActionResponse, error) {
+
+	vmid, err := GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	hard := false
+	if v, ok := data["hard"]; ok {
+		hard = v.GetBoolValue()
+	}
+
+	err = client.RebootVM(vmid, hard)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
+	}
+
+	return &srvpb.PerformActionResponse{Result: true}, nil
+}
+
+// Resumes the execution of a saved VM.
+func Resume(
+	client *one.ONeClient, _ *instpb.InstancesGroup,
+	inst *instpb.Instance,
+	data map[string]*structpb.Value,
+) (*srvpb.PerformActionResponse, error) {
+
+	vmid, err := GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	err = client.ResumeVM(vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
+	}
+
+	return &srvpb.PerformActionResponse{Result: true}, nil
 }

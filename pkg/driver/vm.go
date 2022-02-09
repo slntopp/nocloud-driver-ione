@@ -35,3 +35,21 @@ func (c *ONeClient) PoweroffVM(id int, hard bool) error {
 	}
 	return vmc.Poweroff()
 }
+
+func (c *ONeClient) SuspendVM(id int) error {
+	vmc := c.ctrl.VM(id)
+	return vmc.Suspend()
+}
+
+func (c *ONeClient) RebootVM(id int, hard bool) error {
+	vmc := c.ctrl.VM(id)
+	if hard {
+		return vmc.RebootHard()
+	}
+	return vmc.Reboot()
+}
+
+func (c *ONeClient) ResumeVM(id int) error {
+	vmc := c.ctrl.VM(id)
+	return vmc.Resume()
+}
