@@ -46,5 +46,5 @@ func GetVarValue(in *proto.Var, key string) (r *structpb.Value, err error) {
 	if ok {
 		return r, nil
 	}
-	return nil, fmt.Errorf("Keys '%s' and 'default' are not set", key)
+	return nil, fmt.Errorf("keys '%s' and 'default' are not set", key)
 }

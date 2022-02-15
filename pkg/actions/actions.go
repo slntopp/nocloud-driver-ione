@@ -38,6 +38,7 @@ var Actions = map[string]ServiceAction{
 	"suspend":  Suspend,
 	"reboot":   Reboot,
 	"resume":   Resume,
+	"state":    State,
 }
 
 func GetVMIDFromData(client *one.ONeClient, inst *instpb.Instance) (vmid int, err error) {
@@ -104,7 +105,7 @@ func Suspend(
 
 	err = client.SuspendVM(vmid)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
+		return nil, status.Errorf(codes.Internal, "Can't Suspend VM, error: %v", err)
 	}
 
 	return &srvpb.PerformActionResponse{Result: true}, nil
@@ -129,7 +130,7 @@ func Reboot(
 
 	err = client.RebootVM(vmid, hard)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
+		return nil, status.Errorf(codes.Internal, "Can't Reboot VM, error: %v", err)
 	}
 
 	return &srvpb.PerformActionResponse{Result: true}, nil
@@ -149,8 +150,41 @@ func Resume(
 
 	err = client.ResumeVM(vmid)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
+		return nil, status.Errorf(codes.Internal, "Can't Resume VM, error: %v", err)
 	}
 
 	return &srvpb.PerformActionResponse{Result: true}, nil
+}
+
+// Returns the VM state of the VirtualMachine (numeric value)
+func State(
+	client *one.ONeClient, _ *instpb.InstancesGroup,
+	inst *instpb.Instance,
+	data map[string]*structpb.Value,
+) (*srvpb.PerformActionResponse, error) {
+
+	vmid, err := GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	state, state_str, lcm_state, lcm_state_str, err := client.StateVM(vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't get State VM, error: %v", err)
+	}
+
+	m, err := structpb.NewValue(map[string]interface{}{
+		"state":         state,
+		"state_str":     state_str,
+		"lcm_state":     lcm_state,
+		"lcm_state_str": lcm_state_str,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't pass State VM, error: %v", err)
+	}
+
+	meta := make(map[string]*structpb.Value)
+	meta["StateVM"] = m
+
+	return &srvpb.PerformActionResponse{Meta: meta}, nil
 }

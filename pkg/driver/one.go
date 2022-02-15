@@ -50,7 +50,7 @@ func NewClientFromSP(sp *sppb.ServicesProvider, log *zap.Logger) (*ONeClient, er
 	user  := secrets["user"].GetStringValue()
 	pass  := secrets["pass"].GetStringValue()
 	if host == "" || user == "" || pass == "" {
-		return nil, errors.New("Host or Credentials are empty")
+		return nil, errors.New("host or Credentials are empty")
 	}
 	return NewClient(user, pass, host, log), nil
 }

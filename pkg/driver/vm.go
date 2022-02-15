@@ -53,3 +53,19 @@ func (c *ONeClient) ResumeVM(id int) error {
 	vmc := c.ctrl.VM(id)
 	return vmc.Resume()
 }
+
+func (c *ONeClient) StateVM(id int) (state int, state_str string, lcm_state int, lcm_state_str string, err error) {
+	vmc := c.ctrl.VM(id)
+
+	vm, err := vmc.Info(false)
+	if err != nil {
+		return 0, "nil", 0, "nil", err
+	}
+
+	st, lcm_st, err := vm.State()
+	if err != nil {
+		return 0, "nil", 0, "nil", err
+	}
+
+	return int(st), st.String(), int(lcm_st), lcm_st.String(), nil
+}
