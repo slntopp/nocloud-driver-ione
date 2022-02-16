@@ -22,11 +22,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -69,7 +67,7 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req *pb.TestServiceProviderConfigRequest) (res *sppb.TestResponse, err error) {
 	sp := req.GetServicesProvider()
 	s.log.Debug("TestServiceProviderConfig request received", zap.Any("sp", sp), zap.Bool("syntax_only", req.GetSyntaxOnly()))
-	
+
 	client, err := one.NewClientFromSP(sp, s.log)
 
 	if err != nil {
@@ -126,18 +124,18 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 	username := igroup.GetUuid()
 
 	hasher := sha256.New()
-    hasher.Write([]byte(username + time.Now().String()))
-    userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+	hasher.Write([]byte(username + time.Now().String()))
+	userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
 	if data["userid"] == nil {
 		oneID, err := client.CreateUser(username, userPass, []int{int(group)})
 		if err != nil {
 			s.log.Debug("Couldn't create OpenNebula user",
-			zap.Error(err), zap.String("login", username),
-			zap.String("pass", userPass), zap.Int64("group", int64(group)) )
+				zap.Error(err), zap.String("login", username),
+				zap.String("pass", userPass), zap.Int64("group", int64(group)))
 			return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
 		}
-		
+
 		data["userid"] = structpb.NewNumberValue(float64(oneID))
 	}
 	oneID := int(data["userid"].GetNumberValue())
@@ -157,7 +155,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 		public_ips_pool_id, err := client.ReservePublicIP(oneID, public_ips_amount)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Public IP addresses",
-			zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
+				zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
 			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
 		}
 		data["public_vn"] = structpb.NewNumberValue(float64(public_ips_pool_id))
@@ -177,7 +175,7 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	igroup := input.GetGroup()
 	sp := input.GetServicesProvider()
 	s.log.Debug("Up request received", zap.Any("instances_group", igroup))
-	
+
 	if igroup.GetType() != DRIVER_TYPE {
 		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
 	}
@@ -191,7 +189,7 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 
 	secrets := sp.GetSecrets()
 	group := secrets["group"].GetNumberValue()
-	
+
 	data := igroup.GetData()
 	if data == nil {
 		data = make(map[string]*structpb.Value)
@@ -257,34 +255,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	}
 
 	igroup.Data = make(map[string]*structpb.Value)
-	
+
 	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
 	return &pb.DownResponse{Group: igroup}, nil
-}
-
-func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.PerformActionRequest) (res *srvpb.PerformActionResponse, err error) {
-	s.log.Debug("Invoke request received", zap.Any("req", req))
-	sp := req.GetServicesProvider()
-	igroup := req.GetGroup()
-	client, err := one.NewClientFromSP(sp, s.log)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
-	}
-
-	request := req.GetRequest()
-	var inst *instpb.Instance
-	for _, i := range igroup.GetInstances() {
-		if i.GetUuid() == request.GetInstance() {
-			inst = i
-		}
-	}
-	if inst == nil {
-		return nil, status.Errorf(codes.NotFound, "Instance '%s' not found", request.GetInstance())
-	}
-
-	action, ok := actions.Actions[request.GetAction()]
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", request.GetAction(), DRIVER_TYPE)
-	}
-	return action(client, igroup, inst, request.GetData())
 }

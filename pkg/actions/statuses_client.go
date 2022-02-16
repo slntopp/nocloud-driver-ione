@@ -23,8 +23,8 @@ import (
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 
-	//TODO sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
-	sspb "../../../nocloud/pkg/statuses/proto"
+	sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
+	// sspb "../../../nocloud/pkg/statuses/proto"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
