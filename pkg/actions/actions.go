@@ -68,7 +68,8 @@ try_by_name:
 
 // Powers off a running VM
 func Poweroff(
-	client *one.ONeClient, _ *instpb.InstancesGroup,
+	client *one.ONeClient,
+	_ *instpb.InstancesGroup,
 	inst *instpb.Instance,
 	data map[string]*structpb.Value,
 ) (*srvpb.PerformActionResponse, error) {
@@ -88,12 +89,14 @@ func Poweroff(
 		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
 	}
 
-	return &srvpb.PerformActionResponse{Result: true}, nil
+	// return &srvpb.PerformActionResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
 }
 
 // Saves a running VM
 func Suspend(
-	client *one.ONeClient, _ *instpb.InstancesGroup,
+	client *one.ONeClient,
+	_ *instpb.InstancesGroup,
 	inst *instpb.Instance,
 	data map[string]*structpb.Value,
 ) (*srvpb.PerformActionResponse, error) {
@@ -108,12 +111,14 @@ func Suspend(
 		return nil, status.Errorf(codes.Internal, "Can't Suspend VM, error: %v", err)
 	}
 
-	return &srvpb.PerformActionResponse{Result: true}, nil
+	// return &srvpb.PerformActionResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
 }
 
 // Reboots an already deployed VM
 func Reboot(
-	client *one.ONeClient, _ *instpb.InstancesGroup,
+	client *one.ONeClient,
+	_ *instpb.InstancesGroup,
 	inst *instpb.Instance,
 	data map[string]*structpb.Value,
 ) (*srvpb.PerformActionResponse, error) {
@@ -133,12 +138,14 @@ func Reboot(
 		return nil, status.Errorf(codes.Internal, "Can't Reboot VM, error: %v", err)
 	}
 
-	return &srvpb.PerformActionResponse{Result: true}, nil
+	// return &srvpb.PerformActionResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
 }
 
 // Resumes the execution of a saved VM.
 func Resume(
-	client *one.ONeClient, _ *instpb.InstancesGroup,
+	client *one.ONeClient,
+	_ *instpb.InstancesGroup,
 	inst *instpb.Instance,
 	data map[string]*structpb.Value,
 ) (*srvpb.PerformActionResponse, error) {
@@ -153,12 +160,14 @@ func Resume(
 		return nil, status.Errorf(codes.Internal, "Can't Resume VM, error: %v", err)
 	}
 
-	return &srvpb.PerformActionResponse{Result: true}, nil
+	// return &srvpb.PerformActionResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
 }
 
-// Returns the VM state of the VirtualMachine (numeric value)
+// Returns the VM state of the VirtualMachine
 func State(
-	client *one.ONeClient, _ *instpb.InstancesGroup,
+	client *one.ONeClient,
+	_ *instpb.InstancesGroup,
 	inst *instpb.Instance,
 	data map[string]*structpb.Value,
 ) (*srvpb.PerformActionResponse, error) {
@@ -174,6 +183,7 @@ func State(
 	}
 
 	m, err := structpb.NewValue(map[string]interface{}{
+		"uuid":          inst.Uuid,
 		"state":         state,
 		"state_str":     state_str,
 		"lcm_state":     lcm_state,
