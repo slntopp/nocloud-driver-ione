@@ -17,7 +17,6 @@ package actions
 
 import (
 	"context"
-	"time"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -64,10 +63,8 @@ func StatusesClient(
 
 	result.Meta["StateVM"] = par.Meta["StateVM"]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	_, err = grpc_client.State(ctx, &sspb.PostServiceStateRequest{
-		Uuid:  result.Meta["StateVM"].GetStructValue().AsMap()["uuid"].(string),
+	_, err = grpc_client.State(context.Background(), &sspb.PostServiceStateRequest{
+		Uuid: inst.GetUuid(),
 		State: result.Meta["StateVM"].GetStructValue().AsMap()["state"].(int32),
 		Meta:  result.Meta,
 	})
