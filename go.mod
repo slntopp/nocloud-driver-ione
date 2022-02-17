@@ -5,12 +5,13 @@ go 1.17
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20220128134709-75e34b0d670d
 	github.com/gofrs/uuid v4.2.0+incompatible
-	github.com/slntopp/nocloud v0.0.0-20220216143247-438b8bedc134
+	github.com/slntopp/nocloud v0.0.0-20220217110701-040fb5b1e45a
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	go.uber.org/zap v1.21.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
+	
 )
 
 require (

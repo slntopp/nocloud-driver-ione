@@ -18,45 +18,39 @@ package server
 import (
 	"context"
 
-	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
+	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
+	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
-// func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.PerformActionRequest) (res *srvpb.PerformActionResponse, err error) {
-func (s *DriverServiceServer) Invoke(ctx context.Context, req *sppb.ActionRequest) (res *structpb.Struct, err error) {
+func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.PerformActionRequest) (res *srvpb.PerformActionResponse, err error) {
 	s.log.Debug("Invoke request received", zap.Any("req", req))
+	sp := req.GetServicesProvider()
+	igroup := req.GetGroup()
+	client, err := one.NewClientFromSP(sp, s.log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
 
-	//TODO in nocloud vanilla.PerformActionRequest changed to services_providers.ActionRequest
-	//services_providers.ActionRequest haven't methods GetGroup(), GetInstance()...
+	request := req.GetRequest()
+	var inst *instpb.Instance
+	for _, i := range igroup.GetInstances() {
+		if i.GetUuid() == request.GetInstance() {
+			inst = i
+		}
+	}
+	if inst == nil {
+		return nil, status.Errorf(codes.NotFound, "Instance '%s' not found", request.GetInstance())
+	}
 
-	// sp := req.GetServicesProvider()
-	// igroup := req.GetGroup()
-
-	// client, err := one.NewClientFromSP(sp, s.log)
-	// if err != nil {
-	// 	return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
-	// }
-
-	// request := req.GetRequest()
-
-	// var inst *instpb.Instance
-	// for _, i := range igroup.GetInstances() {
-	// 	if i.GetUuid() == request.GetInstance() {
-	// 		inst = i
-	// 	}
-	// }
-	// if inst == nil {
-	// 	return nil, status.Errorf(codes.NotFound, "Instance '%s' not found", request.GetInstance())
-	// }
-
-	// action, ok := actions.Actions[request.GetAction()]
-	// if !ok {
-	// 	return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", request.GetAction(), DRIVER_TYPE)
-	// }
-	// return action(client, igroup, inst, request.GetData())
-
-	return nil, status.Error(codes.InvalidArgument, "Method commented")
+	action, ok := actions.Actions[request.GetAction()]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", request.GetAction(), DRIVER_TYPE)
+	}
+	return action(client, igroup, inst, request.GetData())
 }

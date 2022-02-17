@@ -21,6 +21,7 @@ import (
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"github.com/slntopp/nocloud/pkg/nocloud"
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 
 	sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
@@ -41,6 +42,8 @@ var (
 func init() {
 	viper.SetDefault("STATUSES_HOST", "statuses:8080")
 	host = viper.GetString("STATUSES_HOST")
+
+	log = nocloud.NewLogger().Named("Statuses")
 }
 
 // Returns the VM state of the VirtualMachine to statuses server
@@ -56,6 +59,10 @@ func StatusesClient(
 	par, err := State(client, nil, inst, data)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't get State VM, error: %v", err)
+	}
+
+	if result.Meta == nil {
+		result.Meta = make(map[string]*structpb.Value)
 	}
 
 	result.Meta["StateVM"] = par.Meta["StateVM"]
