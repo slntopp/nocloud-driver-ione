@@ -21,29 +21,26 @@ import (
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	"github.com/slntopp/nocloud/pkg/nocloud"
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 
 	sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
 	// sspb "../../../nocloud/pkg/statuses/proto"
-	"github.com/spf13/viper"
+
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 var (
-	host string
+	grpc_client sspb.PostServiceClient
 	log  *zap.Logger
+	ctx context.Context
 )
 
-func init() {
-	viper.SetDefault("STATUSES_HOST", "statuses:8080")
-	host = viper.GetString("STATUSES_HOST")
-
-	log = nocloud.NewLogger().Named("Statuses")
+func ConfigureStatusesClient(logger *zap.Logger, client sspb.PostServiceClient) {
+	log = logger.Named("Statuses")
+	grpc_client = client
 }
 
 // Returns the VM state of the VirtualMachine to statuses server
@@ -67,22 +64,8 @@ func StatusesClient(
 
 	result.Meta["StateVM"] = par.Meta["StateVM"]
 
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithBlock())
-
-	log.Debug("Try to connect...", zap.String("host", host), zap.Skip())
-
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, host, opts...)
-	if err != nil {
-		log.Error("fail to dial:", zap.Error(err))
-		return nil, err
-	}
-	defer conn.Close()
-
-	grpc_client := sspb.NewPostServiceClient(conn)
 	_, err = grpc_client.State(ctx, &sspb.PostServiceStateRequest{
 		Uuid:  result.Meta["StateVM"].GetStructValue().AsMap()["uuid"].(string),
 		State: result.Meta["StateVM"].GetStructValue().AsMap()["state"].(int32),
