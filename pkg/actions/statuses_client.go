@@ -65,7 +65,7 @@ func StatusesClient(
 
 	_, err = grpc_client.State(context.Background(), &sspb.PostServiceStateRequest{
 		Uuid: inst.GetUuid(),
-		State: result.Meta["StateVM"].GetStructValue().AsMap()["state"].(int32),
+		State: int32(result.Meta["StateVM"].GetStructValue().GetFields()["state"].GetNumberValue()),
 		Meta:  result.Meta,
 	})
 	if err != nil {
