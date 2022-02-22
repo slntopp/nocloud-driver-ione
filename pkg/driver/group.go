@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+Copyright © 2021-2022 Nikita Ivanovski info@slnt-opp.xyz
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,28 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package one
 
 import (
-	"fmt"
-
-	"github.com/spf13/cobra"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/group"
 )
 
-// testCmd represents the test command
-var testCmd = &cobra.Command{
-	Use:   "test",
-	Short: "Test connection",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := client.GetUser(-1)
-		if err != nil {
-			return err
-		}
-		fmt.Println("Success")
-		return nil
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(testCmd)
+func (c *ONeClient) GetGroup(id int) (*group.Group, error) {
+	gc := c.ctrl.Group(id)
+	return gc.Info(true)
 }

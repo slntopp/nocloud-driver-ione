@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Nikita Ivanovski info@slnt-opp.xyz
+Copyright © 2021-2022 Nikita Ivanovski info@slnt-opp.xyz
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	ione "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
@@ -67,39 +67,38 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req *pb.TestServiceProviderConfigRequest) (res *sppb.TestResponse, err error) {
 	sp := req.GetServicesProvider()
 	s.log.Debug("TestServiceProviderConfig request received", zap.Any("sp", sp), zap.Bool("syntax_only", req.GetSyntaxOnly()))
-	secrets := sp.GetSecrets()
-	host  := secrets["host"].GetStringValue()
-	cred  := secrets["cred"].GetStringValue()
-	group := secrets["group"].GetNumberValue()
 
-	if host == "" || cred == "" {
-		return &sppb.TestResponse{Result: false, Error: "Host or Credentials are empty"}, nil
+	client, err := one.NewClientFromSP(sp, s.log)
+
+	if err != nil {
+		return &sppb.TestResponse{Result: false, Error: err.Error()}, nil
 	}
 
 	vars := sp.GetVars()
-	_, sched_ok := vars["sched"]
-	_, sched_ds_ok := vars["sched_ds"]
-	if !(sched_ok && sched_ds_ok) {
-		return &sppb.TestResponse{Result: false, Error: "Scheduler requirements unset"}, nil
+	{
+		_, sched_ok := vars[one.SCHED]
+		if !sched_ok {
+			return &sppb.TestResponse{Result: false, Error: "Scheduler requirements unset"}, nil
+		}
+		_, sched_ds_ok := vars[one.SCHED_DS]
+		if !sched_ok {
+			return &sppb.TestResponse{Result: false, Error: "DataStore Scheduler requirements unset"}, nil
+		}
+		_, vnet_ok := vars[one.PUBLIC_IP_POOL]
+		if !(sched_ok && sched_ds_ok && vnet_ok) {
+			return &sppb.TestResponse{Result: false, Error: "Public IPs Pool unset"}, nil
+		}
 	}
 
 	if req.GetSyntaxOnly() {
 		return &sppb.TestResponse{Result: true}, nil
 	}
 
-	client := ione.NewIONeClient(host, cred, vars, s.log)
-	pong, err := client.Ping()
-	if err != nil {
-		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Ping didn't go through, error: %s", err.Error())}, nil
-	}
-	if !pong {
-		return &sppb.TestResponse{Result: false, Error: "Ping didn't go through, check host, credentials and if IONe is running"}, nil
-	}
-
 	me, err := client.GetUser(-1)
 	if err != nil {
 		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Can't get account: %s", err.Error())}, nil
 	}
+
 	s.log.Debug("Got user", zap.Any("user", me))
 	isAdmin := me.GID == 0
 	for _, g := range me.Groups.ID {
@@ -109,7 +108,10 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 		return &sppb.TestResponse{Result: false, Error: "User isn't admin(oneadmin group member)"}, nil
 	}
 
-	_, err = client.GetGroup(int64(group))
+	secrets := sp.GetSecrets()
+	group := secrets["group"].GetNumberValue()
+
+	_, err = client.GetGroup(int(group))
 	if err != nil {
 		return &sppb.TestResponse{Result: false, Error: fmt.Sprintf("Can't get group: %s", err.Error())}, nil
 	}
@@ -117,53 +119,53 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 	return &sppb.TestResponse{Result: true}, nil
 }
 
-func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb.InstancesGroup, client *ione.IONe, group float64) (map[string]*structpb.Value, error) {
+func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb.InstancesGroup, client *one.ONeClient, group float64) (map[string]*structpb.Value, error) {
 	data := igroup.GetData()
 	username := igroup.GetUuid()
 
 	hasher := sha256.New()
-    hasher.Write([]byte(username + time.Now().String()))
-    userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+	hasher.Write([]byte(username + time.Now().String()))
+	userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
 	if data["userid"] == nil {
-		oneID, err := client.UserCreate(username, userPass, int64(group))
+		oneID, err := client.CreateUser(username, userPass, []int{int(group)})
 		if err != nil {
 			s.log.Debug("Couldn't create OpenNebula user",
-			zap.Error(err), zap.String("login", username),
-			zap.String("pass", userPass), zap.Int64("group", int64(group)) )
+				zap.Error(err), zap.String("login", username),
+				zap.String("pass", userPass), zap.Int64("group", int64(group)))
 			return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
 		}
-		
+
 		data["userid"] = structpb.NewNumberValue(float64(oneID))
 	}
-	oneID := data["userid"].GetNumberValue()
+	oneID := int(data["userid"].GetNumberValue())
 
 	resources := igroup.GetResources()
-	var public_ips_amount float64 = 0
+	var public_ips_amount int = 0
 	if resources["ips_public"] != nil {
-		public_ips_amount = resources["ips_public"].GetNumberValue()
+		public_ips_amount = int(resources["ips_public"].GetNumberValue())
 	}
 
-	var free float64 = 0
+	var free int = 0
 	if data["public_ips_free"] != nil {
-		free = data["public_ips_free"].GetNumberValue()
+		free = int(data["public_ips_free"].GetNumberValue())
 	}
 	if public_ips_amount > 0 && public_ips_amount > free {
 		public_ips_amount -= free
 		public_ips_pool_id, err := client.ReservePublicIP(oneID, public_ips_amount)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Public IP addresses",
-			zap.Error(err), zap.Float64("amount", public_ips_amount), zap.Float64("user", oneID))
+				zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
 			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
 		}
-		data["public_vn"] = structpb.NewNumberValue(public_ips_pool_id)
+		data["public_vn"] = structpb.NewNumberValue(float64(public_ips_pool_id))
 		total := float64(public_ips_amount)
 		if data["public_ips_total"] != nil {
 			total += data["public_ips_total"].GetNumberValue()
 		}
 		data["public_ips_total"] = structpb.NewNumberValue(total)
 
-		data["public_ips_free"] = structpb.NewNumberValue(free + public_ips_amount)
+		data["public_ips_free"] = structpb.NewNumberValue(float64(free + public_ips_amount))
 	}
 
 	return data, nil
@@ -173,38 +175,40 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	igroup := input.GetGroup()
 	sp := input.GetServicesProvider()
 	s.log.Debug("Up request received", zap.Any("instances_group", igroup))
-	
+
 	if igroup.GetType() != DRIVER_TYPE {
 		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
 	}
 
+	client, err := one.NewClientFromSP(sp, s.log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
+	client.SetSecrets(sp.GetSecrets())
+	client.SetVars(sp.GetVars())
+
 	secrets := sp.GetSecrets()
-	host := secrets["host"].GetStringValue()
-	cred := secrets["cred"].GetStringValue()
 	group := secrets["group"].GetNumberValue()
 
-	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
-
-	
 	data := igroup.GetData()
 	if data == nil {
 		data = make(map[string]*structpb.Value)
 		igroup.Data = data
 	}
 
-	data, err := s.PrepareService(ctx, igroup, client, group)
+	data, err = s.PrepareService(ctx, igroup, client, group)
 	if err != nil {
 		s.log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
 		return nil, err
 	}
-	userid := int64(data["userid"].GetNumberValue())
+	userid := int(data["userid"].GetNumberValue())
 	for _, instance := range igroup.GetInstances() {
-		vmid, err := client.TemplateInstantiate(instance, data)
+		vmid, err := client.InstantiateTemplateHelper(instance, data)
 		if err != nil {
 			s.log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
 			continue
 		}
-		client.Chown("vm", int64(vmid), userid, int64(group))
+		client.Chown("vm", vmid, userid, int(group))
 	}
 
 	igroup.Data = data
@@ -223,63 +227,35 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
 	}
 
-	secrets := sp.GetSecrets()
-	host := secrets["host"].GetStringValue()
-	cred := secrets["cred"].GetStringValue()
+	client, err := one.NewClientFromSP(sp, s.log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
 
-	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
-
-	for _, instance := range igroup.GetInstances() {
+	for i, instance := range igroup.GetInstances() {
 		data := instance.GetData()
 		if _, ok := data["vmid"]; !ok {
 			s.log.Error("Instance has no VM ID in data", zap.Any("data", data), zap.String("instance", instance.GetUuid()))
 		}
-		vmid := int64(data["vmid"].GetNumberValue())
+		vmid := int(data["vmid"].GetNumberValue())
 		client.TerminateVM(vmid, true)
+		instance.Data = make(map[string]*structpb.Value)
+		igroup.Instances[i] = instance
 	}
 
 	data := igroup.GetData()
 	if _, ok := data["userid"]; !ok {
 		s.log.Error("InstanceGroup has no User ID in data", zap.Any("data", data), zap.String("group", igroup.GetUuid()))
+		return &pb.DownResponse{Group: igroup}, nil
 	}
-	userid := int64(data["userid"].GetNumberValue())
-	err := client.UserDelete(userid)
+	userid := int(data["userid"].GetNumberValue())
+	err = client.DeleteUser(userid)
 	if err != nil {
 		s.log.Error("Error deleting OpenNebula User", zap.Error(err))
 	}
-	
-	return &pb.DownResponse{}, nil
-}
 
-func (s *DriverServiceServer) Invoke(ctx context.Context, req *sppb.ActionRequest) (res *structpb.Struct, err error) {
-	s.log.Debug("Invoke request received", zap.Any("req", req))
-	sp := req.GetServicesProvider()
-	secrets := sp.GetSecrets()
-	host := secrets["host"].GetStringValue()
-	cred := secrets["cred"].GetStringValue()
+	igroup.Data = make(map[string]*structpb.Value)
 
-	client := ione.NewIONeClient(host, cred, sp.GetVars(), s.log)
-
-	request := req.GetRequest()
-
-	action := request.GetAction().GetStringValue()
-	if len(action) < 5 {
-		return nil, status.Error(codes.InvalidArgument, "Action name length can't be shorter than 5")
-	}
-	var Response *ione.IONeResponse
-	params := make([]interface{}, len(request.GetParams()))
-	for i, el := range request.GetParams() {
-		params[i] = el.AsInterface()
-	}
-	if action[:5] == "ione/" {
-		Response, err = client.Call(action, params...)
-	} else if action[:4] == "one." {
-		oid := request.GetParams()[0].GetNumberValue()
-		Response, err = client.ONeCall(action, int64(oid), params[1:]...)
-	}
-	if err != nil {
-		return nil, err
-	}
-	res, err = Response.AsMap()
-	return res, err
+	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
+	return &pb.DownResponse{Group: igroup}, nil
 }

@@ -20,6 +20,7 @@ import (
 	"os"
 
 	ione "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	"github.com/slntopp/nocloud/pkg/nocloud"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -30,7 +31,7 @@ import (
 var (
 	cfgFile string
 	host, user, pass string
-	client *ione.IONe
+	client *one.ONeClient
 
 	log *zap.Logger
 )
@@ -96,5 +97,5 @@ func initConfig() {
 	if host == "" || user == "" || pass == "" {
 		panic("Hostname, Username or Password not given")
 	}
-	client = ione.NewIONeClient(host, user + ":" + pass, nil, log)
+	client = ione.NewClient(user, pass, host, log)
 }

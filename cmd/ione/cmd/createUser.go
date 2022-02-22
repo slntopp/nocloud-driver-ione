@@ -37,7 +37,7 @@ var createUserCmd = &cobra.Command{
 			return err
 		}
 
-		user, err := client.UserCreate(login, passwd, int64(group))
+		user, err := client.CreateUser(login, passwd, []int{group})
 		if err != nil {
 			return err
 		}
