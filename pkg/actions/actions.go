@@ -193,8 +193,6 @@ func State(
 		return nil, status.Errorf(codes.Internal, "Can't pass State VM, error: %v", err)
 	}
 
-	meta := make(map[string]*structpb.Value)
-	meta["StateVM"] = m
-
+	meta := m.GetStructValue().Fields
 	return &srvpb.PerformActionResponse{Result: true, Meta: meta}, nil
 }
