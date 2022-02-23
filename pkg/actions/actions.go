@@ -196,5 +196,5 @@ func State(
 	meta := make(map[string]*structpb.Value)
 	meta["StateVM"] = m
 
-	return &srvpb.PerformActionResponse{Meta: meta}, nil
+	return &srvpb.PerformActionResponse{Result: true, Meta: meta}, nil
 }
