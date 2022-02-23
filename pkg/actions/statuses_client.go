@@ -61,11 +61,11 @@ func StatusesClient(
 		result.Meta = make(map[string]*structpb.Value)
 	}
 
-	result.Meta["StateVM"] = par.Meta["StateVM"]
+	result.Meta = par.Meta
 
 	_, err = grpc_client.State(context.Background(), &sspb.PostServiceStateRequest{
 		Uuid: inst.GetUuid(),
-		State: int32(result.Meta["StateVM"].GetStructValue().GetFields()["state"].GetNumberValue()),
+		State: int32(result.Meta["state"].GetNumberValue()),
 		Meta:  result.Meta,
 	})
 	if err != nil {
