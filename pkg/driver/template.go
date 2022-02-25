@@ -96,7 +96,12 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 
 	conf := instance.GetConfig()
 
-	tmpl.Add(keys.Template("PASSWORD"), conf["password"].GetStringValue())
+	if pass := conf["password"].GetStringValue(); pass != "" {
+		tmpl.Add(keys.Template("PASSWORD"), pass)
+	}
+	if ssh_key := conf["ssh_public_key"].GetStringValue(); ssh_key != "" {
+		tmpl.Add(keys.Template("SSH_PUBLIC_KEY"), ssh_key)
+	}
 
 	var template_id int
 	if conf["template_id"] != nil {
