@@ -97,6 +97,9 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		nic := tmpl.AddNIC()
 		nic.Add(shared.NetworkID, public_vn)
 	}
+	if int(resources["ips_public"].GetNumberValue()) > 0 {
+		tmpl.AddCtx(keys.NetworkCtx, "YES")
+	}
 
 	var template_id int
 	if conf["template_id"] != nil {
