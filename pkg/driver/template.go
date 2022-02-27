@@ -97,6 +97,8 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		nic := tmpl.AddNIC()
 		nic.Add(shared.NetworkID, public_vn)
 	}
+	// OpenNebula won't generate Networking context without this key set to YES
+	// so most templates won't generate network interfaces inside the VM
 	if int(resources["ips_public"].GetNumberValue()) > 0 {
 		tmpl.AddCtx(keys.NetworkCtx, "YES")
 	}
