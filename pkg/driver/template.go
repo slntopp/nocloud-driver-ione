@@ -23,7 +23,6 @@ import (
 	tmpl "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/template"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
-	"github.com/gofrs/uuid"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -46,11 +45,8 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		tmpl.AddCtx(keys.SSHPubKey, ssh_key)
 	}
 
-	id, err := uuid.NewV4()
-	if err != nil {
-		return 0, errors.New("couldn't generate UUID")
-	}
-	vmname := id.String()
+	id := instance.GetUuid()
+	vmname := id
 	data[DATA_VM_NAME] = structpb.NewStringValue(vmname)
 
 	// Set VCPU, is 1 by default
