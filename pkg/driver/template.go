@@ -37,6 +37,14 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
 	data := make(map[string]*structpb.Value)
+	conf := instance.GetConfig()
+
+	if pass := conf["password"].GetStringValue(); pass != "" {
+		tmpl.Add(keys.Template("PASSWORD"), pass)
+	}
+	if ssh_key := conf["ssh_public_key"].GetStringValue(); ssh_key != "" {
+		tmpl.AddCtx(keys.SSHPubKey, ssh_key)
+	}
 
 	id, err := uuid.NewV4()
 	if err != nil {
@@ -92,15 +100,6 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	for i := 0; i < int(resources["ips_public"].GetNumberValue()); i++ {
 		nic := tmpl.AddNIC()
 		nic.Add(shared.NetworkID, public_vn)
-	}
-
-	conf := instance.GetConfig()
-
-	if pass := conf["password"].GetStringValue(); pass != "" {
-		tmpl.Add(keys.Template("PASSWORD"), pass)
-	}
-	if ssh_key := conf["ssh_public_key"].GetStringValue(); ssh_key != "" {
-		tmpl.AddCtx(keys.SSHPubKey, ssh_key)
 	}
 
 	var template_id int
