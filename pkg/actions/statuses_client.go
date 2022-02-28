@@ -55,10 +55,6 @@ func StatusesClient(
 		return nil, status.Errorf(codes.Internal, "Can't get State VM, error: %v", err)
 	}
 
-	if result.Meta == nil {
-		result.Meta = make(map[string]*structpb.Value)
-	}
-
 	result.Meta = par.Meta
 
 	_, err = grpc_client.State(context.Background(), &sspb.PostServiceStateRequest{
