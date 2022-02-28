@@ -23,7 +23,6 @@ import (
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 
 	sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
-	// sspb "../../../nocloud/pkg/statuses/proto"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -63,7 +62,7 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	_, err = grpc_client.State(context.Background(), &sspb.PostServiceStateRequest{
-		Uuid: inst.GetUuid(),
+		Uuid:  inst.GetUuid(),
 		State: int32(result.Meta["state"].GetNumberValue()),
 		Meta:  result.Meta,
 	})

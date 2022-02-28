@@ -27,15 +27,16 @@ import (
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
+
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
 )
 
 var (
-	port 	 string
+	port     string
 	type_key string
 
-	log  	 *zap.Logger
+	log           *zap.Logger
 	statuses_host string
 )
 

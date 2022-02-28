@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -258,4 +259,34 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 
 	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
 	return &pb.DownResponse{Group: igroup}, nil
+}
+
+func (s *DriverServiceServer) MonitorStates(ctx context.Context, in *pb.StateUpdateRequest) (*pb.GetTypeResponse, error) {
+
+	ig_array := in.Group
+	sp := in.ServicesProvider
+
+	client, err := one.NewClientFromSP(sp, s.log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
+	client.SetSecrets(sp.GetSecrets())
+	client.SetVars(sp.GetVars())
+
+	for _, ig := range ig_array {
+
+		instances := ig.Instances
+		for _, inst := range instances {
+
+			_, err := actions.StatusesClient(client, inst, nil, nil)
+			if err != nil {
+				s.log.Error("fail to get Services", zap.Error(err))
+				continue
+			}
+
+		}
+
+	}
+
+	return &pb.GetTypeResponse{}, nil
 }
