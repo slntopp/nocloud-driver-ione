@@ -26,6 +26,7 @@ import (
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -278,7 +279,7 @@ func (s *DriverServiceServer) MonitorStates(ctx context.Context, in *pb.StateUpd
 		instances := ig.Instances
 		for _, inst := range instances {
 
-			_, err := actions.StatusesClient(client, inst, nil, nil)
+			_, err := actions.StatusesClient(client, inst, inst.GetData(), &srvpb.PerformActionResponse{Result: true})
 			if err != nil {
 				s.log.Error("fail to get Services", zap.Error(err))
 				continue
