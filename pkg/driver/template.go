@@ -23,7 +23,6 @@ import (
 	tmpl "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/template"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
-	"github.com/gofrs/uuid"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -37,12 +36,17 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
 	data := make(map[string]*structpb.Value)
+	conf := instance.GetConfig()
 
-	id, err := uuid.NewV4()
-	if err != nil {
-		return 0, errors.New("couldn't generate UUID")
+	if pass := conf["password"].GetStringValue(); pass != "" {
+		tmpl.Add(keys.Template("PASSWORD"), pass)
 	}
-	vmname := id.String()
+	if ssh_key := conf["ssh_public_key"].GetStringValue(); ssh_key != "" {
+		tmpl.AddCtx(keys.SSHPubKey, ssh_key)
+	}
+
+	id := instance.GetUuid()
+	vmname := id
 	data[DATA_VM_NAME] = structpb.NewStringValue(vmname)
 
 	// Set VCPU, is 1 by default
@@ -93,10 +97,11 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		nic := tmpl.AddNIC()
 		nic.Add(shared.NetworkID, public_vn)
 	}
-
-	conf := instance.GetConfig()
-
-	tmpl.Add(keys.Template("PASSWORD"), conf["password"].GetStringValue())
+	// OpenNebula won't generate Networking context without this key set to YES
+	// so most templates won't generate network interfaces inside the VM
+	if int(resources["ips_public"].GetNumberValue()) > 0 {
+		tmpl.AddCtx(keys.NetworkCtx, "YES")
+	}
 
 	var template_id int
 	if conf["template_id"] != nil {

@@ -32,8 +32,7 @@ import (
 
 var (
 	grpc_client sspb.PostServiceClient
-	log         *zap.Logger
-	ctx         context.Context
+	log  *zap.Logger
 )
 
 func ConfigureStatusesClient(logger *zap.Logger, client sspb.PostServiceClient) {
