@@ -262,32 +262,25 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	return &pb.DownResponse{Group: igroup}, nil
 }
 
-func (s *DriverServiceServer) MonitorStates(ctx context.Context, in *pb.StateUpdateRequest) (*pb.GetTypeResponse, error) {
+func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
+	log := s.log.Named("Monitoring")
+	sp := req.GetServicesProvider()
 
-	ig_array := in.Group
-	sp := in.ServicesProvider
-
-	client, err := one.NewClientFromSP(sp, s.log)
+	client, err := one.NewClientFromSP(sp, log)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
 	client.SetSecrets(sp.GetSecrets())
 	client.SetVars(sp.GetVars())
 
-	for _, ig := range ig_array {
-
-		instances := ig.Instances
-		for _, inst := range instances {
-
+	for _, ig := range req.GetGroups() {
+		for _, inst := range ig.GetInstances() {
 			_, err := actions.StatusesClient(client, inst, inst.GetData(), &srvpb.PerformActionResponse{Result: true})
 			if err != nil {
-				s.log.Error("fail to get Services", zap.Error(err))
-				continue
+				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
-
 		}
-
 	}
 
-	return &pb.GetTypeResponse{}, nil
+	return &pb.MonitoringResponse{}, nil
 }
