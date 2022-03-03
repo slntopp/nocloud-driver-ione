@@ -22,8 +22,6 @@ import (
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 
-	sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
-
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,11 +29,11 @@ import (
 )
 
 var (
-	grpc_client sspb.PostServiceClient
+	grpc_client instpb.StatesServiceClient
 	log  *zap.Logger
 )
 
-func ConfigureStatusesClient(logger *zap.Logger, client sspb.PostServiceClient) {
+func ConfigureStatusesClient(logger *zap.Logger, client instpb.StatesServiceClient) {
 	log = logger.Named("Statuses")
 	grpc_client = client
 }
@@ -57,10 +55,12 @@ func StatusesClient(
 
 	result.Meta = par.Meta
 
-	_, err = grpc_client.State(context.Background(), &sspb.PostServiceStateRequest{
+	_, err = grpc_client.PostInstanceState(context.Background(), &instpb.PostInstanceStateRequest{
 		Uuid:  inst.GetUuid(),
-		State: int32(result.Meta["state"].GetNumberValue()),
-		Meta:  result.Meta,
+		State: &instpb.InstanceState{
+			State: int32(result.Meta["state"].GetNumberValue()),
+			Meta:  result.Meta,
+		},
 	})
 	if err != nil {
 		log.Error("fail to send statuses:", zap.Error(err))

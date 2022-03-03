@@ -29,7 +29,7 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
 
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	sspb "github.com/slntopp/nocloud/pkg/statuses/proto"
+	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 )
 
 var (
@@ -74,7 +74,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := sspb.NewPostServiceClient(conn)
+	client := instpb.NewStatesServiceClient(conn)
 	actions.ConfigureStatusesClient(log, client)
 
 	s := grpc.NewServer()
