@@ -45,7 +45,6 @@ func StatusesClient(
 	data map[string]*structpb.Value,
 	result *srvpb.PerformActionResponse,
 ) (*srvpb.PerformActionResponse, error) {
-
 	log.Debug("StatusesClient request received")
 
 	par, err := State(client, nil, inst, data)
@@ -66,5 +65,6 @@ func StatusesClient(
 		log.Error("fail to send statuses:", zap.Error(err))
 	}
 
+	log.Debug("Instance State posted")
 	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
 }
