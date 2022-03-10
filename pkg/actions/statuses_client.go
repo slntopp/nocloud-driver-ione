@@ -107,9 +107,8 @@ func StatusesClient(
 	request.State.State = res
 	_, err = grpc_client.PostState(context.Background(), request)
 	if err != nil {
-		log.Error("fail to send statuses:", zap.Error(err))
+		log.Error("Failed to post Instance State", zap.Error(err))
 	}
 
-	log.Debug("Instance State posted")
 	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
 }
