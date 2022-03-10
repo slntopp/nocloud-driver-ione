@@ -112,3 +112,17 @@ func StatusesClient(
 
 	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
 }
+
+func PostServicesProviderState(state *one.LocationState) {
+	request := &instpb.PostStateRequest{
+		Uuid: state.Uuid,
+		State: &instpb.State{
+			State: state.State,
+			Meta: state.Hosts,
+		},
+	}
+	_, err := grpc_client.PostState(context.Background(), request)
+	if err != nil {
+		log.Error("Failed to post Location(ServicesProvider) State", zap.Error(err))
+	}
+}
