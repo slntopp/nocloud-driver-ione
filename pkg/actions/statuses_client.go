@@ -17,6 +17,7 @@ package actions
 
 import (
 	"context"
+	"strings"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -38,6 +39,26 @@ func ConfigureStatusesClient(logger *zap.Logger, client instpb.StatesServiceClie
 	grpc_client = client
 }
 
+var STATES_REF = map[int32]instpb.NoCloudState{
+	0: instpb.NoCloudState_INIT, // INIT
+	1: instpb.NoCloudState_INIT, // PENDING
+	2: instpb.NoCloudState_INIT, // HOLD
+	4: instpb.NoCloudState_STOPPED, // STOPPED
+	5: instpb.NoCloudState_SUSPENDED, // SUSPENDED
+	6: instpb.NoCloudState_DELETED, // DONE
+	8: instpb.NoCloudState_STOPPED, // POWEROFF
+	9: instpb.NoCloudState_INIT, // UNDEPLOYED
+	10: instpb.NoCloudState_OPERATION, // CLONING
+	11: instpb.NoCloudState_FAILURE, // CLONING_FAILURE
+}
+
+var LCM_STATE_REF = map[int32]instpb.NoCloudState{
+	0: instpb.NoCloudState_INIT, // INIT
+	1: instpb.NoCloudState_INIT, // PENDING
+	2: instpb.NoCloudState_INIT, // HOLD
+	3: instpb.NoCloudState_RUNNING, // RUNNING
+}
+
 // Returns the VM state of the VirtualMachine to statuses server
 func StatusesClient(
 	client *one.ONeClient,
@@ -54,13 +75,37 @@ func StatusesClient(
 
 	result.Meta = par.Meta
 
-	_, err = grpc_client.PostInstanceState(context.Background(), &instpb.PostInstanceStateRequest{
+	request := &instpb.PostStateRequest{
 		Uuid:  inst.GetUuid(),
-		State: &instpb.InstanceState{
-			State: int32(result.Meta["state"].GetNumberValue()),
+		State: &instpb.State{
+			State: instpb.NoCloudState_UNKNOWN,
 			Meta:  result.Meta,
 		},
-	})
+	}
+	
+	oneState := int32(result.Meta["state"].GetNumberValue())
+	oneLcmState := int32(result.Meta["lcm_state"].GetNumberValue())
+
+	res, ok := STATES_REF[oneState]
+	if !ok {
+		r, ok := LCM_STATE_REF[oneLcmState]
+		if ok {
+			res = r
+			goto post
+		}
+
+		if strings.HasSuffix(result.Meta["lcm_state_str"].GetStringValue(), "FAILURE") {
+			res = instpb.NoCloudState_FAILURE
+		} else if strings.HasSuffix(result.Meta["lcm_state_str"].GetStringValue(), "UNKNOWN")  {
+			res = instpb.NoCloudState_UNKNOWN
+		} else {
+			res = instpb.NoCloudState_OPERATION
+		}
+	}
+
+	post:
+	request.State.State = res
+	_, err = grpc_client.PostState(context.Background(), request)
 	if err != nil {
 		log.Error("fail to send statuses:", zap.Error(err))
 	}
