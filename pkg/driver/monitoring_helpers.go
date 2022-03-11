@@ -15,7 +15,16 @@ limitations under the License.
 */
 package one
 
-import "github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/datastore"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/host"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/structpb"
+)
 
 var VMMsRecordHelpers = map[string]func(state map[string]interface{}, rec dynamic.Template){
 	"vcenter": vCenterRecordHelper,
@@ -45,4 +54,77 @@ func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template) {
 	if err == nil {
 		state["ts"] = ts
 	}
+}
+
+func MonitorHostsPool(log *zap.Logger, c *ONeClient, pool []host.Host) (res *structpb.Value, err error) {
+	hosts := make(map[string]interface{})
+	for _, host := range pool {
+		hc := c.ctrl.Host(host.ID)
+		state := make(map[string]interface{})
+		state["name"] = host.Name
+
+		s, err := host.StateString()
+		if err != nil {
+			s = "UNKNOWN"
+		}
+		state["state"] = s
+
+		state["im_mad"] = host.IMMAD
+		state["vm_mad"] = host.VMMAD
+
+
+		var rec dynamic.Template
+		var recLen int
+		mon, err := hc.Monitoring()
+		helper, ok := VMMsRecordHelpers[host.VMMAD]
+		if !ok {
+			state["error"] = fmt.Sprintf("Host VM MAD %s unsupported", host.VMMAD)
+			goto done
+		}
+		if err != nil {
+			c.log.Error("Error getting Monitoring data", zap.Error(err))
+			goto done
+		}
+		recLen = len(mon.Records)
+		if recLen == 0 {
+			goto done
+		}
+		rec = mon.Records[recLen - 1]
+		c.log.Debug("Last Monitoring Record", zap.Any("record", rec))
+		helper(state, rec)
+
+		done:
+		hosts[strconv.Itoa(host.ID)] = state
+	}
+	return structpb.NewValue(hosts)
+}
+
+func MonitorDatastoresPool(log *zap.Logger, c *ONeClient, pool []datastore.Datastore) (res *structpb.Value, err error) {
+	dss := make(map[string]interface{})
+	for _, ds := range pool {
+		if ds.Type != "1" {
+			continue
+		}
+		state := make(map[string]interface{})
+		state["name"] = ds.Name
+
+		s, err := ds.StateString()
+		if err != nil {
+			s = "UNKNOWN"
+		}
+		state["state"] = s
+
+		state["ds_mad"] = ds.DSMad
+		state["tm_mad"] = ds.TMMad
+
+		state["used"] = ds.UsedMB
+		state["free"] = ds.FreeMB
+		state["total"] = ds.TotalMB
+
+		driveType, _ := ds.Template.GetStr("DRIVE_TYPE")
+		state["drive_type"] = driveType
+
+		dss[strconv.Itoa(ds.ID)] = state
+	}
+	return structpb.NewValue(dss)
 }

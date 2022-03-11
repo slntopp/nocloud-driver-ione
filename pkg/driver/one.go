@@ -17,11 +17,8 @@ package one
 
 import (
 	"errors"
-	"fmt"
-	"strconv"
 
 	goca "github.com/OpenNebula/one/src/oca/go/src/goca"
-	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
@@ -69,60 +66,42 @@ func (c *ONeClient) SetVars(vars map[string]*sppb.Var) {
 type LocationState struct {
 	Uuid string `json:"uuid"`
 	State instpb.NoCloudState `json:"state"`
-	Hosts map[string]*structpb.Value `json:"hosts"`
+	Error string `json:"error"`
+
+	Meta map[string]*structpb.Value
 }
 
 func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationState, err error) {
+	log := c.log.Named("MonitorLocation").Named(sp.GetUuid())
 	hsc := c.ctrl.Hosts()
 	hosts, err := hsc.Info()
 	if err != nil {
 		return nil, err
 	}
-	res = &LocationState{Uuid: sp.GetUuid(), State: instpb.NoCloudState_RUNNING}
-	res.Hosts = make(map[string]*structpb.Value)
-	for _, host := range hosts.Hosts {
-		hc := c.ctrl.Host(host.ID)
-		state := make(map[string]interface{})
-		s, err := host.StateString()
-		if err != nil {
-			s = "UNKNOWN"
-			res.State = instpb.NoCloudState_UNKNOWN
-		}
-		state["state"] = s
 
-		state["im_mad"] = host.IMMAD
-		state["vm_mad"] = host.VMMAD
+	res = &LocationState{Uuid: sp.GetUuid(), State: instpb.NoCloudState_RUNNING, Meta: make(map[string]*structpb.Value)}
+	hostsState, err := MonitorHostsPool(log.Named("MonitorHostsPool"), c, hosts.Hosts)
+	if err != nil {
+		log.Error("ConvertionError", zap.Error(err))
+		res.State = instpb.NoCloudState_FAILURE
+	} else {
+		res.Meta["hosts"] = hostsState
+	}
 
-		var rec dynamic.Template
-		var recLen int
-		mon, err := hc.Monitoring()
-		helper, ok := VMMsRecordHelpers[host.VMMAD]
-		if !ok {
-			state["error"] = fmt.Sprintf("Host VM MAD %s unsupported", host.VMMAD)
-			goto done
-		}
-		if err != nil {
-			c.log.Error("Error getting Monitoring data", zap.Error(err))
-			goto done
-		}
-		recLen = len(mon.Records)
-		if recLen == 0 {
-			goto done
-		}
-		rec = mon.Records[recLen - 1]
-		c.log.Debug("Last Monitoring Record", zap.Any("record", rec))
-		helper(state, rec)
-
-		done:
-		hs_struct, err := structpb.NewValue(state)
-		if err != nil {
-			c.log.Error("Error converting HostState to StructPB", zap.Any("state", state), zap.Error(err))
-		}
-		res.Hosts[strconv.Itoa(host.ID)] = hs_struct
+	dsc := c.ctrl.Datastores()
+	dss, err := dsc.Info()
+	if err != nil {
+		log.Error("Error Monitoring Location(ServicesProvider) Datastores", zap.Error(err))
+		res.State = instpb.NoCloudState_FAILURE
+		return res, nil
+	}
+	dssState, err := MonitorDatastoresPool(log.Named("MonitorDatastoresPool"), c, dss.Datastores)
+	if err != nil {
+		log.Error("ConvertionError", zap.Error(err))
+		res.State = instpb.NoCloudState_FAILURE
+	} else {
+		res.Meta["datastores"] = dssState
 	}
 
 	return res, nil
 }
-
-
-

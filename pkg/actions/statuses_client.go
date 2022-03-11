@@ -118,7 +118,7 @@ func PostServicesProviderState(state *one.LocationState) {
 		Uuid: state.Uuid,
 		State: &instpb.State{
 			State: state.State,
-			Meta: state.Hosts,
+			Meta: state.Meta,
 		},
 	}
 	_, err := grpc_client.PostState(context.Background(), request)
