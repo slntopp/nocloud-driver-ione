@@ -37,7 +37,7 @@ var (
 	type_key string
 
 	log           *zap.Logger
-	statuses_host string
+	statesHost string
 )
 
 func init() {
@@ -50,8 +50,8 @@ func init() {
 	viper.SetDefault("DRIVER_TYPE_KEY", "ione")
 	type_key = viper.GetString("DRIVER_TYPE_KEY")
 
-	viper.SetDefault("STATUSES_HOST", "statuses:8080")
-	statuses_host = viper.GetString("STATUSES_HOST")
+	viper.SetDefault("STATES_HOST", "statest:8080")
+	statesHost = viper.GetString("STATES_HOST")
 }
 
 func main() {
@@ -64,11 +64,11 @@ func main() {
 		log.Fatal("Failed to listen", zap.String("address", port), zap.Error(err))
 	}
 
-	log.Debug("Init Connection with Statuses", zap.String("host", statuses_host))
+	log.Debug("Init Connection with Statuses", zap.String("host", statesHost))
 	opts := []grpc.DialOption{
 		grpc.WithBlock(), grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
-	conn, err := grpc.Dial(statuses_host, opts...)
+	conn, err := grpc.Dial(statesHost, opts...)
 	if err != nil {
 		log.Fatal("fail to dial Statuses", zap.Error(err))
 	}
