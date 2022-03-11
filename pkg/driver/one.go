@@ -78,7 +78,7 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 	if err != nil {
 		return nil, err
 	}
-	res = &LocationState{Uuid: sp.GetUuid(), State: instpb.NoCloudState_UNKNOWN}
+	res = &LocationState{Uuid: sp.GetUuid(), State: instpb.NoCloudState_RUNNING}
 	res.Hosts = make(map[string]*structpb.Value)
 	for _, host := range hosts.Hosts {
 		hc := c.ctrl.Host(host.ID)
@@ -86,6 +86,7 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 		s, err := host.StateString()
 		if err != nil {
 			s = "UNKNOWN"
+			res.State = instpb.NoCloudState_UNKNOWN
 		}
 		state["state"] = s
 
