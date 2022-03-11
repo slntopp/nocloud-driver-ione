@@ -22,6 +22,7 @@ import (
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -30,33 +31,33 @@ import (
 )
 
 var (
-	grpc_client instpb.StatesServiceClient
+	grpc_client stpb.StatesServiceClient
 	log  *zap.Logger
 )
 
-func ConfigureStatusesClient(logger *zap.Logger, client instpb.StatesServiceClient) {
+func ConfigureStatusesClient(logger *zap.Logger, client stpb.StatesServiceClient) {
 	log = logger.Named("Statuses")
 	grpc_client = client
 }
 
-var STATES_REF = map[int32]instpb.NoCloudState{
-	0: instpb.NoCloudState_INIT, // INIT
-	1: instpb.NoCloudState_INIT, // PENDING
-	2: instpb.NoCloudState_INIT, // HOLD
-	4: instpb.NoCloudState_STOPPED, // STOPPED
-	5: instpb.NoCloudState_SUSPENDED, // SUSPENDED
-	6: instpb.NoCloudState_DELETED, // DONE
-	8: instpb.NoCloudState_STOPPED, // POWEROFF
-	9: instpb.NoCloudState_INIT, // UNDEPLOYED
-	10: instpb.NoCloudState_OPERATION, // CLONING
-	11: instpb.NoCloudState_FAILURE, // CLONING_FAILURE
+var STATES_REF = map[int32]stpb.NoCloudState{
+	0: stpb.NoCloudState_INIT, // INIT
+	1: stpb.NoCloudState_INIT, // PENDING
+	2: stpb.NoCloudState_INIT, // HOLD
+	4: stpb.NoCloudState_STOPPED, // STOPPED
+	5: stpb.NoCloudState_SUSPENDED, // SUSPENDED
+	6: stpb.NoCloudState_DELETED, // DONE
+	8: stpb.NoCloudState_STOPPED, // POWEROFF
+	9: stpb.NoCloudState_INIT, // UNDEPLOYED
+	10: stpb.NoCloudState_OPERATION, // CLONING
+	11: stpb.NoCloudState_FAILURE, // CLONING_FAILURE
 }
 
-var LCM_STATE_REF = map[int32]instpb.NoCloudState{
-	0: instpb.NoCloudState_INIT, // INIT
-	1: instpb.NoCloudState_INIT, // PENDING
-	2: instpb.NoCloudState_INIT, // HOLD
-	3: instpb.NoCloudState_RUNNING, // RUNNING
+var LCM_STATE_REF = map[int32]stpb.NoCloudState{
+	0: stpb.NoCloudState_INIT, // INIT
+	1: stpb.NoCloudState_INIT, // PENDING
+	2: stpb.NoCloudState_INIT, // HOLD
+	3: stpb.NoCloudState_RUNNING, // RUNNING
 }
 
 // Returns the VM state of the VirtualMachine to statuses server
@@ -75,10 +76,10 @@ func StatusesClient(
 
 	result.Meta = par.Meta
 
-	request := &instpb.PostStateRequest{
+	request := &stpb.PostStateRequest{
 		Uuid:  inst.GetUuid(),
-		State: &instpb.State{
-			State: instpb.NoCloudState_UNKNOWN,
+		State: &stpb.State{
+			State: stpb.NoCloudState_UNKNOWN,
 			Meta:  result.Meta,
 		},
 	}
@@ -95,11 +96,11 @@ func StatusesClient(
 		}
 
 		if strings.HasSuffix(result.Meta["lcm_state_str"].GetStringValue(), "FAILURE") {
-			res = instpb.NoCloudState_FAILURE
+			res = stpb.NoCloudState_FAILURE
 		} else if strings.HasSuffix(result.Meta["lcm_state_str"].GetStringValue(), "UNKNOWN")  {
-			res = instpb.NoCloudState_UNKNOWN
+			res = stpb.NoCloudState_UNKNOWN
 		} else {
-			res = instpb.NoCloudState_OPERATION
+			res = stpb.NoCloudState_OPERATION
 		}
 	}
 
@@ -114,9 +115,9 @@ func StatusesClient(
 }
 
 func PostServicesProviderState(state *one.LocationState) {
-	request := &instpb.PostStateRequest{
+	request := &stpb.PostStateRequest{
 		Uuid: state.Uuid,
-		State: &instpb.State{
+		State: &stpb.State{
 			State: state.State,
 			Meta: state.Meta,
 		},

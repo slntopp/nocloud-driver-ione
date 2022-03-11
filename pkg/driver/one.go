@@ -19,8 +19,8 @@ import (
 	"errors"
 
 	goca "github.com/OpenNebula/one/src/oca/go/src/goca"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -65,7 +65,7 @@ func (c *ONeClient) SetVars(vars map[string]*sppb.Var) {
 
 type LocationState struct {
 	Uuid string `json:"uuid"`
-	State instpb.NoCloudState `json:"state"`
+	State stpb.NoCloudState `json:"state"`
 	Error string `json:"error"`
 
 	Meta map[string]*structpb.Value
@@ -79,10 +79,10 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 		return nil, err
 	}
 
-	res = &LocationState{Uuid: sp.GetUuid(), State: instpb.NoCloudState_RUNNING, Meta: make(map[string]*structpb.Value)}
+	res = &LocationState{Uuid: sp.GetUuid(), State: stpb.NoCloudState_RUNNING, Meta: make(map[string]*structpb.Value)}
 	hostsState, err := MonitorHostsPool(log.Named("MonitorHostsPool"), c, hosts.Hosts)
 	if err != nil {
-		res.State = instpb.NoCloudState_FAILURE
+		res.State = stpb.NoCloudState_FAILURE
 	} else {
 		res.Meta["hosts"] = hostsState
 	}
@@ -91,19 +91,19 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 	dss, err := dsc.Info()
 	if err != nil {
 		log.Error("Error Monitoring Location(ServicesProvider) Datastores", zap.Error(err))
-		res.State = instpb.NoCloudState_UNKNOWN
+		res.State = stpb.NoCloudState_UNKNOWN
 		return res, nil
 	}
 	dssState, err := MonitorDatastoresPool(log.Named("MonitorDatastoresPool"), c, dss.Datastores)
 	if err != nil {
-		res.State = instpb.NoCloudState_UNKNOWN
+		res.State = stpb.NoCloudState_UNKNOWN
 	} else {
 		res.Meta["datastores"] = dssState
 	}
 
 	netsState, err := MonitorNetworks(log.Named("MonitorNetworks"), c)
 	if err != nil {
-		res.State = instpb.NoCloudState_UNKNOWN
+		res.State = stpb.NoCloudState_UNKNOWN
 	} else {
 		res.Meta["networking"] = netsState
 	}
