@@ -90,7 +90,6 @@ func MonitorHostsPool(log *zap.Logger, c *ONeClient, pool []host.Host) (res *str
 			goto done
 		}
 		rec = mon.Records[recLen - 1]
-		c.log.Debug("Last Monitoring Record", zap.Any("record", rec))
 		helper(state, rec)
 
 		done:
@@ -127,4 +126,45 @@ func MonitorDatastoresPool(log *zap.Logger, c *ONeClient, pool []datastore.Datas
 		dss[strconv.Itoa(ds.ID)] = state
 	}
 	return structpb.NewValue(dss)
+}
+
+func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err error) {
+	state := make(map[string]interface{})
+
+	state["public_vnet"] = func() (state map[string]interface{}) {
+		state = map[string]interface{}{}
+		public_pool_id, ok := c.vars[PUBLIC_IP_POOL]
+		if !ok {
+			state["error"] = "VNet ID is not set"
+			return state
+		}
+
+		id, err := GetVarValue(public_pool_id, "default")
+		if err != nil {
+			state["error"] = err
+			return state
+		}
+		vnet, err := c.GetVNet(int(id.GetNumberValue()))
+		if err != nil {
+			state["error"] = err
+			return state
+		}
+
+		state["id"] = vnet.ID
+		state["name"] = vnet.Name
+		state["vn_mad"] = vnet.VNMad
+		total, used := 0, 0
+		for _, ar := range vnet.ARs {
+			total += ar.Size
+			used += len(ar.Leases)
+		}
+		state["total"] = total
+		state["used"] = used
+		state["free"] = total - used
+		return state
+	}()
+
+	state["private_vnet"] = map[string]interface{}{"error": "Private VNet Pool Monitoring not implemented"}
+
+	return structpb.NewValue(state)
 }

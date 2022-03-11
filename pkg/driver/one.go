@@ -82,7 +82,6 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 	res = &LocationState{Uuid: sp.GetUuid(), State: instpb.NoCloudState_RUNNING, Meta: make(map[string]*structpb.Value)}
 	hostsState, err := MonitorHostsPool(log.Named("MonitorHostsPool"), c, hosts.Hosts)
 	if err != nil {
-		log.Error("ConvertionError", zap.Error(err))
 		res.State = instpb.NoCloudState_FAILURE
 	} else {
 		res.Meta["hosts"] = hostsState
@@ -92,15 +91,21 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 	dss, err := dsc.Info()
 	if err != nil {
 		log.Error("Error Monitoring Location(ServicesProvider) Datastores", zap.Error(err))
-		res.State = instpb.NoCloudState_FAILURE
+		res.State = instpb.NoCloudState_UNKNOWN
 		return res, nil
 	}
 	dssState, err := MonitorDatastoresPool(log.Named("MonitorDatastoresPool"), c, dss.Datastores)
 	if err != nil {
-		log.Error("ConvertionError", zap.Error(err))
-		res.State = instpb.NoCloudState_FAILURE
+		res.State = instpb.NoCloudState_UNKNOWN
 	} else {
 		res.Meta["datastores"] = dssState
+	}
+
+	netsState, err := MonitorNetworks(log.Named("MonitorNetworks"), c)
+	if err != nil {
+		res.State = instpb.NoCloudState_UNKNOWN
+	} else {
+		res.Meta["networking"] = netsState
 	}
 
 	return res, nil
