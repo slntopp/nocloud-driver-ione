@@ -50,7 +50,7 @@ func init() {
 	viper.SetDefault("DRIVER_TYPE_KEY", "ione")
 	type_key = viper.GetString("DRIVER_TYPE_KEY")
 
-	viper.SetDefault("STATES_HOST", "statest:8080")
+	viper.SetDefault("STATES_HOST", "states:8080")
 	statesHost = viper.GetString("STATES_HOST")
 }
 
