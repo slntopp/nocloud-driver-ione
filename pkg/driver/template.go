@@ -68,6 +68,20 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	}
 	tmpl.Memory(int(resources["ram"].GetNumberValue()))
 
+	if resources["drive_size"] != nil {
+		id := 0
+		disks := tmpl.GetDisks()
+		if conf["template_disk_id"] != nil {
+			id = int(conf["template_disk_id"].GetNumberValue())
+		}
+		if len(disks) <= id {
+			return 0, errors.New("template_disk_id is bigger then amount of disks")
+		}
+		disk := disks[id]
+		disk.AddPair("SIZE", resources["drive_size"].GetNumberValue())
+		disk.AddPair("DRIVE_TYPE", resources["drive_type"].GetStringValue())
+	}
+
 	sched, err := GetVarValue(c.vars[SCHED], "default")
 	if err != nil {
 		return -1, err
