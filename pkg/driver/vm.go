@@ -15,6 +15,11 @@ limitations under the License.
 */
 package one
 
+import (
+	pb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"google.golang.org/protobuf/types/known/structpb"
+)
+
 func (c *ONeClient) GetVMByName(name string) (id int, err error) {
 	vmsc := c.ctrl.VMs()
 	return vmsc.ByName(name)
@@ -68,4 +73,48 @@ func (c *ONeClient) StateVM(id int) (state int, state_str string, lcm_state int,
 	}
 
 	return int(st), st.String(), int(lcm_st), lcm_st.String(), nil
+}
+
+func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
+	vmc := c.ctrl.VM(id)
+	vm, err := vmc.Info(true)
+	if err != nil {
+		return nil, err
+	}
+	inst := pb.Instance{
+		Config: make(map[string]*structpb.Value),
+		Resources: make(map[string]*structpb.Value),
+	}
+	
+	tmpl := vm.Template
+	{
+		tid, err := tmpl.GetFloat("TEMPLATE_ID")
+		if err != nil {
+			return nil, err
+		}
+		inst.Config["template_id"] = structpb.NewNumberValue(tid)
+	}
+	{
+		pwd, err := vm.UserTemplate.GetStr("PASSWORD")
+		if err != nil {
+			return nil, err
+		}
+		inst.Config["password"] = structpb.NewStringValue(pwd)
+	}
+	{
+		cpu, err := tmpl.GetCPU()
+		if err != nil {
+			return nil, err
+		}
+		inst.Resources["cpu"] = structpb.NewNumberValue(cpu)
+	}
+	{
+		ram, err := tmpl.GetMemory()
+		if err != nil {
+			return nil, err
+		}
+		inst.Resources["ram"] = structpb.NewNumberValue(float64(ram))
+	}
+
+	return &inst, nil
 }

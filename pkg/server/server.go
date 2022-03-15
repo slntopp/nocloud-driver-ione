@@ -279,6 +279,13 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
+			vmid, err := actions.GetVMIDFromData(client, inst)
+			if err != nil {
+				log.Error("Error getting VM ID from data", zap.Error(err))
+				continue
+			}
+			res, err := client.VMToInstance(vmid)
+			log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
 		}
 	}
 
