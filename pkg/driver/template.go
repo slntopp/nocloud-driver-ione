@@ -24,6 +24,7 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -31,6 +32,8 @@ func (c *ONeClient) GetTemplate(id int) (*tmpl.Template, error) {
 	tc := c.ctrl.Template(id)
 	return tc.Info(true, true)
 }
+
+const DRIVE_TYPE shared.DiskKeys = "DRIVE_TYPE"
 
 func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_data map[string]*structpb.Value) (vmid int, err error) {
 	resources := instance.GetResources()
@@ -43,6 +46,17 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	}
 	if ssh_key := conf["ssh_public_key"].GetStringValue(); ssh_key != "" {
 		tmpl.AddCtx(keys.SSHPubKey, ssh_key)
+	}
+
+	var template_id int
+	if conf["template_id"] != nil {
+		template_id = int(conf["template_id"].GetNumberValue())
+	} else {
+		return 0, errors.New("template ID isn't given")
+	}
+	vm_tmpl, err := c.GetTemplate(template_id)
+	if err != nil {
+		return 0, err
 	}
 
 	id := instance.GetUuid()
@@ -70,16 +84,23 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 
 	if resources["drive_size"] != nil {
 		id := 0
-		disks := tmpl.GetDisks()
+		disks := vm_tmpl.Template.GetDisks()
 		if conf["template_disk_id"] != nil {
 			id = int(conf["template_disk_id"].GetNumberValue())
 		}
-		if len(disks) <= id {
-			return 0, errors.New("template_disk_id is bigger then amount of disks")
+		c.log.Debug("Disks", zap.Int("disks_len", len(disks)), zap.Int("id", id))
+
+		for i, disk := range disks {
+			new := tmpl.AddDisk()
+			for _, pair := range disk.Pairs {
+				new.AddPair(pair.Key(), pair.Value)
+			}
+			if i == id {
+				new.Del(string(shared.Size))
+				new.Add(shared.Size, int(resources["drive_size"].GetNumberValue()))
+				new.Add(DRIVE_TYPE, resources["drive_type"].GetStringValue())
+			}
 		}
-		disk := disks[id]
-		disk.AddPair("SIZE", resources["drive_size"].GetNumberValue())
-		disk.AddPair("DRIVE_TYPE", resources["drive_type"].GetStringValue())
 	}
 
 	sched, err := GetVarValue(c.vars[SCHED], "default")
@@ -117,14 +138,9 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		tmpl.AddCtx(keys.NetworkCtx, "YES")
 	}
 
-	var template_id int
-	if conf["template_id"] != nil {
-		template_id = int(conf["template_id"].GetNumberValue())
-	} else {
-		return 0, errors.New("template ID isn't given")
-	}
-
-	vmid, err = c.InstantiateTemplate(template_id, vmname, tmpl.String(), false)
+	tmpl_string := tmpl.String()
+	c.log.Debug("Resulting Template", zap.String("template", tmpl_string))
+	vmid, err = c.InstantiateTemplate(template_id, vmname, tmpl_string, false)
 	if err != nil {
 		return -1, err
 	}
