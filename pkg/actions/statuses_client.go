@@ -76,16 +76,22 @@ func StatusesClient(
 
 	result.Meta = par.Meta
 
+	PostInstanceState(inst.GetUuid(), par.Meta)
+
+	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
+}
+
+func PostInstanceState(uuid string, meta map[string]*structpb.Value) {
 	request := &stpb.PostStateRequest{
-		Uuid:  inst.GetUuid(),
+		Uuid:  uuid,
 		State: &stpb.State{
 			State: stpb.NoCloudState_UNKNOWN,
-			Meta:  result.Meta,
+			Meta:  meta,
 		},
 	}
 	
-	oneState := int32(result.Meta["state"].GetNumberValue())
-	oneLcmState := int32(result.Meta["lcm_state"].GetNumberValue())
+	oneState := int32(meta["state"].GetNumberValue())
+	oneLcmState := int32(meta["lcm_state"].GetNumberValue())
 
 	res, ok := STATES_REF[oneState]
 	if !ok {
@@ -95,9 +101,9 @@ func StatusesClient(
 			goto post
 		}
 
-		if strings.HasSuffix(result.Meta["lcm_state_str"].GetStringValue(), "FAILURE") {
+		if strings.HasSuffix(meta["lcm_state_str"].GetStringValue(), "FAILURE") {
 			res = stpb.NoCloudState_FAILURE
-		} else if strings.HasSuffix(result.Meta["lcm_state_str"].GetStringValue(), "UNKNOWN")  {
+		} else if strings.HasSuffix(meta["lcm_state_str"].GetStringValue(), "UNKNOWN")  {
 			res = stpb.NoCloudState_UNKNOWN
 		} else {
 			res = stpb.NoCloudState_OPERATION
@@ -106,12 +112,10 @@ func StatusesClient(
 
 	post:
 	request.State.State = res
-	_, err = grpc_client.PostState(context.Background(), request)
+	_, err := grpc_client.PostState(context.Background(), request)
 	if err != nil {
 		log.Error("Failed to post Instance State", zap.Error(err))
 	}
-
-	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
 }
 
 func PostServicesProviderState(state *one.LocationState) {
