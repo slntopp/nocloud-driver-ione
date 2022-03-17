@@ -26,6 +26,7 @@ import (
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
@@ -45,8 +46,9 @@ type DriverServiceServer struct {
 	log *zap.Logger
 }
 
-func NewDriverServiceServer(log *zap.Logger) *DriverServiceServer {
-	return &DriverServiceServer{log: log}
+func NewDriverServiceServer(log *zap.Logger, key []byte) *DriverServiceServer {
+	auth.SetContext(log, key)
+	return &DriverServiceServer{ log: log }
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
@@ -180,13 +182,14 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.UpResponse, error) {
 	igroup := input.GetGroup()
 	sp := input.GetServicesProvider()
-	s.log.Debug("Up request received", zap.Any("instances_group", igroup))
+	log := s.log.Named("Up")
+	log.Debug("Request received", zap.Any("instances_group", igroup))
 
 	if igroup.GetType() != DRIVER_TYPE {
 		return nil, status.Error(codes.InvalidArgument, "Wrong driver type")
 	}
 
-	client, err := one.NewClientFromSP(sp, s.log)
+	client, err := one.NewClientFromSP(sp, log)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
@@ -204,21 +207,26 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 
 	data, err = s.PrepareService(ctx, igroup, client, group)
 	if err != nil {
-		s.log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
+		log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
 		return nil, err
 	}
 	userid := int(data["userid"].GetNumberValue())
 	for _, instance := range igroup.GetInstances() {
-		vmid, err := client.InstantiateTemplateHelper(instance, data)
+		token, err := auth.MakeTokenInstance(instance.GetUuid())
 		if err != nil {
-			s.log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
+			log.Error("Error generating VM token", zap.String("instance", instance.GetUuid()), zap.Error(err))
+			continue
+		}
+		vmid, err := client.InstantiateTemplateHelper(instance, data, token)
+		if err != nil {
+			log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
 			continue
 		}
 		client.Chown("vm", vmid, userid, int(group))
 	}
 
 	igroup.Data = data
-	s.log.Debug("Up request completed", zap.Any("instances_group", igroup))
+	log.Debug("Up request completed", zap.Any("instances_group", igroup))
 	return &pb.UpResponse{
 		Group: igroup,
 	}, nil

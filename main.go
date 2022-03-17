@@ -33,11 +33,12 @@ import (
 )
 
 var (
-	port     string
-	type_key string
+	port     		string
+	type_key 		string
 
-	log           *zap.Logger
-	statesHost string
+	log           	*zap.Logger
+	statesHost 		string
+	SIGNING_KEY		[]byte
 )
 
 func init() {
@@ -52,6 +53,9 @@ func init() {
 
 	viper.SetDefault("STATES_HOST", "states:8080")
 	statesHost = viper.GetString("STATES_HOST")
+
+	viper.SetDefault("SIGNING_KEY", "seeeecreet")
+	SIGNING_KEY = []byte(viper.GetString("SIGNING_KEY"))
 }
 
 func main() {
@@ -79,7 +83,7 @@ func main() {
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
-	srv := server.NewDriverServiceServer(log.Named("IONe Driver"))
+	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY)
 
 	pb.RegisterDriverServiceServer(s, srv)
 

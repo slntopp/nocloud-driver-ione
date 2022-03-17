@@ -23,6 +23,7 @@ import (
 	tmpl "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/template"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
+	driver_shared "github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -33,15 +34,16 @@ func (c *ONeClient) GetTemplate(id int) (*tmpl.Template, error) {
 	return tc.Info(true, true)
 }
 
-const DRIVE_TYPE shared.DiskKeys = "DRIVE_TYPE"
 
-func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_data map[string]*structpb.Value) (vmid int, err error) {
+
+func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_data map[string]*structpb.Value, token string) (vmid int, err error) {
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
 	data := make(map[string]*structpb.Value)
 	conf := instance.GetConfig()
 
-	tmpl.Add(keys.Template("NOCLOUD"), "TRUE")
+	tmpl.Add(driver_shared.NOCLOUD_VM, "TRUE")
+	tmpl.Add(driver_shared.NOCLOUD_VM_TOKEN, token)
 
 	if pass := conf["password"].GetStringValue(); pass != "" {
 		tmpl.Add(keys.Template("PASSWORD"), pass)
@@ -100,7 +102,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 			if i == id {
 				new.Del(string(shared.Size))
 				new.Add(shared.Size, int(resources["drive_size"].GetNumberValue()))
-				new.Add(DRIVE_TYPE, resources["drive_type"].GetStringValue())
+				new.Add(driver_shared.DRIVE_TYPE, resources["drive_type"].GetStringValue())
 			}
 		}
 	}
