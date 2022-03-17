@@ -170,6 +170,7 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 		state["total"] = total
 		state["used"] = used
 		state["free"] = total - used
+		log.Debug("public_vnet", zap.Any("state", state))
 		return state
 	}()
 
