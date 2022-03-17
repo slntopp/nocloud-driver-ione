@@ -265,6 +265,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
 	log := s.log.Named("Monitoring")
 	sp := req.GetServicesProvider()
+	log.Info("Starting Monitoring Routine", zap.String("sp", sp.GetUuid()))
 
 	client, err := one.NewClientFromSP(sp, log)
 	if err != nil {
@@ -297,5 +298,6 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	actions.PostServicesProviderState(r)
 
+	log.Info("Monitoring Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil
 }
