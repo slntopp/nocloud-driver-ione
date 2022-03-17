@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 NAME HERE <EMAIL ADDRESS>
+Copyright © 2022 Nikita Ivanovski info@slnt-opp.xyz
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,14 @@ package cmd
 import (
 	"encoding/base64"
 	"encoding/xml"
+	"errors"
 
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
+	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -41,6 +44,12 @@ var recordCmd = &cobra.Command{
 		err = xml.Unmarshal(tmpl, vm)
 		if err != nil {
 			return err
+		}
+	
+		utmpl := vm.UserTemplate
+		if v, err := utmpl.GetStr(string(shared.NOCLOUD_VM)); err != nil || v != "TRUE" {
+			log.Info("Not a NoCloud VM", zap.String("attribute", v), zap.Error(err))
+			return nil
 		}
 		
 		st, lcm_st, err := vm.State()
@@ -70,8 +79,14 @@ var recordCmd = &cobra.Command{
 			return err
 		}
 
+		token, err := utmpl.GetStr(string(shared.NOCLOUD_VM_TOKEN))
+		if err != nil {
+			log.Error("Token not present", zap.Error(err))
+			return errors.New("token not present")
+		}
 
 		req := actions.MakePostStateRequest(vm.Name, data.GetFields())
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "bearer " + token)
 		_, err = srvClient.PostState(ctx, req)
 		return err
 	},
