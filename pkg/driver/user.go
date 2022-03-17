@@ -16,6 +16,8 @@ limitations under the License.
 package one
 
 import (
+	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
 )
 
@@ -32,4 +34,13 @@ func (c *ONeClient) CreateUser(name, pass string, groups []int) (id int, err err
 func (c *ONeClient) DeleteUser(id int) error {
 	uc := c.ctrl.User(id)
 	return uc.Delete()
+}
+
+func (c *ONeClient) UserAddAttribute(id int, data map[string]interface{}) error {
+	uc := c.ctrl.User(id)
+	tmpl := dynamic.NewTemplate()
+	for k, v := range data {
+		tmpl.AddPair(k, v)
+	}
+	return uc.Update(tmpl.String(), parameters.Merge)
 }
