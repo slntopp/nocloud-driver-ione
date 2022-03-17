@@ -88,9 +88,11 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 	dssState, err := MonitorDatastoresPool(log.Named("MonitorDatastoresPool"), c)
 	if err != nil {
 		res.State = stpb.NoCloudState_UNKNOWN
-	} else {
-		res.Meta["datastores"] = dssState
+		dssState, _ = structpb.NewValue(map[string]interface{}{
+			"error": err.Error(),
+		})
 	}
+	res.Meta["datastores"] = dssState
 
 	netsState, err := MonitorNetworks(log.Named("MonitorNetworks"), c)
 	if err != nil {
