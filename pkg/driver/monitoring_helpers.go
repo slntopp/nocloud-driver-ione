@@ -20,8 +20,6 @@ import (
 	"strconv"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
-	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/datastore"
-	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/host"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -56,9 +54,15 @@ func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template) {
 	}
 }
 
-func MonitorHostsPool(log *zap.Logger, c *ONeClient, pool []host.Host) (res *structpb.Value, err error) {
+func MonitorHostsPool(log *zap.Logger, c *ONeClient) (res *structpb.Value, err error) {
+	hsc := c.ctrl.Hosts()
+	pool, err := hsc.Info()
+	if err != nil {
+		return nil, err
+	}
+
 	hosts := make(map[string]interface{})
-	for _, host := range pool {
+	for _, host := range pool.Hosts {
 		hc := c.ctrl.Host(host.ID)
 		state := make(map[string]interface{})
 		state["name"] = host.Name
@@ -82,7 +86,7 @@ func MonitorHostsPool(log *zap.Logger, c *ONeClient, pool []host.Host) (res *str
 			goto done
 		}
 		if err != nil {
-			c.log.Error("Error getting Monitoring data", zap.Error(err))
+			log.Error("Error getting Monitoring data", zap.Error(err))
 			goto done
 		}
 		recLen = len(mon.Records)
@@ -98,9 +102,14 @@ func MonitorHostsPool(log *zap.Logger, c *ONeClient, pool []host.Host) (res *str
 	return structpb.NewValue(hosts)
 }
 
-func MonitorDatastoresPool(log *zap.Logger, c *ONeClient, pool []datastore.Datastore) (res *structpb.Value, err error) {
+func MonitorDatastoresPool(log *zap.Logger, c *ONeClient) (res *structpb.Value, err error) {
+	dsc := c.ctrl.Datastores()
+	pool, err := dsc.Info()
+	if err != nil {
+		return nil, err
+	}
 	dss := make(map[string]interface{})
-	for _, ds := range pool {
+	for _, ds := range pool.Datastores {
 		if ds.Type != "1" {
 			continue
 		}
