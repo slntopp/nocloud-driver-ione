@@ -150,12 +150,12 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 
 		id, err := GetVarValue(public_pool_id, "default")
 		if err != nil {
-			state["error"] = err
+			state["error"] = err.Error()
 			return state
 		}
 		vnet, err := c.GetVNet(int(id.GetNumberValue()))
 		if err != nil {
-			state["error"] = err
+			state["error"] = err.Error()
 			return state
 		}
 
