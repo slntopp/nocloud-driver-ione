@@ -17,6 +17,7 @@ package one
 
 import (
 	"errors"
+	"time"
 
 	goca "github.com/OpenNebula/one/src/oca/go/src/goca"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
@@ -103,5 +104,6 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 	}
 	res.Meta["networking"] = netsState
 
+	res.Meta["ts"] = structpb.NewNumberValue(float64(time.Now().Unix()))
 	return res, nil
 }
