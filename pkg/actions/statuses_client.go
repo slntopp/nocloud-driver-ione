@@ -81,7 +81,7 @@ func StatusesClient(
 	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
 }
 
-func PostInstanceState(uuid string, meta map[string]*structpb.Value) {
+func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.PostStateRequest {
 	request := &stpb.PostStateRequest{
 		Uuid:  uuid,
 		State: &stpb.State{
@@ -92,15 +92,15 @@ func PostInstanceState(uuid string, meta map[string]*structpb.Value) {
 	
 	oneState := int32(meta["state"].GetNumberValue())
 	oneLcmState := int32(meta["lcm_state"].GetNumberValue())
-
+	
 	res, ok := STATES_REF[oneState]
 	if !ok {
 		r, ok := LCM_STATE_REF[oneLcmState]
 		if ok {
-			res = r
-			goto post
+			request.State.State = r
+			return request
 		}
-
+	
 		if strings.HasSuffix(meta["lcm_state_str"].GetStringValue(), "FAILURE") {
 			res = stpb.NoCloudState_FAILURE
 		} else if strings.HasSuffix(meta["lcm_state_str"].GetStringValue(), "UNKNOWN")  {
@@ -109,9 +109,12 @@ func PostInstanceState(uuid string, meta map[string]*structpb.Value) {
 			res = stpb.NoCloudState_OPERATION
 		}
 	}
-
-	post:
 	request.State.State = res
+	return request
+}
+
+func PostInstanceState(uuid string, meta map[string]*structpb.Value) {
+	request := MakePostStateRequest(uuid, meta)
 	_, err := grpc_client.PostState(context.Background(), request)
 	if err != nil {
 		log.Error("Failed to post Instance State", zap.Error(err))

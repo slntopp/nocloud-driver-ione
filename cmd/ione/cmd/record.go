@@ -19,10 +19,10 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 
-	pb "github.com/slntopp/nocloud-driver-ione/pkg/edge/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -70,12 +70,10 @@ var recordCmd = &cobra.Command{
 			return err
 		}
 
-		edgeClient.PostInstanceState(ctx, &pb.InstanceState{
-			Instance: vm.Name,
-			Data: data.GetFields(),
-		})
 
-		return nil
+		req := actions.MakePostStateRequest(vm.Name, data.GetFields())
+		_, err = srvClient.PostState(ctx, req)
+		return err
 	},
 }
 

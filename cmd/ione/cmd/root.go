@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
-	pb "github.com/slntopp/nocloud-driver-ione/pkg/edge/proto"
 	"github.com/slntopp/nocloud/pkg/nocloud"
+	pb "github.com/slntopp/nocloud/pkg/services/proto"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -31,12 +30,10 @@ import (
 )
 
 var (
-	client *one.ONeClient
-
 	log *zap.Logger
 
 	ctx context.Context
-	edgeClient pb.EdgeServiceClient
+	srvClient pb.ServicesServiceClient
 )
 	
 // rootCmd represents the base command when called without any subcommands
@@ -81,5 +78,5 @@ func initConfig() {
 	}
 
 	ctx = context.Background()
-	edgeClient = pb.NewEdgeServiceClient(conn)
+	srvClient = pb.NewServicesServiceClient(conn)
 }
