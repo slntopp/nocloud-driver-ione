@@ -41,6 +41,8 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	data := make(map[string]*structpb.Value)
 	conf := instance.GetConfig()
 
+	tmpl.Add(keys.Template("NOCLOUD"), "TRUE")
+
 	if pass := conf["password"].GetStringValue(); pass != "" {
 		tmpl.Add(keys.Template("PASSWORD"), pass)
 	}

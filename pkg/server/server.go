@@ -139,6 +139,10 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 		}
 
 		data["userid"] = structpb.NewNumberValue(float64(oneID))
+
+		client.UserAddAttribute(oneID, map[string]interface{}{
+			"NOCLOUD": "TRUE", 
+		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
 
