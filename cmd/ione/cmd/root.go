@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 
+	pb "github.com/slntopp/nocloud/pkg/edge/proto"
 	"github.com/slntopp/nocloud/pkg/nocloud"
-	pb "github.com/slntopp/nocloud/pkg/services/proto"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -34,19 +34,13 @@ var (
 	log *zap.Logger
 
 	ctx context.Context
-	srvClient pb.ServicesServiceClient
+	srvClient pb.EdgeServiceClient
 )
 	
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "ione",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Configure IONe to NoCloud bind",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -56,12 +50,13 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
 	log = nocloud.NewLogger()
+	cobra.OnInitialize(initConfig)
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	log.Debug("Reading Config")
 	viper.AddConfigPath("/etc/one")
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("ione")
@@ -71,6 +66,8 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	} else {
+		log.Error("Error reading Config", zap.Error(err))
 	}
 
 	conn, err := grpc.Dial("api.nocloud.local:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -79,5 +76,5 @@ func initConfig() {
 	}
 
 	ctx = context.Background()
-	srvClient = pb.NewServicesServiceClient(conn)
+	srvClient = pb.NewEdgeServiceClient(conn)
 }
