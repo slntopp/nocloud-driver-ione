@@ -29,13 +29,7 @@ var (
 // contextCmd represents the context command
 var contextCmd = &cobra.Command{
 	Use:   "context",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Print hook context(host, binary version)",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("context called")
 		log.Info("Context", zap.String("host", host), zap.Bool("insecure", insecure), zap.String("version", VERSION))
@@ -44,14 +38,4 @@ to quickly create a Cobra application.`,
 
 func init() {
 	rootCmd.AddCommand(contextCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// contextCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// contextCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
