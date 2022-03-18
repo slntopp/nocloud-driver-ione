@@ -27,7 +27,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
+	ins "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/spf13/viper"
 )
@@ -37,17 +37,21 @@ var (
 
 	ctx context.Context
 	srvClient pb.EdgeServiceClient
+
+	host string
+	insecure bool
 )
 	
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "ione",
+	Use:   "nocloud-ione",
 	Short: "Configure IONe to NoCloud bind",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
+func Execute(version string) {
+	VERSION = version
 	cobra.CheckErr(rootCmd.Execute())
 }
 
@@ -72,10 +76,10 @@ func initConfig() {
 		log.Fatal("Error reading Config", zap.Error(err))
 	}
 
-	host := viper.GetString("host")
+	host = viper.GetString("host")
 	cred := credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
-	if viper.GetBool("insecure") {
-		cred = insecure.NewCredentials()
+	if insecure = viper.GetBool("insecure"); insecure {
+		cred = ins.NewCredentials()
 	}
 	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(cred))
 	if err != nil {

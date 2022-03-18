@@ -17,6 +17,11 @@ package main
 
 import "github.com/slntopp/nocloud-driver-ione/cmd/ione/cmd"
 
+var version string
+
 func main() {
-	cmd.Execute()
+	if version == "" {
+		version = "dev"
+	}
+	cmd.Execute(version)
 }
