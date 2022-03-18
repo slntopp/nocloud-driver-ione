@@ -123,7 +123,9 @@ var hooksCmd = &cobra.Command{
 
 		log.Info("Command context", zap.String("token", cred), zap.String("endpoint", rpc), zap.String("binary_path", ex))
 
-		client := goca.NewClient(goca.OneConfig{Token: cred, Endpoint: rpc}, nil)
+		token := strings.Split(cred, ":")
+		conf := goca.NewConfig(token[0], token[1], rpc)
+		client := goca.NewClient(conf, nil)
 		ctrl := goca.NewController(client)
 
 		hkc := ctrl.Hooks()
