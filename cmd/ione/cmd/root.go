@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"os"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/spf13/viper"
@@ -67,10 +69,15 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	} else {
-		log.Error("Error reading Config", zap.Error(err))
+		log.Fatal("Error reading Config", zap.Error(err))
 	}
 
-	conn, err := grpc.Dial("api.nocloud.local:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	host := viper.GetString("host")
+	cred := credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
+	if viper.GetBool("insecure") {
+		cred = insecure.NewCredentials()
+	}
+	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(cred))
 	if err != nil {
 		panic(err)
 	}
