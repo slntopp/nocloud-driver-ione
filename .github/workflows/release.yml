@@ -25,7 +25,7 @@ jobs:
         goarch: ${{ matrix.goarch }}
         overwrite: true
         goversion: 1.17
-        ldflags: -s -w -X github.com/slntopp/nocloud-driver-ione/main.version=${{ steps.make_context.outputs.tag }}
+        ldflags: -s -w -X main.version=${{ steps.make_context.outputs.tag }}
         executable_compression: upx
         project_path: cmd/ione
         binary_name: "nocloud-ione"
