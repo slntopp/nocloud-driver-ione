@@ -20,34 +20,26 @@ import (
 	"strconv"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/host"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var VMMsRecordHelpers = map[string]func(state map[string]interface{}, rec dynamic.Template){
+var VMMsRecordHelpers = map[string]func(state map[string]interface{}, rec dynamic.Template, host host.Host){
 	"vcenter": vCenterRecordHelper,
 }
 
-func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template) {
-	capacity, err := rec.GetVector("CAPACITY")
-	if err == nil {
-		freeCpu, err := capacity.GetInt("FREE_CPU")
-		if err == nil {
-			state["free_cpu"] = freeCpu
-		}
-		freeRam, err := capacity.GetInt("FREE_MEMORY")
-		if err == nil {
-			state["free_ram"] = freeRam
-		}
-		usedCpu, err := capacity.GetInt("USED_CPU")
-		if err == nil {
-			state["total_cpu"] = freeCpu + usedCpu
-		}
-		usedRam, err := capacity.GetInt("USED_MEMORY")
-		if err == nil {
-			state["total_ram"] = freeRam + usedRam
-		}
-	}
+func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template, host host.Host) {
+	share := host.Share
+
+	state["total_cpu"] = share.TotalCPU
+	state["used_cpu"] = share.CPUUsage
+	state["free_cpu"] = share.TotalCPU - share.CPUUsage
+
+	state["total_ram"] = share.TotalMem
+	state["used_ram"] = share.MemUsage
+	state["free_ram"] = share.TotalMem - share.MemUsage
+
 	ts, err := rec.GetInt("TIMESTAMP")
 	if err == nil {
 		state["ts"] = ts
@@ -94,7 +86,7 @@ func MonitorHostsPool(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 			goto done
 		}
 		rec = mon.Records[recLen - 1]
-		helper(state, rec)
+		helper(state, rec, host)
 
 		done:
 		hosts[strconv.Itoa(host.ID)] = state
