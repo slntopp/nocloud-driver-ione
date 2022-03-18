@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca"
@@ -121,9 +120,8 @@ var hooksCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
-		exPath := filepath.Dir(ex)
 
-		log.Info("Command context", zap.String("token", cred), zap.String("endpoint", rpc), zap.String("binary_path", exPath))
+		log.Info("Command context", zap.String("token", cred), zap.String("endpoint", rpc), zap.String("binary_path", ex))
 
 		client := goca.NewClient(goca.OneConfig{Token: cred, Endpoint: rpc}, nil)
 		ctrl := goca.NewController(client)
@@ -146,7 +144,7 @@ var hooksCmd = &cobra.Command{
 			for k, v := range conf {
 				h.AddPair(k, v)
 			}
-			h.Add(keys.Command, exPath)
+			h.Add(keys.Command, ex)
 			id, err := hkc.Create(h.String())
 			log.Info("Create Hook attempt", zap.Int("id", id), zap.Error(err))
 		}
