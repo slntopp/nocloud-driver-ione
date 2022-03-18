@@ -123,6 +123,8 @@ var hooksCmd = &cobra.Command{
 		}
 		exPath := filepath.Dir(ex)
 
+		log.Debug("Command context", zap.String("token", cred), zap.String("endpoint", rpc), zap.String("binary_path", exPath))
+
 		client := goca.NewClient(goca.OneConfig{Token: cred, Endpoint: rpc}, nil)
 		ctrl := goca.NewController(client)
 
@@ -165,6 +167,8 @@ var hooksCleanupCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		log.Debug("Command context", zap.String("token", cred), zap.String("endpoint", rpc))
 
 		client := goca.NewClient(goca.OneConfig{Token: cred, Endpoint: rpc}, nil)
 		ctrl := goca.NewController(client)
