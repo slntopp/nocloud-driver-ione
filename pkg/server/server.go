@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -48,7 +49,7 @@ type DriverServiceServer struct {
 
 func NewDriverServiceServer(log *zap.Logger, key []byte) *DriverServiceServer {
 	auth.SetContext(log, key)
-	return &DriverServiceServer{ log: log }
+	return &DriverServiceServer{log: log}
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
@@ -143,7 +144,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 		data["userid"] = structpb.NewNumberValue(float64(oneID))
 
 		client.UserAddAttribute(oneID, map[string]interface{}{
-			"NOCLOUD": "TRUE", 
+			"NOCLOUD": "TRUE",
 		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
@@ -275,6 +276,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 }
 
 func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
+	log.Fatal("!!!!!!!!!!!!!!!!")
 	log := s.log.Named("Monitoring")
 	sp := req.GetServicesProvider()
 	log.Info("Starting Monitoring Routine", zap.String("sp", sp.GetUuid()))
@@ -288,6 +290,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	for _, ig := range req.GetGroups() {
 		for _, inst := range ig.GetInstances() {
+			//log.Info("1111111111111")
+			//log.Info("\ninst :\n" + fmt.Sprint(inst) + "\n")
 			_, err := actions.StatusesClient(client, inst, inst.GetData(), &srvpb.PerformActionResponse{Result: true})
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
