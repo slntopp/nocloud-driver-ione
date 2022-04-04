@@ -84,6 +84,7 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 	inst := pb.Instance{
 		Config:    make(map[string]*structpb.Value),
 		Resources: make(map[string]*structpb.Value),
+		Data:      make(map[string]*structpb.Value),
 	}
 
 	tmpl := vm.Template
@@ -95,7 +96,11 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		inst.Config["template_id"] = structpb.NewNumberValue(tid)
 	}
 	{
-		pwd, err := vm.UserTemplate.GetStr("PASSWORD")
+		ctx, err := tmpl.GetVector("CONTEXT")
+		if err != nil {
+			return nil, err
+		}
+		pwd, err := ctx.GetStr("PASSWORD")
 		if err != nil {
 			return nil, err
 		}
@@ -121,6 +126,25 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 			return nil, err
 		}
 		inst.Data["vmid"] = structpb.NewNumberValue(float64(vmid))
+	}
+	{
+		inst.Data["vm_name"] = structpb.NewStringValue(vm.Name)
+	}
+	{
+		diskInfo, err := tmpl.GetVector("DISK")
+		if err != nil {
+			return nil, err
+		}
+		driveType, err := diskInfo.GetStr("DRIVE_TYPE")
+		if err != nil {
+			return nil, err
+		}
+		driveSize, err := diskInfo.GetFloat("SIZE")
+		if err != nil {
+			return nil, err
+		}
+		inst.Resources["drive_type"] = structpb.NewStringValue(driveType)
+		inst.Resources["drive_size"] = structpb.NewNumberValue(float64(driveSize))
 	}
 
 	return &inst, nil
