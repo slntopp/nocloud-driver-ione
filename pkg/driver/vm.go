@@ -82,10 +82,10 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		return nil, err
 	}
 	inst := pb.Instance{
-		Config: make(map[string]*structpb.Value),
+		Config:    make(map[string]*structpb.Value),
 		Resources: make(map[string]*structpb.Value),
 	}
-	
+
 	tmpl := vm.Template
 	{
 		tid, err := tmpl.GetFloat("TEMPLATE_ID")
@@ -114,6 +114,13 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 			return nil, err
 		}
 		inst.Resources["ram"] = structpb.NewNumberValue(float64(ram))
+	}
+	{
+		vmid, err := tmpl.GetFloat("VMID")
+		if err != nil {
+			return nil, err
+		}
+		inst.Data["vmid"] = structpb.NewNumberValue(float64(vmid))
 	}
 
 	return &inst, nil
