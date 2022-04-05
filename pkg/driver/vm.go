@@ -17,7 +17,6 @@ package one
 
 import (
 	pb "github.com/slntopp/nocloud/pkg/instances/proto"
-	"github.com/slntopp/nocloud/pkg/states/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -88,7 +87,6 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		Config:    make(map[string]*structpb.Value),
 		Resources: make(map[string]*structpb.Value),
 		Data:      make(map[string]*structpb.Value),
-		State:     &proto.State{State: 1},
 		Hash:      "",
 	}
 

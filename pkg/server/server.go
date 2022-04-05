@@ -25,6 +25,7 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
+	"github.com/slntopp/nocloud/pkg/hasher"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
@@ -48,7 +49,7 @@ type DriverServiceServer struct {
 
 func NewDriverServiceServer(log *zap.Logger, key []byte) *DriverServiceServer {
 	auth.SetContext(log, key)
-	return &DriverServiceServer{ log: log }
+	return &DriverServiceServer{log: log}
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
@@ -143,7 +144,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 		data["userid"] = structpb.NewNumberValue(float64(oneID))
 
 		client.UserAddAttribute(oneID, map[string]interface{}{
-			"NOCLOUD": "TRUE", 
+			"NOCLOUD": "TRUE",
 		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
@@ -298,7 +299,23 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				continue
 			}
 			res, err := client.VMToInstance(vmid)
-			log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
+			if err != nil {
+				log.Error("Error during transforming VM to Instance", zap.Error(err))
+				continue
+			}
+			res.Uuid = inst.GetUuid()
+			res.Title = inst.GetTitle()
+			err = hasher.SetHash(res.ProtoReflect())
+			if err != nil {
+				log.Error("Error getting Instance Hash", zap.Error(err))
+				continue
+			}
+			if res.Hash != inst.Hash {
+				log.Info("Hashes don't match", zap.Any("inst1", res), zap.Any("inst2", inst))
+			} else {
+				log.Info("Hashes match")
+			}
+			//log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
 		}
 	}
 
