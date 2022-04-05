@@ -17,6 +17,7 @@ package one
 
 import (
 	pb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"github.com/slntopp/nocloud/pkg/states/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -82,9 +83,13 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		return nil, err
 	}
 	inst := pb.Instance{
+		Uuid:      "",
+		Title:     "",
 		Config:    make(map[string]*structpb.Value),
 		Resources: make(map[string]*structpb.Value),
 		Data:      make(map[string]*structpb.Value),
+		State:     &proto.State{State: 1},
+		Hash:      "",
 	}
 
 	tmpl := vm.Template
@@ -145,6 +150,10 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		}
 		inst.Resources["drive_type"] = structpb.NewStringValue(driveType)
 		inst.Resources["drive_size"] = structpb.NewNumberValue(float64(driveSize))
+	}
+	{
+		inst.Resources["ips_public"] = structpb.NewNumberValue(float64(len(tmpl.GetNICs())))
+		inst.Resources["ips_private"] = structpb.NewNumberValue(0)
 	}
 
 	return &inst, nil
