@@ -16,6 +16,7 @@ limitations under the License.
 package one
 
 import (
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -23,6 +24,10 @@ import (
 func (c *ONeClient) GetVMByName(name string) (id int, err error) {
 	vmsc := c.ctrl.VMs()
 	return vmsc.ByName(name)
+}
+
+func (c *ONeClient) GetVM(vmid int) (*vm.VM, error) {
+	return c.ctrl.VM(vmid).Info(true)
 }
 
 func (c *ONeClient) TerminateVM(id int, hard bool) error {

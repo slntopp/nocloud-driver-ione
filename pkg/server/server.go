@@ -292,6 +292,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
+
+			go handleInstanceBilling(log, client, inst)
+
 			vmid, err := actions.GetVMIDFromData(client, inst)
 			if err != nil {
 				log.Error("Error getting VM ID from data", zap.Error(err))
