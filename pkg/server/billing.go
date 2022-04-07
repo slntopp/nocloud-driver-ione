@@ -4,28 +4,54 @@ import (
 	"sync"
 	"time"
 
-	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 )
 
-type LazyVM func() (*vm.VM, error)
-func GetVM(f func() (*vm.VM, error) ) LazyVM {
-	var o *vm.VM
+func Lazy[T comparable](f func()(T)) (func()(T)) {
+	var o T
+	var once sync.Once
+	return func() (T) {
+		once.Do(func() {
+			o = f()
+			f = nil
+		})
+		return o
+	}
+}
+
+type LazyVM func() (*onevm.VM, error)
+func GetVM(f func() (*onevm.VM, error) ) LazyVM {
+	var o *onevm.VM
 	var err error
 	var once sync.Once
-	return func() (*vm.VM, error) {
+	return func() (*onevm.VM, error) {
 		once.Do(func() {
 			o, err = f()
 			f = nil
 		})
 		return o, err
+	}
+}
+
+type LazyTimeline func() ([]one.Record)
+func MakeTimeline(f func() ([]one.Record)) LazyTimeline {
+	var o []one.Record
+	var once sync.Once
+	return func() ([]one.Record) {
+		once.Do(func() {
+			o = f()
+			f = nil
+		})
+		return o
 	}
 }
 
@@ -44,7 +70,7 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 		log.Error("Failed to get VM ID", zap.Error(err))
 	}
 
-	vm := GetVM(func() (*vm.VM, error) { return client.GetVM(vmid) })
+	vm := GetVM(func() (*onevm.VM, error) { return client.GetVM(vmid) })
 	var created uint64
 	if _, ok := i.Data[shared.VM_CREATED]; ok {
 		created = uint64(i.Data[shared.VM_CREATED].GetNumberValue())
@@ -57,6 +83,11 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 		created = uint64(obj.STime)
 	}
 	
+	timeline := MakeTimeline(func() ([]one.Record) {
+		o, _ := vm()
+		return one.MakeTimeline(o)
+	})
+
 	var records []*billingpb.Record
 	for _, resource := range plan.Resources {
 		var last uint64
@@ -71,7 +102,7 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 			log.Warn("Handler not found", zap.String("resource", resource.Key))
 		}
 		log.Debug("Handling", zap.String("resource", resource.Key), zap.Uint64("last", last), zap.Uint64("created", created), zap.Any("kind", resource.Kind))
-		new, last := handler(log, i, vm, resource, last)
+		new, last := handler(timeline, i, vm, resource, last)
 
 		records = append(records, new...)
 		i.Data[resource.Key + "_last_monitoring"] = structpb.NewNumberValue(float64(last))
@@ -81,7 +112,7 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 }
 
 type BillingHandlerFunc func(
-	*zap.Logger,
+	LazyTimeline,
 	*instpb.Instance,
 	LazyVM,
 	*billingpb.ResourceConf,
@@ -90,19 +121,51 @@ type BillingHandlerFunc func(
 
 var handlers = map[string]BillingHandlerFunc {
 	"cpu": handleCPUBilling,
+	"ram": handleRAMBilling,
 }
 
-func handleCPUBilling(logger *zap.Logger, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last uint64) ([]*billingpb.Record, uint64) {
+func handleCPUBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last uint64) ([]*billingpb.Record, uint64) {
+	o, _ := vm()
+	cpu := Lazy(func () float64 {
+		cpu, _ := o.Template.GetCPU()
+		return cpu
+	})
+	return handleCapacityBilling(cpu, ltl, i, vm, res, last)
+}
+
+func handleRAMBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last uint64) ([]*billingpb.Record, uint64) {
+	o, _ := vm()
+	ram := Lazy(func () float64 {
+		ram, _ := o.Template.GetMemory()
+		return float64(ram)
+	})
+	return handleCapacityBilling(ram, ltl, i, vm, res, last)
+}
+
+func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last uint64) ([]*billingpb.Record, uint64) {
+	now := uint64(time.Now().Unix())
+	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
 
 	if res.Kind == billingpb.Kind_POSTPAID {
+		on := make(map[stpb.NoCloudState]bool)
+		for _, s := range res.On {
+			on[s] = true
+		}
+
 		for end := last + res.Period; end <= uint64(time.Now().Unix()); end += res.Period {
-			records = append(records, &billingpb.Record{
-				Resource: res.Key,
-				Instance: i.GetUuid(),
-				Start: last, End: end, Exec: end,
-				Total: res.Price,
-			})
+			tl := one.FilterTimeline(timeline, last, end)
+			for _, rec := range tl {
+				if _, ok := on[rec.State]; ok != res.Except {
+					records = append(records, &billingpb.Record{
+						Resource: res.Key,
+						Instance: i.GetUuid(),
+						Start: rec.Start, End: rec.End,
+						Exec: rec.End,
+						Total: float64((rec.End - rec.Start) / res.Period) * res.Price * amount(),
+					})
+				}
+			}
 			last = end
 		}
 	} else {
