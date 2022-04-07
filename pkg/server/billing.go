@@ -16,7 +16,7 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 )
 
-func Lazy[T comparable](f func()(T)) (func()(T)) {
+func Lazy[T any](f func()(T)) (func()(T)) {
 	var o T
 	var once sync.Once
 	return func() (T) {
@@ -43,17 +43,6 @@ func GetVM(f func() (*onevm.VM, error) ) LazyVM {
 }
 
 type LazyTimeline func() ([]one.Record)
-func MakeTimeline(f func() ([]one.Record)) LazyTimeline {
-	var o []one.Record
-	var once sync.Once
-	return func() ([]one.Record) {
-		once.Do(func() {
-			o = f()
-			f = nil
-		})
-		return o
-	}
-}
 
 func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.Instance) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
@@ -83,7 +72,7 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 		created = uint64(obj.STime)
 	}
 	
-	timeline := MakeTimeline(func() ([]one.Record) {
+	timeline := Lazy(func() ([]one.Record) {
 		o, _ := vm()
 		return one.MakeTimeline(o)
 	})
