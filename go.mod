@@ -1,10 +1,10 @@
 module github.com/slntopp/nocloud-driver-ione
 
-go 1.17
+go 1.18
 
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20220128134709-75e34b0d670d
-	github.com/slntopp/nocloud v0.0.14-r5
+	github.com/slntopp/nocloud v0.0.14-r7
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	go.uber.org/zap v1.21.0
