@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine AS builder
+FROM golang:1.18-alpine AS builder
 
 RUN apk add upx
 
@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -buildvcs=false .
 RUN upx ./nocloud-driver-ione
 
 RUN apk add -U --no-cache ca-certificates

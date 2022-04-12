@@ -23,3 +23,5 @@ import (
 const DRIVE_TYPE shared.DiskKeys = "DRIVE_TYPE"
 const NOCLOUD_VM keys.Template = "NOCLOUD"
 const NOCLOUD_VM_TOKEN keys.Template = "NOCLOUD_VM_TOKEN"
+
+const VM_CREATED = "created_time"

@@ -1,3 +1,4 @@
 .DS_Store
 examples/templates/service.*.yml
 examples/templates/sp.*.yml
+pkg/**/internal.*.go
