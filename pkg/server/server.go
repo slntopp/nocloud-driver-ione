@@ -25,10 +25,8 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	"github.com/slntopp/nocloud/pkg/hasher"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -286,37 +284,13 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	}
 	client.SetSecrets(sp.GetSecrets())
 	client.SetVars(sp.GetVars())
-
 	for _, ig := range req.GetGroups() {
-		for _, inst := range ig.GetInstances() {
-			_, err := actions.StatusesClient(client, inst, inst.GetData(), &srvpb.PerformActionResponse{Result: true})
-			if err != nil {
-				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
-			}
-			vmid, err := actions.GetVMIDFromData(client, inst)
-			if err != nil {
-				log.Error("Error getting VM ID from data", zap.Error(err))
-				continue
-			}
-			res, err := client.VMToInstance(vmid)
-			if err != nil {
-				log.Error("Error during transforming VM to Instance", zap.Error(err))
-				continue
-			}
-			res.Uuid = inst.GetUuid()
-			res.Title = inst.GetTitle()
-			err = hasher.SetHash(res.ProtoReflect())
-			if err != nil {
-				log.Error("Error getting Instance Hash", zap.Error(err))
-				continue
-			}
-			if res.Hash != inst.Hash {
-				log.Info("Hashes don't match", zap.Any("inst1", res), zap.Any("inst2", inst))
-			} else {
-				log.Info("Hashes match")
-			}
-			//log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
+		resp, err := client.CheckInstancesGroup(ig)
+		if err != nil {
+			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
+			continue
 		}
+		log.Info("Check Instances Group Response", zap.Any("resp", resp))
 	}
 
 	r, err := client.MonitorLocation(sp)
