@@ -89,6 +89,7 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 		handler, ok := handlers[resource.Key]
 		if !ok {
 			log.Warn("Handler not found", zap.String("resource", resource.Key))
+			continue
 		}
 		log.Debug("Handling", zap.String("resource", resource.Key), zap.Uint64("last", last), zap.Uint64("created", created), zap.Any("kind", resource.Kind))
 		new, last := handler(timeline, i, vm, resource, last)
