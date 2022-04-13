@@ -48,7 +48,7 @@ type DriverServiceServer struct {
 
 func NewDriverServiceServer(log *zap.Logger, key []byte) *DriverServiceServer {
 	auth.SetContext(log, key)
-	return &DriverServiceServer{ log: log }
+	return &DriverServiceServer{log: log}
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
@@ -143,7 +143,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb
 		data["userid"] = structpb.NewNumberValue(float64(oneID))
 
 		client.UserAddAttribute(oneID, map[string]interface{}{
-			"NOCLOUD": "TRUE", 
+			"NOCLOUD": "TRUE",
 		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
@@ -303,6 +303,12 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			res, err := client.VMToInstance(vmid)
 			log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
 		}
+		resp, err := client.CheckInstancesGroup(ig)
+		if err != nil {
+			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
+			continue
+		}
+		log.Info("Check Instances Group Response", zap.Any("resp", resp))
 	}
 
 	r, err := client.MonitorLocation(sp)

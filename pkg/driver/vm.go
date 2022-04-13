@@ -16,9 +16,13 @@ limitations under the License.
 package one
 
 import (
+	"errors"
+
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	"github.com/slntopp/nocloud/pkg/hasher"
 	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -88,10 +92,14 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		return nil, err
 	}
 	inst := pb.Instance{
-		Config: make(map[string]*structpb.Value),
+		Uuid:      "",
+		Title:     "",
+		Config:    make(map[string]*structpb.Value),
 		Resources: make(map[string]*structpb.Value),
+		Data:      make(map[string]*structpb.Value),
+		Hash:      "",
 	}
-	
+
 	tmpl := vm.Template
 	{
 		tid, err := tmpl.GetFloat("TEMPLATE_ID")
@@ -101,7 +109,11 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		inst.Config["template_id"] = structpb.NewNumberValue(tid)
 	}
 	{
-		pwd, err := vm.UserTemplate.GetStr("PASSWORD")
+		ctx, err := tmpl.GetVector("CONTEXT")
+		if err != nil {
+			return nil, err
+		}
+		pwd, err := ctx.GetStr("PASSWORD")
 		if err != nil {
 			return nil, err
 		}
@@ -121,19 +133,154 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		}
 		inst.Resources["ram"] = structpb.NewNumberValue(float64(ram))
 	}
+	{
+		vmid, err := tmpl.GetFloat("VMID")
+		if err != nil {
+			return nil, err
+		}
+		inst.Data["vmid"] = structpb.NewNumberValue(float64(vmid))
+	}
+	{
+		inst.Data["vm_name"] = structpb.NewStringValue(vm.Name)
+	}
+	{
+		diskInfo, err := tmpl.GetVector("DISK")
+		if err != nil {
+			return nil, err
+		}
+		driveType, err := diskInfo.GetStr("DRIVE_TYPE")
+		if err != nil {
+			return nil, err
+		}
+		driveSize, err := diskInfo.GetFloat("SIZE")
+		if err != nil {
+			return nil, err
+		}
+		inst.Resources["drive_type"] = structpb.NewStringValue(driveType)
+		inst.Resources["drive_size"] = structpb.NewNumberValue(float64(driveSize))
+	}
+	{
+		inst.Resources["ips_public"] = structpb.NewNumberValue(float64(len(tmpl.GetNICs())))
+		inst.Resources["ips_private"] = structpb.NewNumberValue(0)
+	}
 
 	return &inst, nil
 }
 
+// returns instances of all VMs belonged to User
+func (c *ONeClient) GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, error) {
+	vmsc := c.ctrl.VMs()
+	vms_pool, err := vmsc.Info(userId)
+	if err != nil {
+		return nil, err
+	}
+	ig := &pb.InstancesGroup{
+		Uuid:      "",
+		Type:      "",
+		Config:    make(map[string]*structpb.Value),
+		Instances: make([]*pb.Instance, 0, len(vms_pool.VMs)),
+		Resources: make(map[string]*structpb.Value),
+		Hash:      "",
+	}
+
+	for _, vm := range vms_pool.VMs {
+		inst, err := c.VMToInstance(vm.ID)
+		if err != nil {
+			return nil, err
+		}
+		ig.Instances = append(ig.Instances, inst)
+	}
+	return ig, nil
+}
+
+// O(n) search of Instance in InstancesGroup by VMID
+// I think the best way is to use map[vmid]inst, but it can be redundant, I'm waiting your opinion, Mik
+func findInstanceByVMID(vmid int, ig *pb.InstancesGroup) (*pb.Instance, error) {
+	for _, inst := range ig.GetInstances() {
+		instVMID := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+		if vmid == instVMID {
+			return inst, nil
+		}
+	}
+	return nil, errors.New("instance not found")
+}
+
+type CheckInstancesGroupResponse struct {
+	ToBeCreated []*pb.Instance
+	ToBeDeleted []*pb.Instance
+	ToBeUpdated []*pb.Instance
+	Valid       []*pb.Instance
+}
+
+func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesGroupResponse, error) {
+	resp := CheckInstancesGroupResponse{
+		ToBeCreated: make([]*pb.Instance, 0),
+		ToBeDeleted: make([]*pb.Instance, 0),
+		ToBeUpdated: make([]*pb.Instance, 0),
+		Valid:       make([]*pb.Instance, 0),
+	}
+
+	userId := int(IG.Data["userid"].GetNumberValue())
+	vmsc := c.ctrl.VMs()
+	vms_pool, err := vmsc.Info(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, vm := range vms_pool.VMs {
+		_, err := findInstanceByVMID(vm.ID, IG)
+		if err != nil {
+			vmInst, err := c.VMToInstance(vm.ID)
+			if err != nil {
+				c.log.Error("Error Converting VM to Instance", zap.Error(err))
+				continue
+			}
+			resp.ToBeDeleted = append(resp.ToBeDeleted, vmInst)
+		}
+	}
+
+	for _, inst := range IG.GetInstances() {
+		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+
+		vmc := c.ctrl.VM(vmid)
+
+		_, err := vmc.Info(true)
+		if err != nil {
+			resp.ToBeCreated = append(resp.ToBeCreated, inst)
+			continue
+		}
+
+		res, err := c.VMToInstance(vmid)
+		if err != nil {
+			c.log.Error("Error Converting VM to Instance", zap.Error(err))
+			continue
+		}
+		res.Uuid = inst.GetUuid()
+		res.Title = inst.GetTitle()
+		err = hasher.SetHash(res.ProtoReflect())
+		if err != nil {
+			c.log.Error("Error Setting Instance Hash", zap.Error(err))
+			continue
+		}
+		if res.Hash != inst.Hash {
+			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
+		} else {
+			resp.Valid = append(resp.Valid, inst)
+		}
+	}
+
+	return &resp, nil
+}
+
 type Record struct {
 	Start uint64
-	End uint64
+	End   uint64
 
 	State stpb.NoCloudState
 }
 
 func MakeRecord(from, to int, state stpb.NoCloudState) (res Record) {
-	return Record { uint64(from), uint64(to), state }
+	return Record{uint64(from), uint64(to), state}
 }
 
 func MakeTimeline(vm *vm.VM) (res []Record) {
