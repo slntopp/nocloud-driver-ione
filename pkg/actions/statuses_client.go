@@ -76,7 +76,11 @@ func StatusesClient(
 
 	result.Meta = par.Meta
 
-	PostInstanceState(inst.GetUuid(), par.Meta)
+	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
+	if inst.State != nil && inst.State.State == request.State.State {
+		return result, nil
+	}
+	PostInstanceState(request)
 
 	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
 }
@@ -113,8 +117,7 @@ func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.Po
 	return request
 }
 
-func PostInstanceState(uuid string, meta map[string]*structpb.Value) {
-	request := MakePostStateRequest(uuid, meta)
+func PostInstanceState(request *stpb.PostStateRequest) {
 	_, err := grpc_client.PostState(context.Background(), request)
 	if err != nil {
 		log.Error("Failed to post Instance State", zap.Error(err))

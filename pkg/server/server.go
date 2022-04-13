@@ -289,7 +289,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		if err != nil {
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 			continue
-		}
+    }
 		log.Info("Check Instances Group Response", zap.Any("resp", resp))
 	}
 

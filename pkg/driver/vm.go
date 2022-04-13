@@ -19,14 +19,20 @@ import (
 	"errors"
 
 	"github.com/slntopp/nocloud/pkg/hasher"
-	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"go.uber.org/zap"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	pb "github.com/slntopp/nocloud/pkg/instances/proto"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func (c *ONeClient) GetVMByName(name string) (id int, err error) {
 	vmsc := c.ctrl.VMs()
 	return vmsc.ByName(name)
+}
+
+func (c *ONeClient) GetVM(vmid int) (*vm.VM, error) {
+	return c.ctrl.VM(vmid).Info(true)
 }
 
 func (c *ONeClient) TerminateVM(id int, hard bool) error {
@@ -264,4 +270,60 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	return &resp, nil
+}
+
+type Record struct {
+	Start uint64
+	End uint64
+
+	State stpb.NoCloudState
+}
+
+func MakeRecord(from, to int, state stpb.NoCloudState) (res Record) {
+	return Record { uint64(from), uint64(to), state }
+}
+
+func MakeTimeline(vm *vm.VM) (res []Record) {
+	history := vm.HistoryRecords
+	for _, record := range history {
+		res = append(res, MakeTimelineRecords(record)...)
+	}
+	return res
+}
+
+func FilterTimeline(tl []Record, from, to uint64) (res []Record) {
+	for _, cr := range tl {
+		r := Record(cr)
+		if r.End == 0 {
+			if r.Start == 0 {
+				continue
+			}
+			r.End = to
+		}
+		if r.End < from || r.Start > to {
+			continue
+		}
+		if r.Start < from {
+			r.Start = from
+		}
+		if r.End > to {
+			r.End = to
+		}
+		res = append(res, r)
+	}
+	return res
+}
+
+func MakeTimelineRecords(r vm.HistoryRecord) (res []Record) {
+	res = append(res, MakeRecord(r.RSTime, r.RETime, stpb.NoCloudState_RUNNING))
+	switch r.Action {
+	case 9, 10: // suspended
+		res = append(res, MakeRecord(r.RETime, r.RETime, stpb.NoCloudState_SUSPENDED))
+	case 20: // powered off
+		res = append(res, MakeRecord(r.RETime, r.RETime, stpb.NoCloudState_STOPPED))
+	case 27, 28: // terminated (hard)
+		res = append(res, MakeRecord(r.RETime, r.RETime, stpb.NoCloudState_DELETED))
+	}
+
+	return res
 }
