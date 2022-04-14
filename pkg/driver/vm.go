@@ -281,14 +281,14 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 }
 
 type Record struct {
-	Start uint64
-	End   uint64
+	Start int64
+	End int64
 
 	State stpb.NoCloudState
 }
 
 func MakeRecord(from, to int, state stpb.NoCloudState) (res Record) {
-	return Record{uint64(from), uint64(to), state}
+	return Record { int64(from), int64(to), state }
 }
 
 func MakeTimeline(vm *vm.VM) (res []Record) {
@@ -299,7 +299,7 @@ func MakeTimeline(vm *vm.VM) (res []Record) {
 	return res
 }
 
-func FilterTimeline(tl []Record, from, to uint64) (res []Record) {
+func FilterTimeline(tl []Record, from, to int64) (res []Record) {
 	for _, cr := range tl {
 		r := Record(cr)
 		if r.End == 0 {
