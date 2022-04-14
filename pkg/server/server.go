@@ -303,9 +303,19 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			res, err := client.VMToInstance(vmid)
 			log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
 		}
-		resp, err := client.CheckInstancesGroup(ig)
+		// temporary testing(L306-L323)
+		new_inst, err := client.VMToInstance(67)
 		if err != nil {
-			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
+			return nil, err
+		}
+		new_inst.Data[one.DATA_VM_ID] = structpb.NewNumberValue(38)
+
+		ig1 := *ig
+		ig1.Instances = append(ig1.Instances, new_inst)
+
+		resp, err := client.CheckInstancesGroup(&ig1)
+		if err != nil {
+			log.Error("Error Checking Instances Group", zap.String("ig", ig1.GetUuid()), zap.Error(err))
 			continue
 		}
 		log.Info("Check Instances Group Response", zap.Any("resp", resp))

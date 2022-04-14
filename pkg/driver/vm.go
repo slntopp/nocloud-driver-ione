@@ -148,13 +148,17 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		if err != nil {
 			return nil, err
 		}
+		// if instance does not exist its template doesn't have DRIVE_TYPE & SIZE
+		// that's why we don't return error
 		driveType, err := diskInfo.GetStr("DRIVE_TYPE")
 		if err != nil {
-			return nil, err
+			c.log.Info("VMToInstance", zap.Any("Error", err))
+			driveType = "NOT FOUND"
 		}
 		driveSize, err := diskInfo.GetFloat("SIZE")
 		if err != nil {
-			return nil, err
+			c.log.Info("VMToInstance", zap.Any("Error", err))
+			driveSize = -1
 		}
 		inst.Resources["drive_type"] = structpb.NewStringValue(driveType)
 		inst.Resources["drive_size"] = structpb.NewNumberValue(float64(driveSize))
@@ -239,12 +243,16 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 	}
 
+	userIG, err := c.GetUserVMsInstancesGroup(userId)
+	if err != nil {
+		c.log.Error("Error Recieving User VMs Instances Group", zap.Any("user id", userId))
+		return nil, err
+	}
+
 	for _, inst := range IG.GetInstances() {
 		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
 
-		vmc := c.ctrl.VM(vmid)
-
-		_, err := vmc.Info(true)
+		_, err := findInstanceByVMID(vmid, userIG)
 		if err != nil {
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
 			continue
