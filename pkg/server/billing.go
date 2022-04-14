@@ -60,16 +60,16 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 	}
 
 	vm := GetVM(func() (*onevm.VM, error) { return client.GetVM(vmid) })
-	var created uint64
+	var created int64
 	if _, ok := i.Data[shared.VM_CREATED]; ok {
-		created = uint64(i.Data[shared.VM_CREATED].GetNumberValue())
+		created = int64(i.Data[shared.VM_CREATED].GetNumberValue())
 	} else {
 		obj, err := vm()
 		if err != nil {
 			log.Error("Error getting VM", zap.Error(err))
 			return
 		}
-		created = uint64(obj.STime)
+		created = int64(obj.STime)
 	}
 	
 	timeline := Lazy(func() ([]one.Record) {
@@ -79,9 +79,9 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 
 	var records []*billingpb.Record
 	for _, resource := range plan.Resources {
-		var last uint64
+		var last int64
 		if _, ok := i.Data[resource.Key + "_last_monitoring"]; ok {
-			last = uint64(i.Data[resource.Key + "_last_monitoring"].GetNumberValue())
+			last = int64(i.Data[resource.Key + "_last_monitoring"].GetNumberValue())
 		} else {
 			last = created
 		}
@@ -91,7 +91,7 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 			log.Warn("Handler not found", zap.String("resource", resource.Key))
 			continue
 		}
-		log.Debug("Handling", zap.String("resource", resource.Key), zap.Uint64("last", last), zap.Uint64("created", created), zap.Any("kind", resource.Kind))
+		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
 		new, last := handler(timeline, i, vm, resource, last)
 
 		records = append(records, new...)
@@ -106,15 +106,15 @@ type BillingHandlerFunc func(
 	*instpb.Instance,
 	LazyVM,
 	*billingpb.ResourceConf,
-	uint64,
-) ([]*billingpb.Record, uint64)
+	int64,
+) ([]*billingpb.Record, int64)
 
 var handlers = map[string]BillingHandlerFunc {
 	"cpu": handleCPUBilling,
 	"ram": handleRAMBilling,
 }
 
-func handleCPUBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last uint64) ([]*billingpb.Record, uint64) {
+func handleCPUBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	cpu := Lazy(func () float64 {
 		cpu, _ := o.Template.GetCPU()
@@ -123,7 +123,7 @@ func handleCPUBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *bill
 	return handleCapacityBilling(cpu, ltl, i, vm, res, last)
 }
 
-func handleRAMBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last uint64) ([]*billingpb.Record, uint64) {
+func handleRAMBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	ram := Lazy(func () float64 {
 		ram, _ := o.Template.GetMemory()
@@ -132,8 +132,8 @@ func handleRAMBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *bill
 	return handleCapacityBilling(ram, ltl, i, vm, res, last)
 }
 
-func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last uint64) ([]*billingpb.Record, uint64) {
-	now := uint64(time.Now().Unix())
+func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+	now := int64(time.Now().Unix())
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
 
@@ -143,7 +143,7 @@ func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.I
 			on[s] = true
 		}
 
-		for end := last + res.Period; end <= uint64(time.Now().Unix()); end += res.Period {
+		for end := last + res.Period; end <= int64(time.Now().Unix()); end += res.Period {
 			tl := one.FilterTimeline(timeline, last, end)
 			for _, rec := range tl {
 				if _, ok := on[rec.State]; ok != res.Except {
@@ -159,7 +159,7 @@ func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.I
 			last = end
 		}
 	} else {
-		for end := last + res.Period; end <= uint64(time.Now().Unix()); end += res.Period {
+		for end := last + res.Period; end <= int64(time.Now().Unix()); end += res.Period {
 			records = append(records, &billingpb.Record{
 				Resource: res.Key,
 				Instance: i.GetUuid(),
