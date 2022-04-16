@@ -310,15 +310,14 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		}
 		new_inst.Data[one.DATA_VM_ID] = structpb.NewNumberValue(38)
 
-		ig1 := *ig
-		ig1.Instances = append(ig1.Instances, new_inst)
-
-		resp, err := client.CheckInstancesGroup(&ig1)
+		resp, err := client.CheckInstancesGroup(ig)
 		if err != nil {
-			log.Error("Error Checking Instances Group", zap.String("ig", ig1.GetUuid()), zap.Error(err))
+			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 			continue
 		}
 		log.Info("Check Instances Group Response", zap.Any("resp", resp))
+
+		client.CheckInstancesGroupResponseProcess(resp)
 	}
 
 	r, err := client.MonitorLocation(sp)

@@ -280,15 +280,24 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
+type CIGResp CheckInstancesGroupResponse
+
+func (client *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse) {
+	for _, inst := range resp.ToBeDeleted {
+		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+		client.TerminateVM(vmid, true)
+	}
+}
+
 type Record struct {
 	Start int64
-	End int64
+	End   int64
 
 	State stpb.NoCloudState
 }
 
 func MakeRecord(from, to int, state stpb.NoCloudState) (res Record) {
-	return Record { int64(from), int64(to), state }
+	return Record{int64(from), int64(to), state}
 }
 
 func MakeTimeline(vm *vm.VM) (res []Record) {
