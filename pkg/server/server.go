@@ -317,7 +317,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		}
 		log.Info("Check Instances Group Response", zap.Any("resp", resp))
 
-		client.CheckInstancesGroupResponseProcess(resp)
+		go client.CheckInstancesGroupResponseProcess(resp)
 	}
 
 	r, err := client.MonitorLocation(sp)
