@@ -24,12 +24,15 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
 
+	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
+	"github.com/streadway/amqp"
 )
 
 var (
@@ -38,6 +41,7 @@ var (
 
 	log           	*zap.Logger
 	statesHost 		string
+	RabbitMQConn 	string
 	SIGNING_KEY		[]byte
 )
 
@@ -53,6 +57,9 @@ func init() {
 
 	viper.SetDefault("STATES_HOST", "states:8080")
 	statesHost = viper.GetString("STATES_HOST")
+
+	viper.SetDefault("RABBITMQ_CONN", "amqp://nocloud:secret@rabbitmq:5672/")
+	RabbitMQConn = viper.GetString("RABBITMQ_CONN")
 
 	viper.SetDefault("SIGNING_KEY", "seeeecreet")
 	SIGNING_KEY = []byte(viper.GetString("SIGNING_KEY"))
@@ -81,12 +88,47 @@ func main() {
 	client := stpb.NewStatesServiceClient(conn)
 	actions.ConfigureStatusesClient(log, client)
 
+	rbmq, err := amqp.Dial(RabbitMQConn)
+	if err != nil {
+		log.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
+	}
+	defer rbmq.Close()
+
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY)
+	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
 
 	pb.RegisterDriverServiceServer(s, srv)
 
 	log.Info(fmt.Sprintf("Serving gRPC on 0.0.0.0:%v", port))
 	log.Fatal("Failed to serve gRPC", zap.Error(s.Serve(lis)))
+}
+
+
+func SetupRecordsPublisher(rbmq *amqp.Connection) (server.RecordsPublisherFunc) {
+	return func(payload []*billingpb.Record) {
+		ch, err := rbmq.Channel()
+		if err != nil {
+			log.Fatal("Failed to open a channel", zap.Error(err))
+		}
+		defer ch.Close()
+
+		queue, _ := ch.QueueDeclare(
+			"records",
+			true, false, false, true, nil,
+		)
+
+		for _, record := range payload {
+			body, err := proto.Marshal(record)
+			if err != nil {
+				log.Error("Error while marshalling record", zap.Error(err))
+				continue
+			}
+			ch.Publish("", queue.Name, false, false, amqp.Publishing{
+				ContentType: "text/plain", Body: body,
+			})
+		}
+
+	}
 }

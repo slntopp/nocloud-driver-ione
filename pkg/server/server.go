@@ -44,6 +44,7 @@ func SetDriverType(_type string) {
 type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log *zap.Logger
+	HandlePublishRecords RecordsPublisherFunc
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte) *DriverServiceServer {
@@ -293,7 +294,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
 
-			go handleInstanceBilling(log, client, inst)
+			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst)
 
 			vmid, err := actions.GetVMIDFromData(client, inst)
 			if err != nil {
