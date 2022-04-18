@@ -20,8 +20,7 @@ import (
 	"strings"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
+	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 
 	"go.uber.org/zap"
@@ -63,13 +62,13 @@ var LCM_STATE_REF = map[int32]stpb.NoCloudState{
 // Returns the VM state of the VirtualMachine to statuses server
 func StatusesClient(
 	client *one.ONeClient,
-	inst *instpb.Instance,
+	inst *ipb.Instance,
 	data map[string]*structpb.Value,
-	result *srvpb.PerformActionResponse,
-) (*srvpb.PerformActionResponse, error) {
+	result *ipb.InvokeResponse,
+) (*ipb.InvokeResponse, error) {
 	log.Debug("StatusesClient request received")
 
-	par, err := State(client, nil, inst, data)
+	par, err := State(client, inst, data)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't get State VM, error: %v", err)
 	}
@@ -82,7 +81,7 @@ func StatusesClient(
 	}
 	PostInstanceState(request)
 
-	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
+	return &ipb.InvokeResponse{Result: result.Result, Meta: result.Meta}, nil
 }
 
 func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.PostStateRequest {

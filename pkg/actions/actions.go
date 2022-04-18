@@ -19,8 +19,7 @@ import (
 	"errors"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
+	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -28,10 +27,9 @@ import (
 
 type ServiceAction func(
 	*one.ONeClient,
-	*instpb.InstancesGroup,
-	*instpb.Instance,
+	*ipb.Instance,
 	map[string]*structpb.Value,
-) (*srvpb.PerformActionResponse, error)
+) (*ipb.InvokeResponse, error)
 
 var Actions = map[string]ServiceAction{
 	"poweroff": Poweroff,
@@ -41,7 +39,7 @@ var Actions = map[string]ServiceAction{
 	"state":    State,
 }
 
-func GetVMIDFromData(client *one.ONeClient, inst *instpb.Instance) (vmid int, err error) {
+func GetVMIDFromData(client *one.ONeClient, inst *ipb.Instance) (vmid int, err error) {
 	data := inst.GetData()
 	if data == nil {
 		return -1, errors.New("data is empty")
@@ -69,10 +67,9 @@ try_by_name:
 // Powers off a running VM
 func Poweroff(
 	client *one.ONeClient,
-	_ *instpb.InstancesGroup,
-	inst *instpb.Instance,
+	inst *ipb.Instance,
 	data map[string]*structpb.Value,
-) (*srvpb.PerformActionResponse, error) {
+) (*ipb.InvokeResponse, error) {
 
 	vmid, err := GetVMIDFromData(client, inst)
 	if err != nil {
@@ -89,17 +86,16 @@ func Poweroff(
 		return nil, status.Errorf(codes.Internal, "Can't Power Off VM, error: %v", err)
 	}
 
-	// return &srvpb.PerformActionResponse{Result: true}, nil
-	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
+	// return &ipb.InvokeResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
 // Saves a running VM
 func Suspend(
 	client *one.ONeClient,
-	_ *instpb.InstancesGroup,
-	inst *instpb.Instance,
+	inst *ipb.Instance,
 	data map[string]*structpb.Value,
-) (*srvpb.PerformActionResponse, error) {
+) (*ipb.InvokeResponse, error) {
 
 	vmid, err := GetVMIDFromData(client, inst)
 	if err != nil {
@@ -111,17 +107,16 @@ func Suspend(
 		return nil, status.Errorf(codes.Internal, "Can't Suspend VM, error: %v", err)
 	}
 
-	// return &srvpb.PerformActionResponse{Result: true}, nil
-	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
+	// return &ipb.InvokeResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
 // Reboots an already deployed VM
 func Reboot(
 	client *one.ONeClient,
-	_ *instpb.InstancesGroup,
-	inst *instpb.Instance,
+	inst *ipb.Instance,
 	data map[string]*structpb.Value,
-) (*srvpb.PerformActionResponse, error) {
+) (*ipb.InvokeResponse, error) {
 
 	vmid, err := GetVMIDFromData(client, inst)
 	if err != nil {
@@ -138,17 +133,16 @@ func Reboot(
 		return nil, status.Errorf(codes.Internal, "Can't Reboot VM, error: %v", err)
 	}
 
-	// return &srvpb.PerformActionResponse{Result: true}, nil
-	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
+	// return &ipb.InvokeResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
 // Resumes the execution of a saved VM.
 func Resume(
 	client *one.ONeClient,
-	_ *instpb.InstancesGroup,
-	inst *instpb.Instance,
+	inst *ipb.Instance,
 	data map[string]*structpb.Value,
-) (*srvpb.PerformActionResponse, error) {
+) (*ipb.InvokeResponse, error) {
 
 	vmid, err := GetVMIDFromData(client, inst)
 	if err != nil {
@@ -160,17 +154,16 @@ func Resume(
 		return nil, status.Errorf(codes.Internal, "Can't Resume VM, error: %v", err)
 	}
 
-	// return &srvpb.PerformActionResponse{Result: true}, nil
-	return StatusesClient(client, inst, data, &srvpb.PerformActionResponse{Result: true})
+	// return &ipb.InvokeResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
 // Returns the VM state of the VirtualMachine
 func State(
 	client *one.ONeClient,
-	_ *instpb.InstancesGroup,
-	inst *instpb.Instance,
+	inst *ipb.Instance,
 	data map[string]*structpb.Value,
-) (*srvpb.PerformActionResponse, error) {
+) (*ipb.InvokeResponse, error) {
 
 	vmid, err := GetVMIDFromData(client, inst)
 	if err != nil {
@@ -194,5 +187,5 @@ func State(
 	}
 
 	meta := m.GetStructValue().Fields
-	return &srvpb.PerformActionResponse{Result: true, Meta: meta}, nil
+	return &ipb.InvokeResponse{Result: true, Meta: meta}, nil
 }

@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20220128134709-75e34b0d670d
-	github.com/slntopp/nocloud v0.0.14-r12
+	github.com/slntopp/nocloud v0.0.15-r2
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	github.com/streadway/amqp v1.0.0

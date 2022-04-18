@@ -21,36 +21,23 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
+	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.PerformActionRequest) (res *srvpb.PerformActionResponse, err error) {
+func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest) (res *ipb.InvokeResponse, err error) {
 	s.log.Debug("Invoke request received", zap.Any("req", req))
 	sp := req.GetServicesProvider()
-	igroup := req.GetGroup()
 	client, err := one.NewClientFromSP(sp, s.log)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
 
-	request := req.GetRequest()
-	var inst *instpb.Instance
-	for _, i := range igroup.GetInstances() {
-		if i.GetUuid() == request.GetInstance() {
-			inst = i
-		}
-	}
-	if inst == nil {
-		return nil, status.Errorf(codes.NotFound, "Instance '%s' not found", request.GetInstance())
-	}
-
-	action, ok := actions.Actions[request.GetAction()]
+	action, ok := actions.Actions[req.GetMethod()]
 	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", request.GetAction(), DRIVER_TYPE)
+		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", req.GetMethod(), DRIVER_TYPE)
 	}
-	return action(client, igroup, inst, request.GetData())
+	return action(client, req.Instance, req.GetParams())
 }

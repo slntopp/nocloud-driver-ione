@@ -25,9 +25,8 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -56,17 +55,17 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
 }
 
-func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *instpb.TestInstancesGroupConfigRequest) (*instpb.TestInstancesGroupConfigResponse, error) {
+func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *ipb.TestInstancesGroupConfigRequest) (*ipb.TestInstancesGroupConfigResponse, error) {
 	s.log.Debug("TestInstancesGroupConfig request received", zap.Any("request", request))
 	igroup := request.GetGroup()
 	if igroup.GetType() != DRIVER_TYPE {
-		Errors := []*instpb.TestInstancesGroupConfigError{
+		Errors := []*ipb.TestInstancesGroupConfigError{
 			{Error: fmt.Sprintf("Group type(%s) isn't matching Driver type(%s)", igroup.GetType(), DRIVER_TYPE)},
 		}
-		return &instpb.TestInstancesGroupConfigResponse{Result: false, Errors: Errors}, nil
+		return &ipb.TestInstancesGroupConfigResponse{Result: false, Errors: Errors}, nil
 	}
 
-	return &instpb.TestInstancesGroupConfigResponse{Result: true}, nil
+	return &ipb.TestInstancesGroupConfigResponse{Result: true}, nil
 }
 
 func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req *pb.TestServiceProviderConfigRequest) (res *sppb.TestResponse, err error) {
@@ -124,7 +123,7 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 	return &sppb.TestResponse{Result: true}, nil
 }
 
-func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb.InstancesGroup, client *one.ONeClient, group float64) (map[string]*structpb.Value, error) {
+func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *ipb.InstancesGroup, client *one.ONeClient, group float64) (map[string]*structpb.Value, error) {
 	data := igroup.GetData()
 	username := igroup.GetUuid()
 
@@ -289,7 +288,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	for _, ig := range req.GetGroups() {
 		for _, inst := range ig.GetInstances() {
-			_, err := actions.StatusesClient(client, inst, inst.GetData(), &srvpb.PerformActionResponse{Result: true})
+			_, err := actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
