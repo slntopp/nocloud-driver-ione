@@ -16,12 +16,13 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"strings"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
+	s "github.com/slntopp/nocloud/pkg/states"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
+	"github.com/streadway/amqp"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -30,13 +31,18 @@ import (
 )
 
 var (
-	grpc_client stpb.StatesServiceClient
 	log  *zap.Logger
+	pub s.Pub
+	sp_pub s.Pub
 )
 
-func ConfigureStatusesClient(logger *zap.Logger, client stpb.StatesServiceClient) {
+func ConfigureStatusesClient(logger *zap.Logger, rbmq *amqp.Connection) {
 	log = logger.Named("Statuses")
-	grpc_client = client
+	s := s.NewStatesPubSub(log, nil, rbmq)
+	ch := s.Channel()
+	s.TopicExchange(ch, "states")
+	pub = s.Publisher(ch, "states", "instances")
+	sp_pub = s.Publisher(ch, "states", "sp")
 }
 
 var STATES_REF = map[int32]stpb.NoCloudState{
@@ -79,13 +85,16 @@ func StatusesClient(
 	if inst.State != nil && inst.State.State == request.State.State {
 		return result, nil
 	}
-	PostInstanceState(request)
+	err = pub(request)
+	if err != nil {
+		log.Error("Failed to post State", zap.Error(err))
+	}
 
 	return &ipb.InvokeResponse{Result: result.Result, Meta: result.Meta}, nil
 }
 
-func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.PostStateRequest {
-	request := &stpb.PostStateRequest{
+func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.ObjectState {
+	request := &stpb.ObjectState{
 		Uuid:  uuid,
 		State: &stpb.State{
 			State: stpb.NoCloudState_UNKNOWN,
@@ -116,22 +125,15 @@ func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.Po
 	return request
 }
 
-func PostInstanceState(request *stpb.PostStateRequest) {
-	_, err := grpc_client.PostState(context.Background(), request)
-	if err != nil {
-		log.Error("Failed to post Instance State", zap.Error(err))
-	}
-}
-
 func PostServicesProviderState(state *one.LocationState) {
-	request := &stpb.PostStateRequest{
+	request := &stpb.ObjectState{
 		Uuid: state.Uuid,
 		State: &stpb.State{
 			State: state.State,
 			Meta: state.Meta,
 		},
 	}
-	_, err := grpc_client.PostState(context.Background(), request)
+	err := sp_pub(request)
 	if err != nil {
 		log.Error("Failed to post Location(ServicesProvider) State", zap.Error(err))
 	}

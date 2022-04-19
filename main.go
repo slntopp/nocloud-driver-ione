@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -31,7 +30,6 @@ import (
 
 	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"github.com/streadway/amqp"
 )
 
@@ -75,24 +73,14 @@ func main() {
 		log.Fatal("Failed to listen", zap.String("address", port), zap.Error(err))
 	}
 
-	log.Debug("Init Connection with Statuses", zap.String("host", statesHost))
-	opts := []grpc.DialOption{
-		grpc.WithBlock(), grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-	conn, err := grpc.Dial(statesHost, opts...)
-	if err != nil {
-		log.Fatal("fail to dial Statuses", zap.Error(err))
-	}
-	defer conn.Close()
-
-	client := stpb.NewStatesServiceClient(conn)
-	actions.ConfigureStatusesClient(log, client)
-
+	log.Info("Dialing RabbitMQ", zap.String("url", RabbitMQConn))
 	rbmq, err := amqp.Dial(RabbitMQConn)
 	if err != nil {
 		log.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
 	}
 	defer rbmq.Close()
+
+	actions.ConfigureStatusesClient(log, rbmq)
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
