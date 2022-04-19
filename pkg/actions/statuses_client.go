@@ -32,8 +32,8 @@ import (
 
 var (
 	log  *zap.Logger
-	pub s.Pub
-	sp_pub s.Pub
+	Pub s.Pub
+	SPPub s.Pub
 )
 
 func ConfigureStatusesClient(logger *zap.Logger, rbmq *amqp.Connection) {
@@ -41,8 +41,8 @@ func ConfigureStatusesClient(logger *zap.Logger, rbmq *amqp.Connection) {
 	s := s.NewStatesPubSub(log, nil, rbmq)
 	ch := s.Channel()
 	s.TopicExchange(ch, "states")
-	pub = s.Publisher(ch, "states", "instances")
-	sp_pub = s.Publisher(ch, "states", "sp")
+	Pub = s.Publisher(ch, "states", "instances")
+	SPPub = s.Publisher(ch, "states", "sp")
 }
 
 var STATES_REF = map[int32]stpb.NoCloudState{
@@ -85,7 +85,7 @@ func StatusesClient(
 	if inst.State != nil && inst.State.State == request.State.State {
 		return result, nil
 	}
-	err = pub(request)
+	err = Pub(request)
 	if err != nil {
 		log.Error("Failed to post State", zap.Error(err))
 	}
@@ -133,7 +133,7 @@ func PostServicesProviderState(state *one.LocationState) {
 			Meta: state.Meta,
 		},
 	}
-	err := sp_pub(request)
+	err := SPPub(request)
 	if err != nil {
 		log.Error("Failed to post Location(ServicesProvider) State", zap.Error(err))
 	}

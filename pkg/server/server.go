@@ -28,6 +28,7 @@ import (
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -220,6 +221,16 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		vmid, err := client.InstantiateTemplateHelper(instance, data, token)
 		if err != nil {
 			log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
+			err_value, _ := structpb.NewValue(err.Error())
+			actions.Pub(&stpb.ObjectState{
+				Uuid: instance.Uuid,
+				State: &stpb.State{
+					State: stpb.NoCloudState_FAILURE,
+					Meta: map[string]*structpb.Value{
+						"error": err_value,
+					},
+				},
+			})
 			continue
 		}
 		client.Chown("vm", vmid, userid, int(group))
