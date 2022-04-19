@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -234,9 +235,18 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 			continue
 		}
 		client.Chown("vm", vmid, userid, int(group))
+
+		go datas.Pub(&ipb.ObjectData{
+			Uuid: instance.Uuid,
+			Data: instance.Data,
+		})
 	}
 
 	igroup.Data = data
+	go datas.IGPub(&ipb.ObjectData{
+		Uuid: igroup.Uuid,
+		Data: igroup.Data,
+	})
 	log.Debug("Up request completed", zap.Any("instances_group", igroup))
 	return &pb.UpResponse{
 		Group: igroup,
@@ -298,7 +308,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	client.SetVars(sp.GetVars())
 
 	for _, ig := range req.GetGroups() {
+		log.Debug("Monitoring group", zap.String("group", ig.GetUuid()), zap.String("title", ig.GetTitle()))
+		l := log.Named(ig.Uuid)
 		for _, inst := range ig.GetInstances() {
+			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
 			_, err := actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))

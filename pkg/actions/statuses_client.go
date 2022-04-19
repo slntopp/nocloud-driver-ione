@@ -37,7 +37,7 @@ var (
 )
 
 func ConfigureStatusesClient(logger *zap.Logger, rbmq *amqp.Connection) {
-	log = logger.Named("Statuses")
+	log = logger.Named("States")
 	s := s.NewStatesPubSub(log, nil, rbmq)
 	ch := s.Channel()
 	s.TopicExchange(ch, "states")
