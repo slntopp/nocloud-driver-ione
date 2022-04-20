@@ -17,6 +17,7 @@ package one
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/slntopp/nocloud/pkg/hasher"
@@ -282,10 +283,31 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 
 type CIGResp CheckInstancesGroupResponse
 
-func (client *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse) {
+func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse) {
+
 	for _, inst := range resp.ToBeDeleted {
 		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
-		client.TerminateVM(vmid, true)
+		c.TerminateVM(vmid, true)
+	}
+
+	for _, inst := range resp.ToBeUpdated {
+		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+		vmInst, err := c.VMToInstance(vmid)
+		if err != nil {
+			c.log.Error("Error Converting VM to Instance", zap.Error(err))
+			continue
+		}
+		tmpl := vm.NewTemplate()
+		if vmInst.Resources["cpu"] != inst.Resources["cpu"] {
+			tmpl.CPU(inst.Resources["cpu"].GetNumberValue())
+		}
+		if vmInst.Resources["ram"] != inst.Resources["ram"] {
+			tmpl.Memory(int(inst.Resources["ram"].GetNumberValue()))
+
+		}
+		c.log.Info("template", zap.Any(strconv.Itoa(vmid), tmpl.String()))
+		vmc := c.ctrl.VM(vmid)
+		vmc.Resize(tmpl.String(), true)
 	}
 }
 

@@ -303,12 +303,6 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			res, err := client.VMToInstance(vmid)
 			log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
 		}
-		// temporary testing(L306-L323)
-		new_inst, err := client.VMToInstance(67)
-		if err != nil {
-			return nil, err
-		}
-		new_inst.Data[one.DATA_VM_ID] = structpb.NewNumberValue(38)
 
 		resp, err := client.CheckInstancesGroup(ig)
 		if err != nil {
