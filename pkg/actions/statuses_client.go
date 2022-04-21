@@ -31,10 +31,8 @@ import (
 )
 
 var (
-	grpc_client stpb.StatesServiceClient
-
-	log  *zap.Logger
-	Pub s.Pub
+	log   *zap.Logger
+	Pub   s.Pub
 	SPPub s.Pub
 )
 
@@ -94,7 +92,7 @@ func StatusesClient(
 
 func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.ObjectState {
 	request := &stpb.ObjectState{
-		Uuid:  uuid,
+		Uuid: uuid,
 		State: &stpb.State{
 			State: stpb.NoCloudState_UNKNOWN,
 			Meta:  meta,
