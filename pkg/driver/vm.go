@@ -229,6 +229,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	vmsc := c.ctrl.VMs()
 	vms_pool, err := vmsc.Info(userId)
 	if err != nil {
+		c.log.Error("Error Getting VMs Info by UserId: "+strconv.Itoa(userId), zap.Error(err))
 		return nil, err
 	}
 
@@ -297,17 +298,32 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			c.log.Error("Error Converting VM to Instance", zap.Error(err))
 			continue
 		}
+		updated := make([]interface{}, 0)
 		tmpl := vm.NewTemplate()
-		if vmInst.Resources["cpu"] != inst.Resources["cpu"] {
+		if vmInst.Resources["cpu"].GetNumberValue() != inst.Resources["cpu"].GetNumberValue() {
 			tmpl.CPU(inst.Resources["cpu"].GetNumberValue())
+			updated = append(updated, "cpu")
 		}
-		if vmInst.Resources["ram"] != inst.Resources["ram"] {
+		if vmInst.Resources["ram"].GetNumberValue() != inst.Resources["ram"].GetNumberValue() {
 			tmpl.Memory(int(inst.Resources["ram"].GetNumberValue()))
-
+			updated = append(updated, "ram")
 		}
-		c.log.Info("template", zap.Any(strconv.Itoa(vmid), tmpl.String()))
+		list, err := structpb.NewValue(updated)
+		if err != nil {
+			c.log.Error("Error Converting Updated To Structpb.List", zap.Error(err))
+			continue
+		}
+		inst.State.Meta["updated"] = list
+		c.log.Info("instance", zap.Any("inst", inst))
 		vmc := c.ctrl.VM(vmid)
 		vmc.Resize(tmpl.String(), true)
+	}
+
+	for _, inst := range resp.Valid {
+		_, updated := inst.State.Meta["updated"]
+		if updated {
+			delete(inst.State.Meta, "updated")
+		}
 	}
 }
 

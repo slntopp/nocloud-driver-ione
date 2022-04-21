@@ -17,6 +17,7 @@ package actions
 
 import (
 	"errors"
+	"time"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -188,6 +189,8 @@ func State(
 		"state_str":     state_str,
 		"lcm_state":     lcm_state,
 		"lcm_state_str": lcm_state_str,
+		"updated":       inst.State.Meta["updated"].GetListValue().AsSlice(),
+		"ts":            time.Now().Unix(),
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't pass State VM, error: %v", err)

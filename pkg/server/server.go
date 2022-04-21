@@ -287,6 +287,15 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	client.SetVars(sp.GetVars())
 
 	for _, ig := range req.GetGroups() {
+		resp, err := client.CheckInstancesGroup(ig)
+		if err != nil {
+			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
+			continue
+		}
+		log.Info("Check Instances Group Response", zap.Any("resp", resp))
+
+		client.CheckInstancesGroupResponseProcess(resp)
+
 		for _, inst := range ig.GetInstances() {
 			_, err := actions.StatusesClient(client, inst, inst.GetData(), &srvpb.PerformActionResponse{Result: true})
 			if err != nil {
@@ -303,15 +312,6 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			res, err := client.VMToInstance(vmid)
 			log.Debug("Got Instance config from template", zap.Any("inst", res), zap.Error(err))
 		}
-
-		resp, err := client.CheckInstancesGroup(ig)
-		if err != nil {
-			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
-			continue
-		}
-		log.Info("Check Instances Group Response", zap.Any("resp", resp))
-
-		go client.CheckInstancesGroupResponseProcess(resp)
 	}
 
 	r, err := client.MonitorLocation(sp)
