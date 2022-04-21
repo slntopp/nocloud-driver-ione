@@ -68,7 +68,6 @@ func MonitorHostsPool(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		state["im_mad"] = host.IMMAD
 		state["vm_mad"] = host.VMMAD
 
-
 		var rec dynamic.Template
 		var recLen int
 		mon, err := hc.Monitoring()
@@ -85,10 +84,10 @@ func MonitorHostsPool(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		if recLen == 0 {
 			goto done
 		}
-		rec = mon.Records[recLen - 1]
+		rec = mon.Records[recLen-1]
 		helper(state, rec, host)
 
-		done:
+	done:
 		hosts[strconv.Itoa(host.ID)] = state
 	}
 	return structpb.NewValue(hosts)
@@ -169,4 +168,25 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 	state["private_vnet"] = map[string]interface{}{"error": "Private VNet Pool Monitoring not implemented"}
 
 	return structpb.NewValue(state)
+}
+
+func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err error) {
+	pool, err := c.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	templates := make(map[string]interface{})
+	for _, tmpl := range pool {
+
+		state := make(map[string]interface{})
+
+		state["name"] = tmpl.Name
+
+		desc, _ := tmpl.Template.GetStr("DESCRIPTION")
+		state["desc"] = desc
+
+		templates[strconv.Itoa(tmpl.ID)] = state
+	}
+
+	return structpb.NewValue(templates)
 }
