@@ -29,28 +29,28 @@ import (
 type ONeClient struct {
 	*goca.Client
 	ctrl *goca.Controller
-	log *zap.Logger
+	log  *zap.Logger
 
-	vars map[string]*sppb.Var
+	vars    map[string]*sppb.Var
 	secrets map[string]*structpb.Value
 }
 
 func NewClient(user, password, endpoint string, log *zap.Logger) *ONeClient {
 	conf := goca.NewConfig(user, password, endpoint)
-	c    := goca.NewClient(conf, nil)
+	c := goca.NewClient(conf, nil)
 	ctrl := goca.NewController(c)
 	return &ONeClient{
 		Client: c,
-		ctrl: ctrl,
-		log: log.Named("ONeClient"),
+		ctrl:   ctrl,
+		log:    log.Named("ONeClient"),
 	}
 }
 
 func NewClientFromSP(sp *sppb.ServicesProvider, log *zap.Logger) (*ONeClient, error) {
 	secrets := sp.GetSecrets()
-	host  := secrets["host"].GetStringValue()
-	user  := secrets["user"].GetStringValue()
-	pass  := secrets["pass"].GetStringValue()
+	host := secrets["host"].GetStringValue()
+	user := secrets["user"].GetStringValue()
+	pass := secrets["pass"].GetStringValue()
 	if host == "" || user == "" || pass == "" {
 		return nil, errors.New("host or Credentials are empty")
 	}
@@ -65,9 +65,9 @@ func (c *ONeClient) SetVars(vars map[string]*sppb.Var) {
 }
 
 type LocationState struct {
-	Uuid string `json:"uuid"`
+	Uuid  string            `json:"uuid"`
 	State stpb.NoCloudState `json:"state"`
-	Error string `json:"error"`
+	Error string            `json:"error"`
 
 	Meta map[string]*structpb.Value
 }
@@ -76,7 +76,7 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 	log := c.log.Named("MonitorLocation").Named(sp.GetUuid())
 
 	res = &LocationState{Uuid: sp.GetUuid(), State: stpb.NoCloudState_RUNNING, Meta: make(map[string]*structpb.Value)}
-	
+
 	hostsState, err := MonitorHostsPool(log.Named("MonitorHostsPool"), c)
 	if err != nil {
 		res.State = stpb.NoCloudState_FAILURE
@@ -103,6 +103,15 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationSta
 		})
 	}
 	res.Meta["networking"] = netsState
+
+	templatesState, err := MonitorTemplates(log.Named("MonitorTemplates"), c)
+	if err != nil {
+		res.State = stpb.NoCloudState_UNKNOWN
+		templatesState, _ = structpb.NewValue(map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+	res.Meta["templates"] = templatesState
 
 	res.Meta["ts"] = structpb.NewNumberValue(float64(time.Now().Unix()))
 	return res, nil

@@ -16,13 +16,13 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"strings"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
+	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
+	s "github.com/slntopp/nocloud/pkg/states"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
+	"github.com/streadway/amqp"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -32,12 +32,19 @@ import (
 
 var (
 	grpc_client stpb.StatesServiceClient
-	log         *zap.Logger
+
+	log  *zap.Logger
+	Pub s.Pub
+	SPPub s.Pub
 )
 
-func ConfigureStatusesClient(logger *zap.Logger, client stpb.StatesServiceClient) {
-	log = logger.Named("Statuses")
-	grpc_client = client
+func ConfigureStatusesClient(logger *zap.Logger, rbmq *amqp.Connection) {
+	log = logger.Named("States")
+	s := s.NewStatesPubSub(log, nil, rbmq)
+	ch := s.Channel()
+	s.TopicExchange(ch, "states")
+	Pub = s.Publisher(ch, "states", "instances")
+	SPPub = s.Publisher(ch, "states", "sp")
 }
 
 var STATES_REF = map[int32]stpb.NoCloudState{
@@ -63,13 +70,13 @@ var LCM_STATE_REF = map[int32]stpb.NoCloudState{
 // Returns the VM state of the VirtualMachine to statuses server
 func StatusesClient(
 	client *one.ONeClient,
-	inst *instpb.Instance,
+	inst *ipb.Instance,
 	data map[string]*structpb.Value,
-	result *srvpb.PerformActionResponse,
-) (*srvpb.PerformActionResponse, error) {
+	result *ipb.InvokeResponse,
+) (*ipb.InvokeResponse, error) {
 	log.Debug("StatusesClient request received")
 
-	par, err := State(client, nil, inst, data)
+	par, err := State(client, inst, data)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't get State VM, error: %v", err)
 	}
@@ -77,14 +84,17 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
-	PostInstanceState(request)
+	err = Pub(request)
+	if err != nil {
+		log.Error("Failed to post State", zap.Error(err))
+	}
 
-	return &srvpb.PerformActionResponse{Result: result.Result, Meta: result.Meta}, nil
+	return &ipb.InvokeResponse{Result: result.Result, Meta: result.Meta}, nil
 }
 
-func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.PostStateRequest {
-	request := &stpb.PostStateRequest{
-		Uuid: uuid,
+func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.ObjectState {
+	request := &stpb.ObjectState{
+		Uuid:  uuid,
 		State: &stpb.State{
 			State: stpb.NoCloudState_UNKNOWN,
 			Meta:  meta,
@@ -114,22 +124,15 @@ func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.Po
 	return request
 }
 
-func PostInstanceState(request *stpb.PostStateRequest) {
-	_, err := grpc_client.PostState(context.Background(), request)
-	if err != nil {
-		log.Error("Failed to post Instance State", zap.Error(err))
-	}
-}
-
 func PostServicesProviderState(state *one.LocationState) {
-	request := &stpb.PostStateRequest{
+	request := &stpb.ObjectState{
 		Uuid: state.Uuid,
 		State: &stpb.State{
 			State: state.State,
 			Meta:  state.Meta,
 		},
 	}
-	_, err := grpc_client.PostState(context.Background(), request)
+	err := SPPub(request)
 	if err != nil {
 		log.Error("Failed to post Location(ServicesProvider) State", zap.Error(err))
 	}

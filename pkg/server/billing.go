@@ -44,7 +44,9 @@ func GetVM(f func() (*onevm.VM, error) ) LazyVM {
 
 type LazyTimeline func() ([]one.Record)
 
-func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.Instance) {
+type RecordsPublisherFunc func([]*billingpb.Record)
+
+func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client *one.ONeClient, i *instpb.Instance) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initiazing")
 
@@ -99,6 +101,7 @@ func handleInstanceBilling(logger *zap.Logger, client *one.ONeClient, i *instpb.
 	}
 
 	log.Info("Putting new Records", zap.Any("records", records))
+	publish(records)
 }
 
 type BillingHandlerFunc func(

@@ -34,7 +34,14 @@ func (c *ONeClient) GetTemplate(id int) (*tmpl.Template, error) {
 	return tc.Info(true, true)
 }
 
-
+func (c *ONeClient) ListTemplates() ([]tmpl.Template, error) {
+	tc := c.ctrl.Templates()
+	p, err := tc.Info()
+	if err != nil {
+		return nil, err
+	}
+	return p.Templates, nil
+}
 
 func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_data map[string]*structpb.Value, token string) (vmid int, err error) {
 	resources := instance.GetResources()

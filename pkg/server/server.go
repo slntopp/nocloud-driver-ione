@@ -23,12 +23,13 @@ import (
 	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
-	srvpb "github.com/slntopp/nocloud/pkg/services/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -44,6 +45,7 @@ func SetDriverType(_type string) {
 type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log *zap.Logger
+	HandlePublishRecords RecordsPublisherFunc
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte) *DriverServiceServer {
@@ -55,17 +57,17 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
 }
 
-func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *instpb.TestInstancesGroupConfigRequest) (*instpb.TestInstancesGroupConfigResponse, error) {
+func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *ipb.TestInstancesGroupConfigRequest) (*ipb.TestInstancesGroupConfigResponse, error) {
 	s.log.Debug("TestInstancesGroupConfig request received", zap.Any("request", request))
 	igroup := request.GetGroup()
 	if igroup.GetType() != DRIVER_TYPE {
-		Errors := []*instpb.TestInstancesGroupConfigError{
+		Errors := []*ipb.TestInstancesGroupConfigError{
 			{Error: fmt.Sprintf("Group type(%s) isn't matching Driver type(%s)", igroup.GetType(), DRIVER_TYPE)},
 		}
-		return &instpb.TestInstancesGroupConfigResponse{Result: false, Errors: Errors}, nil
+		return &ipb.TestInstancesGroupConfigResponse{Result: false, Errors: Errors}, nil
 	}
 
-	return &instpb.TestInstancesGroupConfigResponse{Result: true}, nil
+	return &ipb.TestInstancesGroupConfigResponse{Result: true}, nil
 }
 
 func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req *pb.TestServiceProviderConfigRequest) (res *sppb.TestResponse, err error) {
@@ -123,7 +125,7 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 	return &sppb.TestResponse{Result: true}, nil
 }
 
-func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *instpb.InstancesGroup, client *one.ONeClient, group float64) (map[string]*structpb.Value, error) {
+func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *ipb.InstancesGroup, client *one.ONeClient, group float64) (map[string]*structpb.Value, error) {
 	data := igroup.GetData()
 	username := igroup.GetUuid()
 
@@ -220,12 +222,31 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		vmid, err := client.InstantiateTemplateHelper(instance, data, token)
 		if err != nil {
 			log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
+			err_value, _ := structpb.NewValue(err.Error())
+			actions.Pub(&stpb.ObjectState{
+				Uuid: instance.Uuid,
+				State: &stpb.State{
+					State: stpb.NoCloudState_FAILURE,
+					Meta: map[string]*structpb.Value{
+						"error": err_value,
+					},
+				},
+			})
 			continue
 		}
 		client.Chown("vm", vmid, userid, int(group))
+
+		go datas.Pub(&ipb.ObjectData{
+			Uuid: instance.Uuid,
+			Data: instance.Data,
+		})
 	}
 
 	igroup.Data = data
+	go datas.IGPub(&ipb.ObjectData{
+		Uuid: igroup.Uuid,
+		Data: igroup.Data,
+	})
 	log.Debug("Up request completed", zap.Any("instances_group", igroup))
 	return &pb.UpResponse{
 		Group: igroup,
@@ -287,6 +308,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	client.SetVars(sp.GetVars())
 
 	for _, ig := range req.GetGroups() {
+    log.Debug("Monitoring group", zap.String("group", ig.GetUuid()), zap.String("title", ig.GetTitle()))
+		l := log.Named(ig.Uuid)
 		resp, err := client.CheckInstancesGroup(ig)
 		if err != nil {
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
@@ -295,14 +318,15 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		log.Info("Check Instances Group Response", zap.Any("resp", resp))
 
 		client.CheckInstancesGroupResponseProcess(resp)
-
+    
 		for _, inst := range ig.GetInstances() {
-			_, err := actions.StatusesClient(client, inst, inst.GetData(), &srvpb.PerformActionResponse{Result: true})
+			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
+			_, err := actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
 
-			go handleInstanceBilling(log, client, inst)
+			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst)
 
 			vmid, err := actions.GetVMIDFromData(client, inst)
 			if err != nil {
