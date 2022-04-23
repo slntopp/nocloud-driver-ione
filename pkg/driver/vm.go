@@ -18,6 +18,7 @@ package one
 import (
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/slntopp/nocloud/pkg/hasher"
@@ -199,10 +200,14 @@ func (c *ONeClient) GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, er
 }
 
 // O(n) search of Instance in InstancesGroup by VMID
-// I think the best way is to use map[vmid]inst, but it can be redundant, I'm waiting your opinion, Mik
-func findInstanceByVMID(vmid int, ig *pb.InstancesGroup) (*pb.Instance, error) {
+// I think the best way is to use map[vmid]inst, but it can be redundant, maybe remaked in future
+func findInstanceByVMID(c *ONeClient, vmid int, ig *pb.InstancesGroup) (*pb.Instance, error) {
 	for _, inst := range ig.GetInstances() {
-		instVMID := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+		instVMID, err := GetVMIDFromData(c, inst)
+		if err != nil {
+			c.log.Error("Error Getting VMID from Data", zap.Error(err))
+			continue
+		}
 		if vmid == instVMID {
 			return inst, nil
 		}
@@ -234,7 +239,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	for _, vm := range vms_pool.VMs {
-		_, err := findInstanceByVMID(vm.ID, IG)
+		_, err := findInstanceByVMID(c, vm.ID, IG)
 		if err != nil {
 			vmInst, err := c.VMToInstance(vm.ID)
 			if err != nil {
@@ -252,9 +257,13 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	for _, inst := range IG.GetInstances() {
-		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+		vmid, err := GetVMIDFromData(c, inst)
+		if err != nil {
+			c.log.Error("Error Getting VMID from Data", zap.Error(err))
+			continue
+		}
 
-		_, err := findInstanceByVMID(vmid, userIG)
+		_, err = findInstanceByVMID(c, vmid, userIG)
 		if err != nil {
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
 			continue
@@ -267,7 +276,13 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 		res.Uuid = inst.GetUuid()
 		res.Title = inst.GetTitle()
+		res.State = inst.GetState()
 		err = hasher.SetHash(res.ProtoReflect())
+		if err != nil {
+			c.log.Error("Error Setting Instance Hash", zap.Error(err))
+			continue
+		}
+		err = hasher.SetHash(inst.ProtoReflect())
 		if err != nil {
 			c.log.Error("Error Setting Instance Hash", zap.Error(err))
 			continue
@@ -282,41 +297,103 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
-type CIGResp CheckInstancesGroupResponse
-
 func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse) {
 
 	for _, inst := range resp.ToBeDeleted {
-		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+		vmid, err := GetVMIDFromData(c, inst)
+		if err != nil {
+			c.log.Error("Error Getting VMID from Data", zap.Error(err))
+			continue
+		}
 		c.TerminateVM(vmid, true)
 	}
 
 	for _, inst := range resp.ToBeUpdated {
-		vmid := int(inst.GetData()[DATA_VM_ID].GetNumberValue())
+		vmid, err := GetVMIDFromData(c, inst)
+		if err != nil {
+			c.log.Error("Error Getting VMID from Data", zap.Error(err))
+			continue
+		}
+		vmc := c.ctrl.VM(vmid)
+		VM, err := vmc.Info(true)
+		if err != nil {
+			c.log.Error("Error Getting VM Info", zap.Error(err))
+			continue
+		}
+
 		vmInst, err := c.VMToInstance(vmid)
 		if err != nil {
 			c.log.Error("Error Converting VM to Instance", zap.Error(err))
 			continue
 		}
 		updated := make([]interface{}, 0)
+
+		// Resizing using template
+		_, lcmState, err := VM.State()
+		if err != nil {
+			c.log.Error("Error Recieving VM State", zap.Error(err))
+			continue
+		}
 		tmpl := vm.NewTemplate()
 		if vmInst.Resources["cpu"].GetNumberValue() != inst.Resources["cpu"].GetNumberValue() {
 			tmpl.CPU(inst.Resources["cpu"].GetNumberValue())
 			updated = append(updated, "cpu")
 		}
+
 		if vmInst.Resources["ram"].GetNumberValue() != inst.Resources["ram"].GetNumberValue() {
 			tmpl.Memory(int(inst.Resources["ram"].GetNumberValue()))
 			updated = append(updated, "ram")
 		}
-		list, err := structpb.NewValue(updated)
+
+		if len(updated) > 0 {
+			if lcmState == vm.Running {
+				err = vmc.Poweroff()
+				if err != nil {
+					c.log.Error("Error VM Poweroff()", zap.Error(err))
+					continue
+				}
+				for {
+					VM, err = vmc.Info(true)
+					if err != nil {
+						c.log.Error("Error Getting VM Info", zap.Error(err))
+						continue
+					}
+					state, _, err := VM.State()
+					if err != nil {
+						c.log.Error("Error Recieving VM State", zap.Error(err))
+						continue
+					}
+					if state == vm.Poweroff {
+						break
+					} else {
+						t := time.NewTimer(2 * time.Second)
+						<-t.C
+					}
+				}
+			}
+			err = vmc.Resize(tmpl.String(), true)
+			if err != nil {
+				c.log.Error("Error Resizing using template", zap.Error(err))
+				updated = make([]interface{}, 0)
+			}
+		}
+
+		// Resizing without template
+		if vmInst.Resources["drive_size"].GetNumberValue() != inst.Resources["drive_size"].GetNumberValue() {
+			err = vmc.Disk(0).Resize(strconv.Itoa(int(inst.Resources["drive_size"].GetNumberValue())))
+			if err != nil {
+				c.log.Error("Error Disk Resizing", zap.Error(err))
+			} else {
+				updated = append(updated, "drive_size")
+			}
+		}
+
+		updlist, err := structpb.NewValue(updated)
 		if err != nil {
 			c.log.Error("Error Converting Updated To Structpb.List", zap.Error(err))
 			continue
 		}
-		inst.State.Meta["updated"] = list
-		c.log.Info("instance", zap.Any("inst", inst))
-		vmc := c.ctrl.VM(vmid)
-		vmc.Resize(tmpl.String(), true)
+		inst.State.Meta["updated"] = updlist
 	}
 
 	for _, inst := range resp.Valid {
@@ -325,6 +402,31 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			delete(inst.State.Meta, "updated")
 		}
 	}
+}
+
+func GetVMIDFromData(client *ONeClient, inst *pb.Instance) (vmid int, err error) {
+	data := inst.GetData()
+	if data == nil {
+		return -1, errors.New("data is empty")
+	}
+
+	vmidVar, ok := data[DATA_VM_ID]
+	if !ok {
+		goto try_by_name
+	}
+	vmid = int(vmidVar.GetNumberValue())
+	return vmid, nil
+
+try_by_name:
+	name, ok := data[DATA_VM_NAME]
+	if !ok {
+		return -1, errors.New("VM ID and VM Name aren't set in data")
+	}
+	vmid, err = client.GetVMByName(name.GetStringValue())
+	if err != nil {
+		return -1, err
+	}
+	return vmid, nil
 }
 
 type Record struct {

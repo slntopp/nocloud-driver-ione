@@ -5,7 +5,6 @@ import (
 	"time"
 
 	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
-	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
@@ -16,10 +15,10 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 )
 
-func Lazy[T any](f func()(T)) (func()(T)) {
+func Lazy[T any](f func() T) func() T {
 	var o T
 	var once sync.Once
-	return func() (T) {
+	return func() T {
 		once.Do(func() {
 			o = f()
 			f = nil
@@ -29,7 +28,8 @@ func Lazy[T any](f func()(T)) (func()(T)) {
 }
 
 type LazyVM func() (*onevm.VM, error)
-func GetVM(f func() (*onevm.VM, error) ) LazyVM {
+
+func GetVM(f func() (*onevm.VM, error)) LazyVM {
 	var o *onevm.VM
 	var err error
 	var once sync.Once
@@ -42,7 +42,7 @@ func GetVM(f func() (*onevm.VM, error) ) LazyVM {
 	}
 }
 
-type LazyTimeline func() ([]one.Record)
+type LazyTimeline func() []one.Record
 
 type RecordsPublisherFunc func([]*billingpb.Record)
 
@@ -56,7 +56,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		return
 	}
 
-	vmid, err := actions.GetVMIDFromData(client, i)
+	vmid, err := one.GetVMIDFromData(client, i)
 	if err != nil {
 		log.Error("Failed to get VM ID", zap.Error(err))
 	}
@@ -73,8 +73,8 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		}
 		created = int64(obj.STime)
 	}
-	
-	timeline := Lazy(func() ([]one.Record) {
+
+	timeline := Lazy(func() []one.Record {
 		o, _ := vm()
 		return one.MakeTimeline(o)
 	})
@@ -82,8 +82,8 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 	var records []*billingpb.Record
 	for _, resource := range plan.Resources {
 		var last int64
-		if _, ok := i.Data[resource.Key + "_last_monitoring"]; ok {
-			last = int64(i.Data[resource.Key + "_last_monitoring"].GetNumberValue())
+		if _, ok := i.Data[resource.Key+"_last_monitoring"]; ok {
+			last = int64(i.Data[resource.Key+"_last_monitoring"].GetNumberValue())
 		} else {
 			last = created
 		}
@@ -97,7 +97,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		new, last := handler(timeline, i, vm, resource, last)
 
 		records = append(records, new...)
-		i.Data[resource.Key + "_last_monitoring"] = structpb.NewNumberValue(float64(last))
+		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 	}
 
 	log.Info("Putting new Records", zap.Any("records", records))
@@ -112,14 +112,14 @@ type BillingHandlerFunc func(
 	int64,
 ) ([]*billingpb.Record, int64)
 
-var handlers = map[string]BillingHandlerFunc {
+var handlers = map[string]BillingHandlerFunc{
 	"cpu": handleCPUBilling,
 	"ram": handleRAMBilling,
 }
 
 func handleCPUBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
-	cpu := Lazy(func () float64 {
+	cpu := Lazy(func() float64 {
 		cpu, _ := o.Template.GetCPU()
 		return cpu
 	})
@@ -128,14 +128,14 @@ func handleCPUBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *bill
 
 func handleRAMBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
-	ram := Lazy(func () float64 {
+	ram := Lazy(func() float64 {
 		ram, _ := o.Template.GetMemory()
 		return float64(ram)
 	})
 	return handleCapacityBilling(ram, ltl, i, vm, res, last)
 }
 
-func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+func handleCapacityBilling(amount func() float64, ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	now := int64(time.Now().Unix())
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
@@ -153,9 +153,9 @@ func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.I
 					records = append(records, &billingpb.Record{
 						Resource: res.Key,
 						Instance: i.GetUuid(),
-						Start: rec.Start, End: rec.End,
-						Exec: rec.End,
-						Total: float64((rec.End - rec.Start) / res.Period) * res.Price * amount(),
+						Start:    rec.Start, End: rec.End,
+						Exec:  rec.End,
+						Total: float64((rec.End-rec.Start)/res.Period) * res.Price * amount(),
 					})
 				}
 			}
@@ -166,7 +166,7 @@ func handleCapacityBilling(amount func()(float64), ltl LazyTimeline, i *instpb.I
 			records = append(records, &billingpb.Record{
 				Resource: res.Key,
 				Instance: i.GetUuid(),
-				Start: last, End: end, Exec: last,
+				Start:    last, End: end, Exec: last,
 				Total: res.Price,
 			})
 			last = end

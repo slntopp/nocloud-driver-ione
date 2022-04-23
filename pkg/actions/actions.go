@@ -16,7 +16,6 @@ limitations under the License.
 package actions
 
 import (
-	"errors"
 	"time"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -40,31 +39,6 @@ var Actions = map[string]ServiceAction{
 	"state":    State,
 }
 
-func GetVMIDFromData(client *one.ONeClient, inst *ipb.Instance) (vmid int, err error) {
-	data := inst.GetData()
-	if data == nil {
-		return -1, errors.New("data is empty")
-	}
-
-	vmidVar, ok := data[one.DATA_VM_ID]
-	if !ok {
-		goto try_by_name
-	}
-	vmid = int(vmidVar.GetNumberValue())
-	return vmid, nil
-
-try_by_name:
-	name, ok := data[one.DATA_VM_NAME]
-	if !ok {
-		return -1, errors.New("VM ID and VM Name aren't set in data")
-	}
-	vmid, err = client.GetVMByName(name.GetStringValue())
-	if err != nil {
-		return -1, err
-	}
-	return vmid, nil
-}
-
 // Powers off a running VM
 func Poweroff(
 	client *one.ONeClient,
@@ -72,7 +46,7 @@ func Poweroff(
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 
-	vmid, err := GetVMIDFromData(client, inst)
+	vmid, err := one.GetVMIDFromData(client, inst)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
@@ -98,7 +72,7 @@ func Suspend(
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 
-	vmid, err := GetVMIDFromData(client, inst)
+	vmid, err := one.GetVMIDFromData(client, inst)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
@@ -119,7 +93,7 @@ func Reboot(
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 
-	vmid, err := GetVMIDFromData(client, inst)
+	vmid, err := one.GetVMIDFromData(client, inst)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
@@ -145,7 +119,7 @@ func Resume(
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 
-	vmid, err := GetVMIDFromData(client, inst)
+	vmid, err := one.GetVMIDFromData(client, inst)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
@@ -166,7 +140,7 @@ func State(
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 
-	vmid, err := GetVMIDFromData(client, inst)
+	vmid, err := one.GetVMIDFromData(client, inst)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}

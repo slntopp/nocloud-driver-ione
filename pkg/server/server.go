@@ -44,7 +44,7 @@ func SetDriverType(_type string) {
 
 type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
-	log *zap.Logger
+	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
 }
 
@@ -308,7 +308,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	client.SetVars(sp.GetVars())
 
 	for _, ig := range req.GetGroups() {
-    log.Debug("Monitoring group", zap.String("group", ig.GetUuid()), zap.String("title", ig.GetTitle()))
+		log.Debug("Monitoring group", zap.String("group", ig.GetUuid()), zap.String("title", ig.GetTitle()))
 		l := log.Named(ig.Uuid)
 		resp, err := client.CheckInstancesGroup(ig)
 		if err != nil {
@@ -318,7 +318,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		log.Info("Check Instances Group Response", zap.Any("resp", resp))
 
 		client.CheckInstancesGroupResponseProcess(resp)
-    
+
 		for _, inst := range ig.GetInstances() {
 			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
 			_, err := actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
@@ -328,7 +328,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst)
 
-			vmid, err := actions.GetVMIDFromData(client, inst)
+			vmid, err := one.GetVMIDFromData(client, inst)
 			if err != nil {
 				log.Error("Error getting VM ID from data", zap.Error(err))
 				continue
