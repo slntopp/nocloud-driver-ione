@@ -31,8 +31,8 @@ import (
 )
 
 var (
-	log  *zap.Logger
-	Pub s.Pub
+	log   *zap.Logger
+	Pub   s.Pub
 	SPPub s.Pub
 )
 
@@ -46,22 +46,22 @@ func ConfigureStatusesClient(logger *zap.Logger, rbmq *amqp.Connection) {
 }
 
 var STATES_REF = map[int32]stpb.NoCloudState{
-	0: stpb.NoCloudState_INIT, // INIT
-	1: stpb.NoCloudState_INIT, // PENDING
-	2: stpb.NoCloudState_INIT, // HOLD
-	4: stpb.NoCloudState_STOPPED, // STOPPED
-	5: stpb.NoCloudState_SUSPENDED, // SUSPENDED
-	6: stpb.NoCloudState_DELETED, // DONE
-	8: stpb.NoCloudState_STOPPED, // POWEROFF
-	9: stpb.NoCloudState_INIT, // UNDEPLOYED
+	0:  stpb.NoCloudState_INIT,      // INIT
+	1:  stpb.NoCloudState_INIT,      // PENDING
+	2:  stpb.NoCloudState_INIT,      // HOLD
+	4:  stpb.NoCloudState_STOPPED,   // STOPPED
+	5:  stpb.NoCloudState_SUSPENDED, // SUSPENDED
+	6:  stpb.NoCloudState_DELETED,   // DONE
+	8:  stpb.NoCloudState_STOPPED,   // POWEROFF
+	9:  stpb.NoCloudState_INIT,      // UNDEPLOYED
 	10: stpb.NoCloudState_OPERATION, // CLONING
-	11: stpb.NoCloudState_FAILURE, // CLONING_FAILURE
+	11: stpb.NoCloudState_FAILURE,   // CLONING_FAILURE
 }
 
 var LCM_STATE_REF = map[int32]stpb.NoCloudState{
-	0: stpb.NoCloudState_INIT, // INIT
-	1: stpb.NoCloudState_INIT, // PENDING
-	2: stpb.NoCloudState_INIT, // HOLD
+	0: stpb.NoCloudState_INIT,    // INIT
+	1: stpb.NoCloudState_INIT,    // PENDING
+	2: stpb.NoCloudState_INIT,    // HOLD
 	3: stpb.NoCloudState_RUNNING, // RUNNING
 }
 
@@ -82,9 +82,6 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
-	if inst.State != nil && inst.State.State == request.State.State {
-		return result, nil
-	}
 	err = Pub(request)
 	if err != nil {
 		log.Error("Failed to post State", zap.Error(err))
@@ -95,16 +92,16 @@ func StatusesClient(
 
 func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.ObjectState {
 	request := &stpb.ObjectState{
-		Uuid:  uuid,
+		Uuid: uuid,
 		State: &stpb.State{
 			State: stpb.NoCloudState_UNKNOWN,
 			Meta:  meta,
 		},
 	}
-	
+
 	oneState := int32(meta["state"].GetNumberValue())
 	oneLcmState := int32(meta["lcm_state"].GetNumberValue())
-	
+
 	res, ok := STATES_REF[oneState]
 	if !ok {
 		r, ok := LCM_STATE_REF[oneLcmState]
@@ -112,10 +109,10 @@ func MakePostStateRequest(uuid string, meta map[string]*structpb.Value) *stpb.Ob
 			request.State.State = r
 			return request
 		}
-	
+
 		if strings.HasSuffix(meta["lcm_state_str"].GetStringValue(), "FAILURE") {
 			res = stpb.NoCloudState_FAILURE
-		} else if strings.HasSuffix(meta["lcm_state_str"].GetStringValue(), "UNKNOWN")  {
+		} else if strings.HasSuffix(meta["lcm_state_str"].GetStringValue(), "UNKNOWN") {
 			res = stpb.NoCloudState_UNKNOWN
 		} else {
 			res = stpb.NoCloudState_OPERATION
@@ -130,7 +127,7 @@ func PostServicesProviderState(state *one.LocationState) {
 		Uuid: state.Uuid,
 		State: &stpb.State{
 			State: state.State,
-			Meta: state.Meta,
+			Meta:  state.Meta,
 		},
 	}
 	err := SPPub(request)
