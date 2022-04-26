@@ -47,13 +47,19 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 	if err != nil {
 		user_pub_net_id = -1
 	}
-	for i := 0; i < n; i++ {
+	/*for i := 0; i < n; i++ {
 		user_pub_net_id, err = c.ReserveVNet(
 			public_pool.ID, 1, user_pub_net_id,
 			fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, u))
 		if err != nil {
 			return -1, err
 		}
+	}*/
+	user_pub_net_id, err = c.ReserveVNet(
+		public_pool.ID, n, user_pub_net_id,
+		fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, u))
+	if err != nil {
+		return -1, err
 	}
 
 	c.Chown(
@@ -89,13 +95,20 @@ func (c *ONeClient) ReservePrivateIP(u, n int) (pool_id int, err error) {
 	if err != nil {
 		user_private_net_id = -1
 	}
-	for i := 0; i < n; i++ {
+	/*for i := 0; i < n; i++ {
 		user_private_net_id, err = c.ReserveVNet(
 			private_pool.ID, 1, user_private_net_id,
 			fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u))
 		if err != nil {
 			return -1, err
 		}
+	}*/
+
+	user_private_net_id, err = c.ReserveVNet(
+		private_pool.ID, n, user_private_net_id,
+		fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u))
+	if err != nil {
+		return -1, err
 	}
 
 	c.Chown(

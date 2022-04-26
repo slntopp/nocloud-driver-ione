@@ -240,17 +240,6 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		return nil, err
 	}
 
-	data["public_vn"], err = one.GetVarValue(sp.GetVars()[one.PUBLIC_IP_POOL], "default")
-	if err != nil {
-		log.Error("Error Getting Public VN", zap.Error(err))
-		return nil, err
-	}
-	data["private_vn"], err = one.GetVarValue(sp.GetVars()[one.PRIVATE_IP_POOL], "default")
-	if err != nil {
-		log.Error("Error Getting Private VN", zap.Error(err))
-		return nil, err
-	}
-
 	userid := int(data["userid"].GetNumberValue())
 	for _, instance := range igroup.GetInstances() {
 		token, err := auth.MakeTokenInstance(instance.GetUuid())
