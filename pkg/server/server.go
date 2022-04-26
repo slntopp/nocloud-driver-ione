@@ -156,12 +156,12 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *ipb.In
 		public_ips_amount = int(resources["ips_public"].GetNumberValue())
 	}
 
-	var free int = 0
+	var freePubIps int = 0
 	if data["public_ips_free"] != nil {
-		free = int(data["public_ips_free"].GetNumberValue())
+		freePubIps = int(data["public_ips_free"].GetNumberValue())
 	}
-	if public_ips_amount > 0 && public_ips_amount > free {
-		public_ips_amount -= free
+	if public_ips_amount > 0 && public_ips_amount > freePubIps {
+		public_ips_amount -= freePubIps
 		public_ips_pool_id, err := client.ReservePublicIP(oneID, public_ips_amount)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Public IP addresses",
@@ -175,7 +175,34 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, igroup *ipb.In
 		}
 		data["public_ips_total"] = structpb.NewNumberValue(total)
 
-		data["public_ips_free"] = structpb.NewNumberValue(float64(free + public_ips_amount))
+		data["public_ips_free"] = structpb.NewNumberValue(float64(freePubIps + public_ips_amount))
+	}
+
+	var private_ips_amount int = 0
+	if resources["ips_private"] != nil {
+		private_ips_amount = int(resources["ips_private"].GetNumberValue())
+	}
+
+	var freePrivateIps int = 0
+	if data["private_ips_free"] != nil {
+		freePrivateIps = int(data["private_ips_free"].GetNumberValue())
+	}
+	if private_ips_amount > 0 && private_ips_amount > freePrivateIps {
+		private_ips_amount -= freePrivateIps
+		private_ips_pool_id, err := client.ReservePrivateIP(oneID, private_ips_amount)
+		if err != nil {
+			s.log.Debug("Couldn't reserve Private IP addresses",
+				zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
+			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+		data["private_vn"] = structpb.NewNumberValue(float64(private_ips_pool_id))
+		total := float64(private_ips_amount)
+		if data["private_ips_total"] != nil {
+			total += data["private_ips_total"].GetNumberValue()
+		}
+		data["private_ips_total"] = structpb.NewNumberValue(total)
+
+		data["private_ips_free"] = structpb.NewNumberValue(float64(freePrivateIps + private_ips_amount))
 	}
 
 	return data, nil
@@ -212,6 +239,18 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
 		return nil, err
 	}
+
+	data["public_vn"], err = one.GetVarValue(sp.GetVars()[one.PUBLIC_IP_POOL], "default")
+	if err != nil {
+		log.Error("Error Getting Public VN", zap.Error(err))
+		return nil, err
+	}
+	data["private_vn"], err = one.GetVarValue(sp.GetVars()[one.PRIVATE_IP_POOL], "default")
+	if err != nil {
+		log.Error("Error Getting Private VN", zap.Error(err))
+		return nil, err
+	}
+
 	userid := int(data["userid"].GetNumberValue())
 	for _, instance := range igroup.GetInstances() {
 		token, err := auth.MakeTokenInstance(instance.GetUuid())

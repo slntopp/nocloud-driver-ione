@@ -149,6 +149,17 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		tmpl.AddCtx(keys.NetworkCtx, "YES")
 	}
 
+	private_vn := int(group_data["private_vn"].GetNumberValue())
+	for i := 0; i < int(resources["ips_private"].GetNumberValue()); i++ {
+		nic := tmpl.AddNIC()
+		nic.Add(shared.NetworkID, private_vn)
+	}
+	// OpenNebula won't generate Networking context without this key set to YES
+	// so most templates won't generate network interfaces inside the VM
+	if int(resources["ips_private"].GetNumberValue()) > 0 {
+		tmpl.AddCtx(keys.NetworkCtx, "YES")
+	}
+
 	tmpl_string := tmpl.String()
 	c.log.Debug("Resulting Template", zap.String("template", tmpl_string))
 	vmid, err = c.InstantiateTemplate(template_id, vmname, tmpl_string, false)
@@ -161,7 +172,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	return vmid, nil
 }
 
-func (c *ONeClient) InstantiateTemplate(id int, vmname, tmpl string, pending bool) (vmid int, err error ){
+func (c *ONeClient) InstantiateTemplate(id int, vmname, tmpl string, pending bool) (vmid int, err error) {
 	tc := c.ctrl.Template(id)
 	return tc.Instantiate(vmname, pending, tmpl, false)
 }

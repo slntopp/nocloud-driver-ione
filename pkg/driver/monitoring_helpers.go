@@ -165,7 +165,39 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 		return state
 	}()
 
-	state["private_vnet"] = map[string]interface{}{"error": "Private VNet Pool Monitoring not implemented"}
+	state["private_vnet"] = func() (state map[string]interface{}) {
+		state = map[string]interface{}{}
+		private_pool_id, ok := c.vars[PRIVATE_IP_POOL]
+		if !ok {
+			state["error"] = "VNet ID is not set"
+			return state
+		}
+
+		id, err := GetVarValue(private_pool_id, "default")
+		if err != nil {
+			state["error"] = err.Error()
+			return state
+		}
+		vnet, err := c.GetVNet(int(id.GetNumberValue()))
+		if err != nil {
+			state["error"] = err.Error()
+			return state
+		}
+
+		state["id"] = vnet.ID
+		state["name"] = vnet.Name
+		state["vn_mad"] = vnet.VNMad
+		total, used := 0, 0
+		for _, ar := range vnet.ARs {
+			total += ar.Size
+			used += len(ar.Leases)
+		}
+		state["total"] = total
+		state["used"] = used
+		state["free"] = total - used
+		log.Debug("private_vnet", zap.Any("state", state))
+		return state
+	}()
 
 	return structpb.NewValue(state)
 }

@@ -29,6 +29,8 @@ var (
 	SCHED_DS = "sched_ds"
 	// OpenNebula Super VNet public IP addresses to be reserved from
 	PUBLIC_IP_POOL = "public_ip_pool"
+	// OpenNebula Super VNet private IP addresses to be reserved from
+	PRIVATE_IP_POOL = "private_vnets_pool"
 
 	// OpenNebula VM Name Data Key
 	DATA_VM_NAME = "vm_name"

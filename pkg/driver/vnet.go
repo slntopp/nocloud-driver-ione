@@ -25,7 +25,8 @@ import (
 )
 
 var (
-	USER_PUBLIC_VNET_NAME_PATTERN = "user-%d-pub-vnet"
+	USER_PUBLIC_VNET_NAME_PATTERN  = "user-%d-pub-vnet"
+	USER_PRIVATE_VNET_NAME_PATTERN = "user-%d-private-vnet"
 )
 
 func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
@@ -54,20 +55,62 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 			return -1, err
 		}
 	}
-	
+
 	c.Chown(
 		"vn", user_pub_net_id,
-		u, int(c.secrets["group"].GetNumberValue()) )
+		u, int(c.secrets["group"].GetNumberValue()))
 	c.Chmod(
 		"vn", user_pub_net_id,
 		&shared.Permissions{
 			1, 1, 0,
 			0, 0, 0,
-			0, 0, 0 },
+			0, 0, 0},
 	)
 	c.UpdateVNet(user_pub_net_id, "TYPE=\"PUBLIC\"", parameters.Merge)
 
 	return user_pub_net_id, nil
+}
+
+func (c *ONeClient) ReservePrivateIP(u, n int) (pool_id int, err error) {
+	private_pool_id, ok := c.vars[PRIVATE_IP_POOL]
+	if !ok {
+		return -1, errors.New("VNet ID is not set")
+	}
+
+	id, err := GetVarValue(private_pool_id, "default")
+	if err != nil {
+		return -1, err
+	}
+	private_pool, err := c.GetVNet(int(id.GetNumberValue()))
+	if err != nil {
+		return -1, err
+	}
+	user_private_net_id, err := c.GetUserPrivateVNet(u)
+	if err != nil {
+		user_private_net_id = -1
+	}
+	for i := 0; i < n; i++ {
+		user_private_net_id, err = c.ReserveVNet(
+			private_pool.ID, 1, user_private_net_id,
+			fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u))
+		if err != nil {
+			return -1, err
+		}
+	}
+
+	c.Chown(
+		"vn", user_private_net_id,
+		u, int(c.secrets["group"].GetNumberValue()))
+	c.Chmod(
+		"vn", user_private_net_id,
+		&shared.Permissions{
+			1, 1, 0,
+			0, 0, 0,
+			0, 0, 0},
+	)
+	c.UpdateVNet(user_private_net_id, "TYPE=\"PRIVATE\"", parameters.Merge)
+
+	return user_private_net_id, nil
 }
 
 func (c *ONeClient) GetVNet(id int) (*vnet.VirtualNetwork, error) {
@@ -80,7 +123,12 @@ func (c *ONeClient) GetUserPublicVNet(user int) (id int, err error) {
 	return vnsc.ByName(fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, user))
 }
 
-func(c *ONeClient) UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error {
+func (c *ONeClient) GetUserPrivateVNet(user int) (id int, err error) {
+	vnsc := c.ctrl.VirtualNetworks()
+	return vnsc.ByName(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, user))
+}
+
+func (c *ONeClient) UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error {
 	vnc := c.ctrl.VirtualNetwork(id)
 	return vnc.Update(tmpl, uType)
 }
