@@ -21,6 +21,7 @@ import (
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/host"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/image"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -175,6 +176,7 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 	if err != nil {
 		return nil, err
 	}
+
 	templates := make(map[string]interface{})
 	for _, tmpl := range pool {
 
@@ -185,6 +187,30 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		desc, _ := tmpl.Template.GetStr("DESCRIPTION")
 		state["desc"] = desc
 
+		var img *image.Image
+		var img_id int
+		var err error
+
+		if len(tmpl.Template.GetDisks()) == 0 {
+			state["warning"] = "Template has no disks"
+			goto store
+		}
+
+		if _, err := tmpl.Template.GetDisks()[0].GetInt("IMAGE_ID"); err != nil {
+			state["warning"] = "Template has no image"
+			goto store
+		}
+
+		img_id, _ = tmpl.Template.GetDisks()[0].GetInt("IMAGE_ID")
+		img, err = c.GetImage(img_id)
+		if err != nil {
+			state["warning"] = fmt.Errorf("error getting image %d: %s", img_id, err)
+			goto store
+		}
+
+		state["min_size"] = img.Size
+
+		store:
 		templates[strconv.Itoa(tmpl.ID)] = state
 	}
 
