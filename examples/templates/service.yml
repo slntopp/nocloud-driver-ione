@@ -2,8 +2,8 @@ version: "1"
 title: "IONe VDC"
 context:
 instances_groups:
-  demo-ione:
-    type: ione
+  - type: ione
+    title: Demo
     resources:
       ips_public: 1
     instances:
