@@ -175,6 +175,7 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 	if err != nil {
 		return nil, err
 	}
+
 	templates := make(map[string]interface{})
 	for _, tmpl := range pool {
 
@@ -184,6 +185,13 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 
 		desc, _ := tmpl.Template.GetStr("DESCRIPTION")
 		state["desc"] = desc
+
+		disk := tmpl.Template.GetDisks()[0]
+		img_id, err := disk.GetInt("IMAGE_ID")
+
+		img, err := c.GetImage(img_id)
+
+		state["min_size"] = img.Size
 
 		templates[strconv.Itoa(tmpl.ID)] = state
 	}
