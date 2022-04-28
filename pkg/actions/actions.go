@@ -159,10 +159,15 @@ func State(
 		"ts":            time.Now().Unix(),
 	}
 
+	if inst.State == nil || inst.State.Meta == nil {
+		goto make_value
+	}
+
 	if upd, ok := inst.State.Meta["updated"]; ok {
 		m["updated"] = upd.GetListValue().AsSlice()
 	}
 
+	make_value:
 	meta, err := structpb.NewValue(m)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't pass State VM, error: %v", err)
