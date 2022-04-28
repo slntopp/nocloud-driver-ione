@@ -274,7 +274,10 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 		}
 		vmid := int(data["vmid"].GetNumberValue())
 		client.TerminateVM(vmid, true)
-		instance.Data = make(map[string]*structpb.Value)
+
+		delete(instance.Data, "vmid")
+		delete(instance.Data, "vm_name")
+
 		igroup.Instances[i] = instance
 
 		go datas.Pub(&ipb.ObjectData{
