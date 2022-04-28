@@ -252,7 +252,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 
 	userIG, err := c.GetUserVMsInstancesGroup(userId)
 	if err != nil {
-		c.log.Error("Error Recieving User VMs Instances Group", zap.Any("user id", userId))
+		c.log.Error("Error Recieving User VMs Instances Group", zap.Any("user", userId), zap.Error(err))
 		return nil, err
 	}
 
