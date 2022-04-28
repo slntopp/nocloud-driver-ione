@@ -150,19 +150,23 @@ func State(
 		return nil, status.Errorf(codes.Internal, "Can't get State VM, error: %v", err)
 	}
 
-	m, err := structpb.NewValue(map[string]interface{}{
+	m := map[string]interface{}{
 		"uuid":          inst.Uuid,
 		"state":         state,
 		"state_str":     state_str,
 		"lcm_state":     lcm_state,
 		"lcm_state_str": lcm_state_str,
-		"updated":       inst.State.Meta["updated"].GetListValue().AsSlice(),
 		"ts":            time.Now().Unix(),
-	})
+	}
+
+	if upd, ok := inst.State.Meta["updated"]; ok {
+		m["updated"] = upd.GetListValue().AsSlice()
+	}
+
+	meta, err := structpb.NewValue(m)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't pass State VM, error: %v", err)
 	}
 
-	meta := m.GetStructValue().Fields
-	return &ipb.InvokeResponse{Result: true, Meta: meta}, nil
+	return &ipb.InvokeResponse{ Result: true, Meta: meta.GetStructValue().Fields }, nil
 }
