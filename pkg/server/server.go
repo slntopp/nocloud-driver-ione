@@ -326,10 +326,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		if err != nil {
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 			continue
+		} else {
+			log.Info("Check Instances Group Response", zap.Any("resp", resp))
+			client.CheckInstancesGroupResponseProcess(resp)
 		}
-		log.Info("Check Instances Group Response", zap.Any("resp", resp))
 
-		client.CheckInstancesGroupResponseProcess(resp)
 
 		for _, inst := range ig.GetInstances() {
 			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
