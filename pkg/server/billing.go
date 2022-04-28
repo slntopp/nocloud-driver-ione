@@ -5,9 +5,11 @@ import (
 	"time"
 
 	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -96,12 +98,20 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
 		new, last := handler(timeline, i, vm, resource, last)
 
+		if len(new) == 0 {
+			continue
+		}
+
 		records = append(records, new...)
 		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 	}
 
 	log.Info("Putting new Records", zap.Any("records", records))
-	publish(records)
+	go publish(records)
+	go datas.Pub(&ipb.ObjectData{
+		Uuid: i.Uuid,
+		Data: i.Data,
+	})
 }
 
 type BillingHandlerFunc func(
