@@ -96,7 +96,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 			continue
 		}
 		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
-		new, last := handler(timeline, i, vm, resource, last)
+		new, last := handler(log, timeline, i, vm, resource, last)
 
 		if len(new) == 0 {
 			continue
@@ -115,6 +115,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 }
 
 type BillingHandlerFunc func(
+	*zap.Logger,
 	LazyTimeline,
 	*instpb.Instance,
 	LazyVM,
@@ -127,29 +128,31 @@ var handlers = map[string]BillingHandlerFunc{
 	"ram": handleRAMBilling,
 }
 
-func handleCPUBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	cpu := Lazy(func() float64 {
 		cpu, _ := o.Template.GetCPU()
 		return cpu
 	})
-	return handleCapacityBilling(cpu, ltl, i, vm, res, last)
+	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, vm, res, last)
 }
 
-func handleRAMBilling(ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	ram := Lazy(func() float64 {
 		ram, _ := o.Template.GetMemory()
 		return float64(ram)
 	})
-	return handleCapacityBilling(ram, ltl, i, vm, res, last)
+	return handleCapacityBilling(log.Named("RAM"), ram, ltl, i, vm, res, last)
 }
 
-func handleCapacityBilling(amount func() float64, ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *instpb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
 	now := int64(time.Now().Unix())
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
 
+	log.Debug("Handling Capacity Billing", zap.Any("timeline", ltl()), zap.Any("filtered", timeline))
+	
 	if res.Kind == billingpb.Kind_POSTPAID {
 		on := make(map[stpb.NoCloudState]bool)
 		for _, s := range res.On {
