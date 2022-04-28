@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	"github.com/slntopp/nocloud/pkg/hasher"
 	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
@@ -103,6 +104,7 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 	}
 
 	tmpl := vm.Template
+	utmpl := vm.UserTemplate
 	{
 		tid, err := tmpl.GetFloat("TEMPLATE_ID")
 		if err != nil {
@@ -111,17 +113,22 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		inst.Config["template_id"] = structpb.NewNumberValue(tid)
 	}
 	{
-		ctx, err := tmpl.GetVector("CONTEXT")
-		if err != nil {
-			return nil, err
+		pwd, err := utmpl.GetStr("PASSWORD")
+		if err == nil {
+			inst.Config["password"] = structpb.NewStringValue(pwd)
 		}
-		pwd, err := ctx.GetStr("PASSWORD")
-		if err != nil {
-			return nil, err
-		}
-		inst.Config["password"] = structpb.NewStringValue(pwd)
 	}
 	{
+		ctx, err := tmpl.GetVector("CONTEXT")
+		if err == nil {
+			goto cpu
+		}
+		ssh, err := ctx.GetStr(string(keys.SSHPubKey))
+		if err != nil {
+			inst.Config["ssh_public_key"] = structpb.NewStringValue(ssh)
+		}
+	}
+	cpu: {
 		cpu, err := tmpl.GetCPU()
 		if err != nil {
 			return nil, err
