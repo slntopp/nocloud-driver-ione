@@ -165,37 +165,28 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 		return state
 	}()
 
-	state["private_vnet"] = func() (state map[string]interface{}) {
+	state["private_vnet_tmpl"] = func() (state map[string]interface{}) {
 		state = map[string]interface{}{}
-		private_pool_id, ok := c.vars[PRIVATE_IP_POOL]
+		private_vnet_tmpl_id, ok := c.vars[PRIVATE_VN_TEMPLATE]
 		if !ok {
-			state["error"] = "VNet ID is not set"
+			state["error"] = "VNet Template is not set"
 			return state
 		}
 
-		id, err := GetVarValue(private_pool_id, "default")
+		id, err := GetVarValue(private_vnet_tmpl_id, "default")
 		if err != nil {
 			state["error"] = err.Error()
 			return state
 		}
-		vnet, err := c.GetVNet(int(id.GetNumberValue()))
+		vn_tmpl, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Info(true)
 		if err != nil {
 			state["error"] = err.Error()
 			return state
 		}
 
-		state["id"] = vnet.ID
-		state["name"] = vnet.Name
-		state["vn_mad"] = vnet.VNMad
-		total, used := 0, 0
-		for _, ar := range vnet.ARs {
-			total += ar.Size
-			used += len(ar.Leases)
-		}
-		state["total"] = total
-		state["used"] = used
-		state["free"] = total - used
-		log.Debug("private_vnet", zap.Any("state", state))
+		state["id"] = vn_tmpl.ID
+		state["name"] = vn_tmpl.Name
+		log.Debug("private_vnet_tmpl", zap.Any("state", state))
 		return state
 	}()
 

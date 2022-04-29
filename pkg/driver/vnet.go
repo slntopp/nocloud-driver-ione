@@ -77,38 +77,21 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 	return user_pub_net_id, nil
 }
 
-func (c *ONeClient) ReservePrivateIP(u, n int) (pool_id int, err error) {
-	private_pool_id, ok := c.vars[PRIVATE_IP_POOL]
+func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
+	private_tmpl_id, ok := c.vars[PRIVATE_VN_TEMPLATE]
 	if !ok {
-		return -1, errors.New("VNet ID is not set")
+		return -1, errors.New("VNet Tmpl ID is not set")
 	}
 
-	id, err := GetVarValue(private_pool_id, "default")
+	id, err := GetVarValue(private_tmpl_id, "default")
 	if err != nil {
 		return -1, err
 	}
-	private_pool, err := c.GetVNet(int(id.GetNumberValue()))
-	if err != nil {
-		return -1, err
-	}
-	user_private_net_id, err := c.GetUserPrivateVNet(u)
+
+	//extra := fmt.Sprintf("VLAN_ID=%d", ar)
+	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u), "VLAN_ID=0")
 	if err != nil {
 		user_private_net_id = -1
-	}
-	/*for i := 0; i < n; i++ {
-		user_private_net_id, err = c.ReserveVNet(
-			private_pool.ID, 1, user_private_net_id,
-			fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u))
-		if err != nil {
-			return -1, err
-		}
-	}*/
-
-	user_private_net_id, err = c.ReserveVNet(
-		private_pool.ID, n, user_private_net_id,
-		fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u))
-	if err != nil {
-		return -1, err
 	}
 
 	c.Chown(
