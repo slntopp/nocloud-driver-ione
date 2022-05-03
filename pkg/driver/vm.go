@@ -18,6 +18,7 @@ package one
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
@@ -97,6 +98,7 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 	inst := pb.Instance{
 		Uuid:      "",
 		Title:     "",
+		Status:    0,
 		Config:    make(map[string]*structpb.Value),
 		Resources: make(map[string]*structpb.Value),
 		Data:      make(map[string]*structpb.Value),
@@ -128,7 +130,8 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 			inst.Config["ssh_public_key"] = structpb.NewStringValue(ssh)
 		}
 	}
-	cpu: {
+cpu:
+	{
 		cpu, err := tmpl.GetCPU()
 		if err != nil {
 			return nil, err
@@ -173,8 +176,24 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 		inst.Resources["drive_size"] = structpb.NewNumberValue(float64(driveSize))
 	}
 	{
-		inst.Resources["ips_public"] = structpb.NewNumberValue(float64(len(tmpl.GetNICs())))
-		inst.Resources["ips_private"] = structpb.NewNumberValue(0)
+		ips_public, ips_private := 0, 0
+		NICs := tmpl.GetNICs()
+		for _, nic := range NICs {
+			vn_name, err := nic.GetStr("NETWORK")
+			if err != nil {
+				return nil, err
+			}
+			if strings.HasSuffix(vn_name, "pub-vnet") {
+				ips_public++
+				continue
+			}
+			if strings.HasSuffix(vn_name, "private-vnet") {
+				ips_private++
+				continue
+			}
+		}
+		inst.Resources["ips_public"] = structpb.NewNumberValue(float64(ips_public))
+		inst.Resources["ips_private"] = structpb.NewNumberValue(float64(ips_private))
 	}
 
 	return &inst, nil
@@ -283,7 +302,9 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 		res.Uuid = inst.GetUuid()
 		res.Title = inst.GetTitle()
+		res.Status = inst.GetStatus()
 		res.State = inst.GetState()
+		//res.Resources = inst.GetResources()
 		err = hasher.SetHash(res.ProtoReflect())
 		if err != nil {
 			c.log.Error("Error Setting Instance Hash", zap.Error(err))
@@ -295,6 +316,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 			continue
 		}
 		if res.Hash != inst.Hash {
+			c.log.Info("original", zap.Any("", inst))
+			c.log.Info("recieved", zap.Any("", res))
 			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
 		} else {
 			resp.Valid = append(resp.Valid, inst)
