@@ -166,31 +166,6 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 		return state
 	}()
 
-	state["private_vnet_tmpl"] = func() (state map[string]interface{}) {
-		state = map[string]interface{}{}
-		private_vnet_tmpl_id, ok := c.vars[PRIVATE_VN_TEMPLATE]
-		if !ok {
-			state["error"] = "VNet Template is not set"
-			return state
-		}
-
-		id, err := GetVarValue(private_vnet_tmpl_id, "default")
-		if err != nil {
-			state["error"] = err.Error()
-			return state
-		}
-		vn_tmpl, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Info(true)
-		if err != nil {
-			state["error"] = err.Error()
-			return state
-		}
-
-		state["id"] = vn_tmpl.ID
-		state["name"] = vn_tmpl.Name
-		log.Debug("private_vnet_tmpl", zap.Any("state", state))
-		return state
-	}()
-
 	return structpb.NewValue(state)
 }
 
@@ -233,7 +208,7 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 
 		state["min_size"] = img.Size
 
-		store:
+	store:
 		templates[strconv.Itoa(tmpl.ID)] = state
 	}
 
