@@ -166,6 +166,8 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 		return state
 	}()
 
+	state["private_vnet"] = map[string]interface{}{"error": "Private VNet Pool Monitoring not implemented"}
+
 	return structpb.NewValue(state)
 }
 
