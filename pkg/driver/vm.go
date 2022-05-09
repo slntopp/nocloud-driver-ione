@@ -306,7 +306,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		res.Title = inst.GetTitle()
 		res.Status = inst.GetStatus()
 		res.State = inst.GetState()
-		//res.Resources = inst.GetResources()
+		res.BillingPlan = inst.GetBillingPlan()
+
 		err = hasher.SetHash(res.ProtoReflect())
 		if err != nil {
 			c.log.Error("Error Setting Instance Hash", zap.Error(err))
