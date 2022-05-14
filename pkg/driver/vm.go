@@ -305,7 +305,6 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		res.Uuid = inst.GetUuid()
 		res.Title = inst.GetTitle()
 		res.Status = inst.GetStatus()
-		res.State = inst.GetState()
 		res.BillingPlan = inst.GetBillingPlan()
 
 		err = hasher.SetHash(res.ProtoReflect())
@@ -313,14 +312,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 			c.log.Error("Error Setting Instance Hash", zap.Error(err))
 			continue
 		}
-		err = hasher.SetHash(inst.ProtoReflect())
-		if err != nil {
-			c.log.Error("Error Setting Instance Hash", zap.Error(err))
-			continue
-		}
+
 		if res.Hash != inst.Hash {
-			c.log.Info("original", zap.Any("", inst))
-			c.log.Info("recieved", zap.Any("", res))
 			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
 		} else {
 			resp.Valid = append(resp.Valid, inst)
