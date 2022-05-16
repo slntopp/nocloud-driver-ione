@@ -88,8 +88,10 @@ func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
 		return -1, err
 	}
 
-	//extra := fmt.Sprintf("VLAN_ID=%d", ar)
-	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u), "VLAN_ID=0")
+	private_vnet_name := fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u)
+	private_ar := "AR = [\n	IP = \"10.0.0.0\",\n	SIZE = \"255\",\n	TYPE = \"IP4\" ]"
+
+	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(private_vnet_name, private_ar)
 	if err != nil {
 		user_private_net_id = -1
 	}
