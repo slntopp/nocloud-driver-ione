@@ -305,7 +305,6 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		res.Uuid = inst.GetUuid()
 		res.Title = inst.GetTitle()
 		res.Status = inst.GetStatus()
-		res.BillingPlan = inst.GetBillingPlan()
 
 		err = hasher.SetHash(res.ProtoReflect())
 		if err != nil {
@@ -442,6 +441,9 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 	}
 
 	for _, inst := range resp.Valid {
+		if inst.GetState() == nil || inst.GetState().Meta == nil {
+			continue
+		}
 		_, updated := inst.State.Meta["updated"]
 		if updated {
 			delete(inst.State.Meta, "updated")
