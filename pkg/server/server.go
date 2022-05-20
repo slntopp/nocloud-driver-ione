@@ -336,8 +336,14 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
-	client.SetSecrets(sp.GetSecrets())
-	client.SetVars(sp.GetVars())
+
+	secrets := sp.GetSecrets()
+	vars := sp.GetVars()
+
+	client.SetSecrets(secrets)
+	client.SetVars(vars)
+
+	group := secrets["group"].GetNumberValue()
 
 	for _, ig := range req.GetGroups() {
 		log.Debug("Monitoring group", zap.String("group", ig.GetUuid()), zap.String("title", ig.GetTitle()))
@@ -347,7 +353,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 		} else {
 			log.Info("Check Instances Group Response", zap.Any("resp", resp))
-			client.CheckInstancesGroupResponseProcess(resp)
+			client.CheckInstancesGroupResponseProcess(resp, ig.GetData(), int(group))
 		}
 
 		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))

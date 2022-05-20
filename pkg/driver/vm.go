@@ -23,8 +23,10 @@ import (
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud/pkg/hasher"
 	pb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"github.com/slntopp/nocloud/pkg/nocloud/auth"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -303,21 +305,14 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		res.Uuid = inst.GetUuid()
 		res.Title = inst.GetTitle()
 		res.Status = inst.GetStatus()
-		res.State = inst.GetState()
-		//res.Resources = inst.GetResources()
+
 		err = hasher.SetHash(res.ProtoReflect())
 		if err != nil {
 			c.log.Error("Error Setting Instance Hash", zap.Error(err))
 			continue
 		}
-		err = hasher.SetHash(inst.ProtoReflect())
-		if err != nil {
-			c.log.Error("Error Setting Instance Hash", zap.Error(err))
-			continue
-		}
+
 		if res.Hash != inst.Hash {
-			c.log.Info("original", zap.Any("", inst))
-			c.log.Info("recieved", zap.Any("", res))
 			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
 		} else {
 			resp.Valid = append(resp.Valid, inst)
@@ -327,7 +322,26 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
-func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse) {
+func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, data map[string]*structpb.Value, group int) {
+	userid := int(data["userid"].GetNumberValue())
+	for _, inst := range resp.ToBeCreated {
+		token, err := auth.MakeTokenInstance(inst.GetUuid())
+		if err != nil {
+			c.log.Error("Error generating VM token", zap.String("instance", inst.GetUuid()), zap.Error(err))
+			continue
+		}
+		vmid, err := c.InstantiateTemplateHelper(inst, data, token)
+		if err != nil {
+			c.log.Error("Error deploying VM", zap.String("instance", inst.GetUuid()), zap.Error(err))
+			continue
+		}
+		c.Chown("vm", vmid, userid, group)
+
+		go datas.Pub(&pb.ObjectData{
+			Uuid: inst.Uuid,
+			Data: inst.Data,
+		})
+	}
 
 	for _, inst := range resp.ToBeDeleted {
 		vmid, err := GetVMIDFromData(c, inst)
@@ -427,6 +441,9 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 	}
 
 	for _, inst := range resp.Valid {
+		if inst.GetState() == nil || inst.GetState().Meta == nil {
+			continue
+		}
 		_, updated := inst.State.Meta["updated"]
 		if updated {
 			delete(inst.State.Meta, "updated")
