@@ -17,7 +17,9 @@ package one
 
 import (
 	"fmt"
+	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/host"
@@ -166,7 +168,64 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 		return state
 	}()
 
-	state["private_vnet"] = map[string]interface{}{"error": "Private VNet Pool Monitoring not implemented"}
+	state["private_vnet"] = func() (state map[string]interface{}) {
+		state = map[string]interface{}{}
+
+		free_ports := make(map[string]*big.Int)
+
+		user_pool, err := c.ctrl.Users().Info()
+		if err != nil {
+			state["error"] = "Can't get users pool"
+			return state
+		}
+
+		vnsc := c.ctrl.VirtualNetworks()
+		vns, err := vnsc.Info()
+		log.Info("vnsc.Info()", zap.Any("vns", vns))
+		for _, user := range user_pool.Users {
+			id := user.ID
+			vnet_id, err := c.GetUserPrivateVNet(id)
+			if err != nil {
+				log.Info("Getting User Private VNet", zap.Error(err))
+				continue
+			}
+
+			vnet, err := c.GetVNet(vnet_id)
+			if err != nil {
+				log.Info("Getting VNet", zap.Error(err))
+				continue
+			}
+
+			vn_mad := vnet.VNMad
+			for _, ar := range vnet.ARs {
+				for _, lease := range ar.Leases {
+					ip := lease.IP
+					port, err := strconv.Atoi(strings.Split(ip, ".")[3])
+					if err != nil {
+						log.Error("Can't get port", zap.Error(err))
+						continue
+					}
+
+					if _, ok := free_ports[vn_mad]; !ok {
+						free_ports[vn_mad] = big.NewInt(0)
+					}
+					free_ports[vn_mad].SetBit(free_ports[vn_mad], port, 1)
+				}
+			}
+		}
+
+		state["free_vlans"] = func() (state map[string]interface{}) {
+			state = map[string]interface{}{}
+			for vn_mad, free := range free_ports {
+				state[vn_mad] = free.String()
+			}
+
+			log.Info("private_state", zap.Any("state", state))
+			return state
+		}()
+
+		return state
+	}()
 
 	return structpb.NewValue(state)
 }
