@@ -118,12 +118,12 @@ func (c *ONeClient) GetVNet(id int) (*vnet.VirtualNetwork, error) {
 
 func (c *ONeClient) GetUserPublicVNet(user int) (id int, err error) {
 	vnsc := c.ctrl.VirtualNetworks()
-	return vnsc.ByName(fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, user))
+	return vnsc.ByName(fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, user), user)
 }
 
 func (c *ONeClient) GetUserPrivateVNet(user int) (id int, err error) {
 	vnsc := c.ctrl.VirtualNetworks()
-	return vnsc.ByName(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, user))
+	return vnsc.ByName(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, user), user)
 }
 
 func (c *ONeClient) UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error {
