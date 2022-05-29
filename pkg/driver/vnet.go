@@ -22,6 +22,7 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
+	"go.uber.org/zap"
 )
 
 var (
@@ -77,7 +78,7 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 	return user_pub_net_id, nil
 }
 
-func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
+func (c *ONeClient) ReservePrivateIP(u int, vnMad string, vlanID int) (pool_id int, err error) {
 	private_tmpl_id, ok := c.vars[PRIVATE_VN_TEMPLATE]
 	if !ok {
 		return -1, errors.New("VNet Tmpl ID is not set")
@@ -90,8 +91,12 @@ func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
 
 	private_vnet_name := fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u)
 	private_ar := "AR = [\n	IP = \"10.0.0.0\",\n	SIZE = \"255\",\n	TYPE = \"IP4\" ]"
+	private_vlan := fmt.Sprintf("VLAN_ID = %d\nAUTOMATIC_VLAN_ID = \"NO\"", vlanID)
+	private_vn_mad := fmt.Sprintf("VN_MAD = \"%s\"", vnMad)
 
-	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(private_vnet_name, private_ar)
+	extra := private_ar + "\n" + private_vlan + "\n" + private_vn_mad
+
+	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(private_vnet_name, extra)
 	if err != nil {
 		user_private_net_id = -1
 	}
@@ -114,6 +119,34 @@ func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
 func (c *ONeClient) GetVNet(id int) (*vnet.VirtualNetwork, error) {
 	vnc := c.ctrl.VirtualNetwork(id)
 	return vnc.Info(true)
+}
+
+func (c *ONeClient) DeleteVNet(id int) error {
+	vnc := c.ctrl.VirtualNetwork(id)
+	return vnc.Delete()
+}
+
+func (c *ONeClient) DeleteUserAndVNets(id int) error {
+	if pubVn, err := c.GetUserPublicVNet(id); err == nil {
+		err = c.DeleteVNet(pubVn)
+		if err != nil {
+			c.log.Debug("Couldn't Delete Pub VNet", zap.Error(err), zap.Int("user", id), zap.Int("vnet_id", pubVn))
+		}
+	}
+
+	if privateVn, err := c.GetUserPrivateVNet(id); err == nil {
+		err = c.DeleteVNet(privateVn)
+		if err != nil {
+			c.log.Debug("Couldn't Delete Private VNet", zap.Error(err), zap.Int("user", id), zap.Int("vnet_id", privateVn))
+		}
+	}
+
+	err := c.DeleteUser(id)
+	if err != nil {
+		c.log.Debug("Couldn't Delete User", zap.Error(err), zap.Int("user", id))
+	}
+
+	return err
 }
 
 func (c *ONeClient) GetUserPublicVNet(user int) (id int, err error) {
