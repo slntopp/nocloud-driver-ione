@@ -6,6 +6,12 @@ secrets:
   pass: token
   group: 100
 vars:
+  private_vnets_pool: # this is actually a template ID, key will be changed soon
+    value:
+      default: 1
+  public_ip_pool:
+    value:
+      default: 0
   sched:
     value:
       default: "ID=\"1\""
