@@ -154,7 +154,6 @@ func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeV
 		if !ok {
 			vnMadFreeVlans = structpb.NewStringValue("0")
 		}
-		c.log.Info(vnMadFreeVlans.GetStringValue())
 
 		freeVlansBitSet, ok := big.NewInt(0).SetString(vnMadFreeVlans.GetStringValue(), 10)
 		if !ok {
@@ -198,8 +197,6 @@ func (c *ONeClient) ReservePrivateIP(u int, vnMad string, vlanID int) (pool_id i
 	private_bridge := fmt.Sprintf("BRIDGE = user-%d-vlan-%d", u, vlanID)
 
 	extra := private_ar + "\n" + private_vlan + "\n" + private_vn_mad + "\n" + private_bridge
-
-	c.log.Info("extra", zap.Any("extra", extra))
 
 	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(private_vnet_name, extra)
 	if err != nil {

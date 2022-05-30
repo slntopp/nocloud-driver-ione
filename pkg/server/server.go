@@ -201,8 +201,6 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
 
-		s.log.Info("find free vlan", zap.Any("vnMad", vnMad), zap.Any("freeVlan", freeVlan))
-
 		private_ips_pool_id, err := client.ReservePrivateIP(oneID, vnMad, freeVlan)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Private IP addresses",
@@ -213,8 +211,6 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
 		data["private_vn"] = structpb.NewNumberValue(float64(private_ips_pool_id))
-
-		s.log.Info("private ip pool id", zap.Any("vn id", private_ips_pool_id))
 	}
 
 	return data, nil
