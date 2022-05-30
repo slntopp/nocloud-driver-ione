@@ -192,7 +192,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			last = end
 		}
 	} else {
-		for end := last + res.Period; end <= int64(time.Now().Unix()); end += res.Period {
+		for end := last + res.Period; last <= int64(time.Now().Unix()); end += res.Period {
 			records = append(records, &billingpb.Record{
 				Resource: res.Key,
 				Instance: i.GetUuid(),
@@ -207,7 +207,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 }
 
 func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billingpb.Record, int64) {
-	log.Debug("Handling Static Billing")
+	log.Debug("Handling Static Billing", zap.Int64("last", last))
 	product, ok := i.BillingPlan.Products[*i.Product]
 	if !ok {
 		log.Warn("Product not found", zap.String("product", *i.Product))
@@ -216,7 +216,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billi
 
 	var records []*billingpb.Record
 	if product.Kind == billingpb.Kind_POSTPAID {
-		for end := last + product.Period; end <= int64(time.Now().Unix()); end += product.Period {
+		log.Debug("Handling Postpaid Billing", zap.Any("product", product))
+		for end := last + product.Period; end <= time.Now().Unix(); end += product.Period {
 			records = append(records, &billingpb.Record{
 				Product:  *i.Product,
 				Instance: i.GetUuid(),
@@ -225,7 +226,9 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billi
 			})
 		}
 	} else {
-		for end := last + product.Period; end <= int64(time.Now().Unix()); end += product.Period {
+		end := last + product.Period
+		log.Debug("Handling Prepaid Billing", zap.Any("product", product), zap.Int64("end", end), zap.Int64("now", time.Now().Unix()))
+		for ; last <= time.Now().Unix(); end += product.Period {
 			records = append(records, &billingpb.Record{
 				Product:  *i.Product,
 				Instance: i.GetUuid(),
