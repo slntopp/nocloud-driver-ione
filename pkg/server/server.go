@@ -20,7 +20,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -192,102 +191,30 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		address_range_id = int(data["address_range_id"].GetNumberValue())
 	}*/
 	if private_ips_amount > 0 {
-		vlans, ok := sp.Secrets["vlans"]
-		if !ok {
-			err := fmt.Errorf("no vlans in sp config, uuid: %s", sp.GetUuid())
-			s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-
-			client.DeleteUserAndVNets(oneID)
-
-			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
-		}
-
-		freeVnMad := ""
-		freeVlan := -1
-		for vn_mad, info := range vlans.GetStructValue().Fields {
-			startValue, ok := info.GetStructValue().GetFields()["start"]
-			if !ok {
-				err := fmt.Errorf("no vlans' start in config, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vn_mad)
-				s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-				continue
-			}
-			start := int(startValue.GetNumberValue())
-
-			sizeValue, ok := info.GetStructValue().GetFields()["size"]
-			if !ok {
-				err := fmt.Errorf("no vlans' size in config, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vn_mad)
-				s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-				continue
-			}
-			size := int(sizeValue.GetNumberValue())
-
-			networking, ok := sp.GetState().Meta["networking"]
-			if !ok {
-				err := fmt.Errorf("networking not found, sp uuid: %s", sp.GetUuid())
-				s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-				continue
-			}
-
-			privateVnet, ok := networking.GetStructValue().Fields["private_vnet"]
-			if !ok {
-				err := fmt.Errorf("private vnet state not found, sp uuid: %s", sp.GetUuid())
-				s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-				continue
-			}
-
-			freeVlans, ok := privateVnet.GetStructValue().Fields["free_vlans"]
-			if !ok {
-				err := fmt.Errorf("free vlans state not found, sp uuid: %s", sp.GetUuid())
-				s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-				continue
-			}
-
-			vnMadFreeVlans, ok := freeVlans.GetStructValue().Fields[vn_mad]
-			if !ok {
-				err := fmt.Errorf("free vlans info not found in config, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vn_mad)
-				s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-				continue
-			}
-
-			freeVlansBitSet, ok := big.NewInt(0).SetString(vnMadFreeVlans.GetStringValue(), 10)
-			if !ok {
-				err := fmt.Errorf("can't convert free vlans info to big.Int, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vn_mad)
-				s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-				continue
-			}
-
-			for i := start; i < start+size; i++ {
-				if freeVlansBitSet.Bit(i) == 0 {
-					freeVnMad = vn_mad
-					freeVlan = i
-					break
-				}
-			}
-
-			if freeVlan != -1 {
-				break
-			}
-		}
-
-		if freeVlan == -1 {
-			err := fmt.Errorf("no free vlans, sp uuid: %s", sp.GetUuid())
-			s.log.Error("Can't Reserve Private IPs", zap.Error(err))
-
-			client.DeleteUserAndVNets(oneID)
-
-			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
-		}
-
-		private_ips_pool_id, err := client.ReservePrivateIP(oneID, freeVnMad, freeVlan)
+		vnMad, freeVlan, err := client.FindFreeVlan(sp)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Private IP addresses",
 				zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
 
-			client.DeleteUser(oneID)
+			client.DeleteUserAndVNets(oneID)
+
+			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		s.log.Info("find free vlan", zap.Any("vnMad", vnMad), zap.Any("freeVlan", freeVlan))
+
+		private_ips_pool_id, err := client.ReservePrivateIP(oneID, vnMad, freeVlan)
+		if err != nil {
+			s.log.Debug("Couldn't reserve Private IP addresses",
+				zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
+
+			client.DeleteUserAndVNets(oneID)
 
 			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
 		data["private_vn"] = structpb.NewNumberValue(float64(private_ips_pool_id))
+
+		s.log.Info("private ip pool id", zap.Any("vn id", private_ips_pool_id))
 	}
 
 	return data, nil
