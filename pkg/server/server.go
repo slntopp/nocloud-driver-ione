@@ -242,47 +242,51 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		igroup.Data = data
 	}
 
-	data, err = s.PrepareService(ctx, sp, igroup, client, group)
-	if err != nil {
-		log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
-		return nil, err
-	}
-
-	userid := int(data["userid"].GetNumberValue())
-	for _, instance := range igroup.GetInstances() {
-		token, err := auth.MakeTokenInstance(instance.GetUuid())
+	if data["userid"] == nil {
+		data, err = s.PrepareService(ctx, sp, igroup, client, group)
 		if err != nil {
-			log.Error("Error generating VM token", zap.String("instance", instance.GetUuid()), zap.Error(err))
-			continue
+			log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
+			return nil, err
 		}
-		vmid, err := client.InstantiateTemplateHelper(instance, data, token)
-		if err != nil {
-			log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
-			err_value, _ := structpb.NewValue(err.Error())
-			actions.Pub(&stpb.ObjectState{
-				Uuid: instance.Uuid,
-				State: &stpb.State{
-					State: stpb.NoCloudState_FAILURE,
-					Meta: map[string]*structpb.Value{
-						"error": err_value,
+
+		userid := int(data["userid"].GetNumberValue())
+		for _, instance := range igroup.GetInstances() {
+			token, err := auth.MakeTokenInstance(instance.GetUuid())
+			if err != nil {
+				log.Error("Error generating VM token", zap.String("instance", instance.GetUuid()), zap.Error(err))
+				continue
+			}
+			vmid, err := client.InstantiateTemplateHelper(instance, data, token)
+			if err != nil {
+				log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
+				err_value, _ := structpb.NewValue(err.Error())
+				actions.Pub(&stpb.ObjectState{
+					Uuid: instance.Uuid,
+					State: &stpb.State{
+						State: stpb.NoCloudState_FAILURE,
+						Meta: map[string]*structpb.Value{
+							"error": err_value,
+						},
 					},
-				},
+				})
+				continue
+			}
+			client.Chown("vm", vmid, userid, int(group))
+
+			go datas.Pub(&ipb.ObjectData{
+				Uuid: instance.Uuid,
+				Data: instance.Data,
 			})
-			continue
 		}
-		client.Chown("vm", vmid, userid, int(group))
 
-		go datas.Pub(&ipb.ObjectData{
-			Uuid: instance.Uuid,
-			Data: instance.Data,
+		igroup.Data = data
+		go datas.IGPub(&ipb.ObjectData{
+			Uuid: igroup.Uuid,
+			Data: igroup.Data,
 		})
+	} else {
+		s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp})
 	}
-
-	igroup.Data = data
-	go datas.IGPub(&ipb.ObjectData{
-		Uuid: igroup.Uuid,
-		Data: igroup.Data,
-	})
 	log.Debug("Up request completed", zap.Any("instances_group", igroup))
 	return &pb.UpResponse{
 		Group: igroup,
@@ -328,7 +332,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 		return &pb.DownResponse{Group: igroup}, nil
 	}
 	userid := int(data["userid"].GetNumberValue())
-	err = client.DeleteUser(userid)
+	err = client.DeleteUserAndVNets(userid)
 	if err != nil {
 		s.log.Error("Error deleting OpenNebula User", zap.Error(err))
 	}
@@ -368,7 +372,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		if err != nil {
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 		} else {
-			log.Info("Check Instances Group Response", zap.Any("resp", resp))
+			log.Debug("Check Instances Group Response", zap.Any("resp", resp))
 			client.CheckInstancesGroupResponseProcess(resp, ig.GetData(), int(group))
 		}
 

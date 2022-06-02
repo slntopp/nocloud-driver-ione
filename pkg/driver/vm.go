@@ -229,7 +229,7 @@ func (c *ONeClient) GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, er
 
 // O(n) search of Instance in InstancesGroup by VMID
 // I think the best way is to use map[vmid]inst, but it can be redundant, maybe remaked in future
-func findInstanceByVMID(c *ONeClient, vmid int, ig *pb.InstancesGroup) (*pb.Instance, error) {
+/*func findInstanceByVMID(c *ONeClient, vmid int, ig *pb.InstancesGroup) (*pb.Instance, error) {
 	for _, inst := range ig.GetInstances() {
 		instVMID, err := GetVMIDFromData(c, inst)
 		if err != nil {
@@ -237,6 +237,15 @@ func findInstanceByVMID(c *ONeClient, vmid int, ig *pb.InstancesGroup) (*pb.Inst
 			continue
 		}
 		if vmid == instVMID {
+			return inst, nil
+		}
+	}
+	return nil, errors.New("instance not found")
+}*/
+
+func findInstanceByUuid(uuid string, ig *pb.InstancesGroup) (*pb.Instance, error) {
+	for _, inst := range ig.GetInstances() {
+		if inst.GetUuid() == uuid {
 			return inst, nil
 		}
 	}
@@ -267,7 +276,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	for _, vm := range vms_pool.VMs {
-		_, err := findInstanceByVMID(c, vm.ID, IG)
+		_, err := findInstanceByUuid(vm.Name, IG)
 		if err != nil {
 			vmInst, err := c.VMToInstance(vm.ID)
 			if err != nil {
@@ -278,20 +287,21 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 	}
 
-	userIG, err := c.GetUserVMsInstancesGroup(userId)
+	/*userIG, err := c.GetUserVMsInstancesGroup(userId)
 	if err != nil {
 		c.log.Error("Error Recieving User VMs Instances Group", zap.Any("user", userId), zap.Error(err))
 		return nil, err
-	}
+	}*/
 
 	for _, inst := range IG.GetInstances() {
-		vmid, err := GetVMIDFromData(c, inst)
+		/*vmid, err := GetVMIDFromData(c, inst)
 		if err != nil {
 			c.log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
 		}
+		_, err = findInstanceByVMID(c, vmid, userIG)*/
 
-		_, err = findInstanceByVMID(c, vmid, userIG)
+		vmid, err := vmsc.ByName(inst.GetUuid(), userId)
 		if err != nil {
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
 			continue
