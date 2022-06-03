@@ -54,6 +54,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 
 	if pass := conf["password"].GetStringValue(); pass != "" {
 		tmpl.Add(keys.Template("PASSWORD"), pass)
+		tmpl.AddCtx("PASSWORD", pass)
 	}
 	if ssh_key := conf["ssh_public_key"].GetStringValue(); ssh_key != "" {
 		tmpl.AddCtx(keys.SSHPubKey, ssh_key)
@@ -143,11 +144,6 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		nic := tmpl.AddNIC()
 		nic.Add(shared.NetworkID, public_vn)
 	}
-	// OpenNebula won't generate Networking context without this key set to YES
-	// so most templates won't generate network interfaces inside the VM
-	if int(resources["ips_public"].GetNumberValue()) > 0 {
-		tmpl.AddCtx(keys.NetworkCtx, "YES")
-	}
 
 	private_vn := int(group_data["private_vn"].GetNumberValue())
 	for i := 0; i < int(resources["ips_private"].GetNumberValue()); i++ {
@@ -156,7 +152,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	}
 	// OpenNebula won't generate Networking context without this key set to YES
 	// so most templates won't generate network interfaces inside the VM
-	if int(resources["ips_private"].GetNumberValue()) > 0 {
+	if int(resources["ips_public"].GetNumberValue())+int(resources["ips_private"].GetNumberValue()) > 0 {
 		tmpl.AddCtx(keys.NetworkCtx, "YES")
 	}
 

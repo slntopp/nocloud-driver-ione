@@ -17,6 +17,7 @@ package one
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -89,6 +90,52 @@ func (c *ONeClient) StateVM(id int) (state int, state_str string, lcm_state int,
 	}
 
 	return int(st), st.String(), int(lcm_st), lcm_st.String(), nil
+}
+
+func (c *ONeClient) NetworkingVM(id int) (map[string]interface{}, error) {
+	vmc := c.ctrl.VM(id)
+
+	vm, err := vmc.Info(false)
+	if err != nil {
+		return nil, err
+	}
+
+	networking := make(map[string]interface{})
+
+	publicIps := make([]interface{}, 0)
+	privateIps := make([]interface{}, 0)
+
+	nics := vm.Template.GetNICs()
+	for _, nic := range nics {
+		ip, err := nic.GetStr("IP")
+		if err != nil {
+			c.log.Error("Couldn't get IP", zap.Any("nic", nic))
+			continue
+		}
+
+		vnet, err := nic.GetStr("NETWORK")
+		if err != nil {
+			c.log.Error("Couldn't get Network", zap.Any("nic", nic))
+			continue
+		}
+
+		switch vnet {
+		case fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, vm.UID):
+			publicIps = append(publicIps, ip)
+		case fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, vm.UID):
+			privateIps = append(privateIps, ip)
+		default:
+			{
+				c.log.Error("Invalid VNet Name", zap.Any("vnet", vnet))
+				continue
+			}
+		}
+	}
+
+	networking["public"] = publicIps
+	networking["private"] = privateIps
+
+	return networking, nil
 }
 
 func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
@@ -229,7 +276,7 @@ func (c *ONeClient) GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, er
 
 // O(n) search of Instance in InstancesGroup by VMID
 // I think the best way is to use map[vmid]inst, but it can be redundant, maybe remaked in future
-func findInstanceByVMID(c *ONeClient, vmid int, ig *pb.InstancesGroup) (*pb.Instance, error) {
+/*func findInstanceByVMID(c *ONeClient, vmid int, ig *pb.InstancesGroup) (*pb.Instance, error) {
 	for _, inst := range ig.GetInstances() {
 		instVMID, err := GetVMIDFromData(c, inst)
 		if err != nil {
@@ -237,6 +284,15 @@ func findInstanceByVMID(c *ONeClient, vmid int, ig *pb.InstancesGroup) (*pb.Inst
 			continue
 		}
 		if vmid == instVMID {
+			return inst, nil
+		}
+	}
+	return nil, errors.New("instance not found")
+}*/
+
+func findInstanceByUuid(uuid string, ig *pb.InstancesGroup) (*pb.Instance, error) {
+	for _, inst := range ig.GetInstances() {
+		if inst.GetUuid() == uuid {
 			return inst, nil
 		}
 	}
@@ -267,7 +323,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	for _, vm := range vms_pool.VMs {
-		_, err := findInstanceByVMID(c, vm.ID, IG)
+		_, err := findInstanceByUuid(vm.Name, IG)
 		if err != nil {
 			vmInst, err := c.VMToInstance(vm.ID)
 			if err != nil {
@@ -278,20 +334,21 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 	}
 
-	userIG, err := c.GetUserVMsInstancesGroup(userId)
+	/*userIG, err := c.GetUserVMsInstancesGroup(userId)
 	if err != nil {
 		c.log.Error("Error Recieving User VMs Instances Group", zap.Any("user", userId), zap.Error(err))
 		return nil, err
-	}
+	}*/
 
 	for _, inst := range IG.GetInstances() {
-		vmid, err := GetVMIDFromData(c, inst)
+		/*vmid, err := GetVMIDFromData(c, inst)
 		if err != nil {
 			c.log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
 		}
+		_, err = findInstanceByVMID(c, vmid, userIG)*/
 
-		_, err = findInstanceByVMID(c, vmid, userIG)
+		vmid, err := vmsc.ByName(inst.GetUuid(), userId)
 		if err != nil {
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
 			continue

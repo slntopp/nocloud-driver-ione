@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
-	"strings"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/host"
@@ -171,7 +170,7 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 	state["private_vnet"] = func() (state map[string]interface{}) {
 		state = map[string]interface{}{}
 
-		free_ports := make(map[string]*big.Int)
+		free_vlans := make(map[string]*big.Int)
 
 		user_pool, err := c.ctrl.Users().Info()
 		if err != nil {
@@ -179,14 +178,10 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 			return state
 		}
 
-		vnsc := c.ctrl.VirtualNetworks()
-		vns, err := vnsc.Info()
-		log.Info("vnsc.Info()", zap.Any("vns", vns))
 		for _, user := range user_pool.Users {
 			id := user.ID
 			vnet_id, err := c.GetUserPrivateVNet(id)
 			if err != nil {
-				log.Info("Getting User Private VNet", zap.Error(err))
 				continue
 			}
 
@@ -197,26 +192,21 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 			}
 
 			vn_mad := vnet.VNMad
-			for _, ar := range vnet.ARs {
-				for _, lease := range ar.Leases {
-					ip := lease.IP
-					port, err := strconv.Atoi(strings.Split(ip, ".")[3])
-					if err != nil {
-						log.Error("Can't get port", zap.Error(err))
-						continue
-					}
-
-					if _, ok := free_ports[vn_mad]; !ok {
-						free_ports[vn_mad] = big.NewInt(0)
-					}
-					free_ports[vn_mad].SetBit(free_ports[vn_mad], port, 1)
-				}
+			vlanID, err := strconv.Atoi(vnet.VlanID)
+			if err != nil {
+				log.Info("Getting VlanID", zap.Error(err))
+				continue
 			}
+
+			if _, ok := free_vlans[vn_mad]; !ok {
+				free_vlans[vn_mad] = big.NewInt(0)
+			}
+			free_vlans[vn_mad].SetBit(free_vlans[vn_mad], vlanID, 1)
 		}
 
 		state["free_vlans"] = func() (state map[string]interface{}) {
 			state = map[string]interface{}{}
-			for vn_mad, free := range free_ports {
+			for vn_mad, free := range free_vlans {
 				state[vn_mad] = free.String()
 			}
 

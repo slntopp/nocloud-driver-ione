@@ -18,10 +18,16 @@ package one
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
+	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 var (
@@ -77,7 +83,103 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 	return user_pub_net_id, nil
 }
 
-func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
+func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeVlan int, err error) {
+	vlans, ok := sp.Secrets["vlans"]
+	if !ok {
+		err := fmt.Errorf("no vlans in sp config, uuid: %s", sp.GetUuid())
+		c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+		return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+	}
+
+	vnMad = ""
+	freeVlan = -1
+	if privateVNTmplVar, ok := sp.Vars[PRIVATE_VN_TEMPLATE]; ok {
+		tmplId, err := GetVarValue(privateVNTmplVar, "default")
+		if err != nil {
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		vnt, err := c.ctrl.VNTemplate(int(tmplId.GetNumberValue())).Info(true)
+		if err != nil {
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		vnMad, err = vnt.Template.GetStr("VN_MAD")
+		if err != nil {
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		info := vlans.GetStructValue().Fields[vnMad]
+		startValue, ok := info.GetStructValue().GetFields()["start"]
+		if !ok {
+			err := fmt.Errorf("no vlans' start in config, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vnMad)
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+		start := int(startValue.GetNumberValue())
+
+		sizeValue, ok := info.GetStructValue().GetFields()["size"]
+		if !ok {
+			err := fmt.Errorf("no vlans' size in config, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vnMad)
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+		size := int(sizeValue.GetNumberValue())
+
+		networking, ok := sp.GetState().Meta["networking"]
+		if !ok {
+			err := fmt.Errorf("networking not found, sp uuid: %s", sp.GetUuid())
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		privateVnet, ok := networking.GetStructValue().Fields["private_vnet"]
+		if !ok {
+			err := fmt.Errorf("private vnet state not found, sp uuid: %s", sp.GetUuid())
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		freeVlans, ok := privateVnet.GetStructValue().Fields["free_vlans"]
+		if !ok {
+			err := fmt.Errorf("free vlans state not found, sp uuid: %s", sp.GetUuid())
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		vnMadFreeVlans, ok := freeVlans.GetStructValue().Fields[vnMad]
+		if !ok {
+			vnMadFreeVlans = structpb.NewStringValue("0")
+		}
+
+		freeVlansBitSet, ok := big.NewInt(0).SetString(vnMadFreeVlans.GetStringValue(), 10)
+		if !ok {
+			err := fmt.Errorf("can't convert free vlans info to big.Int, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vnMad)
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+
+		for i := start; i < start+size; i++ {
+			if freeVlansBitSet.Bit(i) == 0 {
+				freeVlan = i
+				break
+			}
+		}
+	}
+
+	if freeVlan == -1 {
+		err := fmt.Errorf("free vlan not found, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vnMad)
+		c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+		return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+	}
+
+	return vnMad, freeVlan, nil
+}
+
+func (c *ONeClient) ReservePrivateIP(u int, vnMad string, vlanID int) (pool_id int, err error) {
 	private_tmpl_id, ok := c.vars[PRIVATE_VN_TEMPLATE]
 	if !ok {
 		return -1, errors.New("VNet Tmpl ID is not set")
@@ -90,10 +192,15 @@ func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
 
 	private_vnet_name := fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, u)
 	private_ar := "AR = [\n	IP = \"10.0.0.0\",\n	SIZE = \"255\",\n	TYPE = \"IP4\" ]"
+	private_vlan := fmt.Sprintf("VLAN_ID = %d\nAUTOMATIC_VLAN_ID = \"NO\"", vlanID)
+	private_vn_mad := fmt.Sprintf("VN_MAD = \"%s\"", vnMad)
+	private_bridge := fmt.Sprintf("BRIDGE = user-%d-vlan-%d", u, vlanID)
 
-	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(private_vnet_name, private_ar)
+	extra := private_ar + "\n" + private_vlan + "\n" + private_vn_mad + "\n" + private_bridge
+
+	user_private_net_id, err := c.ctrl.VNTemplate(int(id.GetNumberValue())).Instantiate(private_vnet_name, extra)
 	if err != nil {
-		user_private_net_id = -1
+		return -1, err
 	}
 
 	c.Chown(
@@ -114,6 +221,34 @@ func (c *ONeClient) ReservePrivateIP(u int) (pool_id int, err error) {
 func (c *ONeClient) GetVNet(id int) (*vnet.VirtualNetwork, error) {
 	vnc := c.ctrl.VirtualNetwork(id)
 	return vnc.Info(true)
+}
+
+func (c *ONeClient) DeleteVNet(id int) error {
+	vnc := c.ctrl.VirtualNetwork(id)
+	return vnc.Delete()
+}
+
+func (c *ONeClient) DeleteUserAndVNets(id int) error {
+	if pubVn, err := c.GetUserPublicVNet(id); err == nil {
+		err = c.DeleteVNet(pubVn)
+		if err != nil {
+			c.log.Debug("Couldn't Delete Pub VNet", zap.Error(err), zap.Int("user", id), zap.Int("vnet_id", pubVn))
+		}
+	}
+
+	if privateVn, err := c.GetUserPrivateVNet(id); err == nil {
+		err = c.DeleteVNet(privateVn)
+		if err != nil {
+			c.log.Debug("Couldn't Delete Private VNet", zap.Error(err), zap.Int("user", id), zap.Int("vnet_id", privateVn))
+		}
+	}
+
+	err := c.DeleteUser(id)
+	if err != nil {
+		c.log.Debug("Couldn't Delete User", zap.Error(err), zap.Int("user", id))
+	}
+
+	return err
 }
 
 func (c *ONeClient) GetUserPublicVNet(user int) (id int, err error) {

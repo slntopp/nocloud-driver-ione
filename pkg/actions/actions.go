@@ -167,11 +167,16 @@ func State(
 		m["updated"] = upd.GetListValue().AsSlice()
 	}
 
-	make_value:
+	m["networking"], err = client.NetworkingVM(vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't get Networking VM, error: %v", err)
+	}
+
+make_value:
 	meta, err := structpb.NewValue(m)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't pass State VM, error: %v", err)
 	}
 
-	return &ipb.InvokeResponse{ Result: true, Meta: meta.GetStructValue().Fields }, nil
+	return &ipb.InvokeResponse{Result: true, Meta: meta.GetStructValue().Fields}, nil
 }
