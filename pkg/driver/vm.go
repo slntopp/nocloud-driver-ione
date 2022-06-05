@@ -30,6 +30,8 @@ import (
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -290,13 +292,46 @@ func (c *ONeClient) GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, er
 	return nil, errors.New("instance not found")
 }*/
 
-func findInstanceByUuid(uuid string, ig *pb.InstancesGroup) (*pb.Instance, error) {
+/*func (c *ONeClient) FindInstanceByVM(vm *vm.VM, ig *pb.InstancesGroup) (*pb.Instance, error) {
+
 	for _, inst := range ig.GetInstances() {
-		if inst.GetUuid() == uuid {
-			return inst, nil
+		instVMid, err := GetVMIDFromData(c, inst)
+		if err != nil || instVMid != vm.ID {
+			continue
 		}
+
+		return inst, nil
 	}
-	return nil, errors.New("instance not found")
+
+	return nil, status.Errorf(codes.InvalidArgument, "Error Instance Not Found, VM Name: %s, VM ID: %d", vm.Name, vm.ID)
+}*/
+
+func (c *ONeClient) FindVMByInstance(inst *pb.Instance) (*vm.VM, error) {
+	vmid, err := GetVMIDFromData(c, inst)
+	if err != nil {
+		return nil, err
+	}
+
+	VM, errByVMID := c.ctrl.VM(vmid).Info(true)
+	if errByVMID != nil {
+		return nil, err
+	}
+
+	st, _, err := VM.State()
+	if err != nil {
+		return nil, err
+	}
+
+	if st == vm.Done {
+		_, errByName := c.GetVMByName(inst.GetUuid())
+		if errByName != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "Error searching VM by ID: %v, by Name: %v", errByVMID, errByName)
+		}
+
+		return VM, errByVMID
+	}
+
+	return VM, nil
 }
 
 type CheckInstancesGroupResponse struct {
@@ -314,47 +349,48 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		Valid:       make([]*pb.Instance, 0),
 	}
 
-	userId := int(IG.Data["userid"].GetNumberValue())
+	var userId int
+	if id, ok := IG.Data["userid"]; ok {
+		userId = int(id.GetNumberValue())
+	} else {
+		return nil, status.Errorf(codes.InvalidArgument, "Error User ID Not Found, IG, %v", IG)
+	}
+
 	vmsc := c.ctrl.VMs()
 	vms_pool, err := vmsc.Info(userId)
 	if err != nil {
-		c.log.Error("Error Getting VMs Info by UserId: "+strconv.Itoa(userId), zap.Error(err))
+		c.log.Error("Error Getting VMs Info by UserId", zap.Any("userId", userId), zap.Error(err))
 		return nil, err
+	}
+	instMapForFastSearch := make(map[int]*pb.Instance, len(IG.GetInstances()))
+	for _, inst := range IG.GetInstances() {
+		vmid, err := GetVMIDFromData(c, inst)
+		if err != nil {
+			continue
+		}
+		instMapForFastSearch[vmid] = inst
 	}
 
 	for _, vm := range vms_pool.VMs {
-		_, err := findInstanceByUuid(vm.Name, IG)
-		if err != nil {
+		if _, ok := instMapForFastSearch[vm.ID]; !ok {
 			vmInst, err := c.VMToInstance(vm.ID)
 			if err != nil {
 				c.log.Error("Error Converting VM to Instance", zap.Error(err))
 				continue
 			}
+
 			resp.ToBeDeleted = append(resp.ToBeDeleted, vmInst)
 		}
 	}
 
-	/*userIG, err := c.GetUserVMsInstancesGroup(userId)
-	if err != nil {
-		c.log.Error("Error Recieving User VMs Instances Group", zap.Any("user", userId), zap.Error(err))
-		return nil, err
-	}*/
-
 	for _, inst := range IG.GetInstances() {
-		/*vmid, err := GetVMIDFromData(c, inst)
-		if err != nil {
-			c.log.Error("Error Getting VMID from Data", zap.Error(err))
-			continue
-		}
-		_, err = findInstanceByVMID(c, vmid, userIG)*/
-
-		vmid, err := vmsc.ByName(inst.GetUuid(), userId)
+		vm, err := c.FindVMByInstance(inst)
 		if err != nil {
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
 			continue
 		}
 
-		res, err := c.VMToInstance(vmid)
+		res, err := c.VMToInstance(vm.ID)
 		if err != nil {
 			c.log.Error("Error Converting VM to Instance", zap.Error(err))
 			continue
@@ -467,7 +503,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 					if state == vm.Poweroff {
 						break
 					} else {
-						t := time.NewTimer(2 * time.Second)
+						t := time.NewTimer(1 * time.Second)
 						<-t.C
 					}
 				}
