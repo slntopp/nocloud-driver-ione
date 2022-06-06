@@ -307,31 +307,35 @@ func (c *ONeClient) GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, er
 }*/
 
 func (c *ONeClient) FindVMByInstance(inst *pb.Instance) (*vm.VM, error) {
+	var st vm.State
+	var VM *vm.VM
+
 	vmid, err := GetVMIDFromData(c, inst)
 	if err != nil {
-		return nil, err
+		goto byName
 	}
 
-	VM, errByVMID := c.ctrl.VM(vmid).Info(true)
-	if errByVMID != nil {
-		return nil, err
-	}
-
-	st, _, err := VM.State()
+	VM, err = c.ctrl.VM(vmid).Info(true)
 	if err != nil {
-		return nil, err
+		goto byName
 	}
 
-	if st == vm.Done {
-		_, errByName := c.GetVMByName(inst.GetUuid())
-		if errByName != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "Error searching VM by ID: %v, by Name: %v", errByVMID, errByName)
-		}
-
-		return VM, errByVMID
+	st, _, err = VM.State()
+	if err != nil {
+		goto byName
 	}
 
-	return VM, nil
+	if st != vm.Done {
+		return VM, nil
+	}
+
+byName:
+	vmid, err = c.GetVMByName(inst.GetUuid())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error searching VM %v", err)
+	}
+
+	return c.ctrl.VM(vmid).Info(true)
 }
 
 type CheckInstancesGroupResponse struct {
