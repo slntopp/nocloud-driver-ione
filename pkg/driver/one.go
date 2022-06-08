@@ -72,47 +72,54 @@ type LocationState struct {
 	Meta map[string]*structpb.Value
 }
 
-func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (res *LocationState, err error) {
+type LocationPublicData struct {
+	Uuid  string `json:"uuid"`
+	Error string `json:"error"`
+
+	PublicData map[string]*structpb.Value
+}
+
+func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (st *LocationState, pd *LocationPublicData, err error) {
 	log := c.log.Named("MonitorLocation").Named(sp.GetUuid())
 
-	res = &LocationState{Uuid: sp.GetUuid(), State: stpb.NoCloudState_RUNNING, Meta: make(map[string]*structpb.Value)}
+	st = &LocationState{Uuid: sp.GetUuid(), State: stpb.NoCloudState_RUNNING, Meta: make(map[string]*structpb.Value)}
+	pd = &LocationPublicData{Uuid: sp.GetUuid(), PublicData: make(map[string]*structpb.Value)}
 
 	hostsState, err := MonitorHostsPool(log.Named("MonitorHostsPool"), c)
 	if err != nil {
-		res.State = stpb.NoCloudState_FAILURE
+		st.State = stpb.NoCloudState_FAILURE
 		hostsState, _ = structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
 		})
 	}
-	res.Meta["hosts"] = hostsState
+	st.Meta["hosts"] = hostsState
 
 	dssState, err := MonitorDatastoresPool(log.Named("MonitorDatastoresPool"), c)
 	if err != nil {
-		res.State = stpb.NoCloudState_UNKNOWN
+		st.State = stpb.NoCloudState_UNKNOWN
 		dssState, _ = structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
 		})
 	}
-	res.Meta["datastores"] = dssState
+	st.Meta["datastores"] = dssState
 
 	netsState, err := MonitorNetworks(log.Named("MonitorNetworks"), c)
 	if err != nil {
-		res.State = stpb.NoCloudState_UNKNOWN
+		st.State = stpb.NoCloudState_UNKNOWN
 		netsState, _ = structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
 		})
 	}
-	res.Meta["networking"] = netsState
+	st.Meta["networking"] = netsState
 
 	templatesState, err := MonitorTemplates(log.Named("MonitorTemplates"), c)
 	if err != nil {
-		res.State = stpb.NoCloudState_UNKNOWN
 		templatesState, _ = structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
 		})
 	}
-	res.Meta["templates"] = templatesState
+	pd.PublicData["templates"] = templatesState
 
-	res.Meta["ts"] = structpb.NewNumberValue(float64(time.Now().Unix()))
-	return res, nil
+	st.Meta["ts"] = structpb.NewNumberValue(float64(time.Now().Unix()))
+	return st, pd, nil
 }

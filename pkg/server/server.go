@@ -388,13 +388,16 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		}
 	}
 
-	r, err := client.MonitorLocation(sp)
+	st, pd, err := client.MonitorLocation(sp)
 	if err != nil {
 		log.Error("Error Monitoring Location(ServicesProvider)", zap.String("sp", sp.GetUuid()), zap.Error(err))
 		return &pb.MonitoringResponse{}, nil
 	}
 
-	actions.PostServicesProviderState(r)
+	log.Debug("Location Monitoring", zap.Any("pd", pd))
+
+	actions.PostServicesProviderState(st)
+	actions.PostServicesProviderPublicData(pd)
 
 	log.Info("Monitoring Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil

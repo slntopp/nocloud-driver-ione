@@ -4,12 +4,12 @@ go 1.18
 
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20220128134709-75e34b0d670d
-	github.com/slntopp/nocloud v0.0.15-r9
+	github.com/slntopp/nocloud v0.0.15-r10
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.12.0
 	github.com/streadway/amqp v1.0.0
 	go.uber.org/zap v1.21.0
-	google.golang.org/grpc v1.46.2
+	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 )
 
@@ -20,7 +20,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.3 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

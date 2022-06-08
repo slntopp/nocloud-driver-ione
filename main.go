@@ -35,13 +35,13 @@ import (
 )
 
 var (
-	port     		string
-	type_key 		string
+	port     string
+	type_key string
 
-	log           	*zap.Logger
-	statesHost 		string
-	RabbitMQConn 	string
-	SIGNING_KEY		[]byte
+	log          *zap.Logger
+	statesHost   string
+	RabbitMQConn string
+	SIGNING_KEY  []byte
 )
 
 func init() {
@@ -83,6 +83,7 @@ func main() {
 
 	actions.ConfigureStatusesClient(log, rbmq)
 	datas.Configure(log, rbmq)
+	actions.ConfigurePublicDataClient(log, rbmq)
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
@@ -95,8 +96,7 @@ func main() {
 	log.Fatal("Failed to serve gRPC", zap.Error(s.Serve(lis)))
 }
 
-
-func SetupRecordsPublisher(rbmq *amqp.Connection) (server.RecordsPublisherFunc) {
+func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 	return func(payload []*billingpb.Record) {
 		ch, err := rbmq.Channel()
 		if err != nil {
