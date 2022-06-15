@@ -29,7 +29,6 @@ import (
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -249,44 +248,15 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 			return nil, err
 		}
 
-		userid := int(data["userid"].GetNumberValue())
-		for _, instance := range igroup.GetInstances() {
-			token, err := auth.MakeTokenInstance(instance.GetUuid())
-			if err != nil {
-				log.Error("Error generating VM token", zap.String("instance", instance.GetUuid()), zap.Error(err))
-				continue
-			}
-			vmid, err := client.InstantiateTemplateHelper(instance, data, token)
-			if err != nil {
-				log.Error("Error deploying VM", zap.String("instance", instance.GetUuid()), zap.Error(err))
-				err_value, _ := structpb.NewValue(err.Error())
-				actions.Pub(&stpb.ObjectState{
-					Uuid: instance.Uuid,
-					State: &stpb.State{
-						State: stpb.NoCloudState_FAILURE,
-						Meta: map[string]*structpb.Value{
-							"error": err_value,
-						},
-					},
-				})
-				continue
-			}
-			client.Chown("vm", vmid, userid, int(group))
-
-			go datas.Pub(&ipb.ObjectData{
-				Uuid: instance.Uuid,
-				Data: instance.Data,
-			})
-		}
-
 		igroup.Data = data
-		go datas.IGPub(&ipb.ObjectData{
+		datas.IGPub(&ipb.ObjectData{
 			Uuid: igroup.Uuid,
 			Data: igroup.Data,
 		})
-	} else {
-		s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp})
 	}
+
+	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp})
+
 	log.Debug("Up request completed", zap.Any("instances_group", igroup))
 	return &pb.UpResponse{
 		Group: igroup,
