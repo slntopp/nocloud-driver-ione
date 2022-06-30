@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud/pkg/nocloud"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -42,6 +43,7 @@ var (
 	statesHost   string
 	RabbitMQConn string
 	SIGNING_KEY  []byte
+	redisHost    string
 )
 
 func init() {
@@ -62,6 +64,9 @@ func init() {
 
 	viper.SetDefault("SIGNING_KEY", "seeeecreet")
 	SIGNING_KEY = []byte(viper.GetString("SIGNING_KEY"))
+
+	viper.SetDefault("REDIS_HOST", "redis:6379")
+	redisHost = viper.GetString("REDIS_HOST")
 }
 
 func main() {
@@ -87,7 +92,14 @@ func main() {
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
-	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY)
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisHost,
+		DB:   0, // use default DB
+	})
+	log.Info("RedisDB connection established")
+
+	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
 
 	pb.RegisterDriverServiceServer(s, srv)

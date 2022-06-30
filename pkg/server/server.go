@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -35,7 +36,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var DRIVER_TYPE string
+var (
+	DRIVER_TYPE      string
+	MONITORING_REDIS = "MONITORING"
+)
 
 func SetDriverType(_type string) {
 	DRIVER_TYPE = _type
@@ -45,11 +49,12 @@ type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
+	rdb                  *redis.Client
 }
 
-func NewDriverServiceServer(log *zap.Logger, key []byte) *DriverServiceServer {
+func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *DriverServiceServer {
 	auth.SetContext(log, key)
-	return &DriverServiceServer{log: log}
+	return &DriverServiceServer{log: log, rdb: rdb}
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
@@ -255,7 +260,7 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		})
 	}
 
-	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp})
+	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp, Scheduled: false})
 
 	log.Debug("Up request completed", zap.Any("instances_group", igroup))
 	return &pb.UpResponse{
@@ -335,9 +340,21 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	group := secrets["group"].GetNumberValue()
 
+	redisKey := fmt.Sprintf("%s-SP-%s", MONITORING_REDIS, sp.Uuid)
+
 	for _, ig := range req.GetGroups() {
 		log.Debug("Monitoring group", zap.String("group", ig.GetUuid()), zap.String("title", ig.GetTitle()))
 		l := log.Named(ig.Uuid)
+
+		// checking for unscheduled monitoring\
+		if req.Scheduled {
+			if monitoredRecently := s.rdb.HExists(ctx, redisKey, ig.Uuid).Val(); monitoredRecently {
+				continue
+			}
+		} else {
+			s.rdb.HSet(ctx, redisKey, ig.Uuid, "MONITORED")
+		}
+
 		resp, err := client.CheckInstancesGroup(ig)
 		if err != nil {
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
@@ -356,6 +373,12 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst)
 		}
+	}
+
+	// cleaning of unschedully monitored IGs
+	if req.Scheduled {
+		igKeys := s.rdb.HKeys(ctx, redisKey).Val()
+		s.rdb.HDel(ctx, redisKey, igKeys...)
 	}
 
 	st, pd, err := client.MonitorLocation(sp)
