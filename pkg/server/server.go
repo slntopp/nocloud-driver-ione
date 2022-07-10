@@ -387,7 +387,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		return &pb.MonitoringResponse{}, nil
 	}
 
-	log.Debug("Location Monitoring", zap.Any("pd", pd))
+	log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
 
 	actions.PostServicesProviderState(st)
 	actions.PostServicesProviderPublicData(pd)
