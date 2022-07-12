@@ -29,77 +29,77 @@ import (
 
 var hooks = []map[string]string{
 	{
-    "NAME": "nocloud.pending",
-    "ON": "CUSTOM",
-    "STATE": "PENDING",
-    "LCM_STATE": "LCM_INIT",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
-  {
-    "NAME": "nocloud.hold",
-    "ON": "CUSTOM",
-    "STATE": "HOLD",
-    "LCM_STATE": "LCM_INIT",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
-  {
-    "NAME": "nocloud.active-boot",
-    "ON": "CUSTOM",
-    "STATE": "ACTIVE",
-    "LCM_STATE": "BOOT",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
-  {
-    "NAME": "nocloud.active-running",
-    "ON": "CUSTOM",
-    "STATE": "ACTIVE",
-    "LCM_STATE": "RUNNING",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
-  {
-    "NAME": "nocloud.inactive-stopped",
-    "ON": "CUSTOM",
-    "STATE": "STOPPED",
-    "LCM_STATE": "LCM_INIT",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
-  {
-    "NAME": "nocloud.inactive-suspended",
-    "ON": "CUSTOM",
-    "STATE": "SUSPENDED",
-    "LCM_STATE": "LCM_INIT",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
-  {
-    "NAME": "nocloud.inactive-done",
-    "ON": "CUSTOM",
-    "STATE": "DONE",
-    "LCM_STATE": "LCM_INIT",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
-  {
-    "NAME": "nocloud.inactive-poweroff",
-    "ON": "CUSTOM",
-    "STATE": "POWEROFF",
-    "LCM_STATE": "LCM_INIT",
-    "ARGUMENTS": "record $TEMPLATE",
-    "TYPE": "state",
-    "RESOURCE": "VM",
-  },
+		"NAME":      "nocloud.pending",
+		"ON":        "CUSTOM",
+		"STATE":     "PENDING",
+		"LCM_STATE": "LCM_INIT",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
+	{
+		"NAME":      "nocloud.hold",
+		"ON":        "CUSTOM",
+		"STATE":     "HOLD",
+		"LCM_STATE": "LCM_INIT",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
+	{
+		"NAME":      "nocloud.active-boot",
+		"ON":        "CUSTOM",
+		"STATE":     "ACTIVE",
+		"LCM_STATE": "BOOT",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
+	{
+		"NAME":      "nocloud.active-running",
+		"ON":        "CUSTOM",
+		"STATE":     "ACTIVE",
+		"LCM_STATE": "RUNNING",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
+	{
+		"NAME":      "nocloud.inactive-stopped",
+		"ON":        "CUSTOM",
+		"STATE":     "STOPPED",
+		"LCM_STATE": "LCM_INIT",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
+	{
+		"NAME":      "nocloud.inactive-suspended",
+		"ON":        "CUSTOM",
+		"STATE":     "SUSPENDED",
+		"LCM_STATE": "LCM_INIT",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
+	{
+		"NAME":      "nocloud.inactive-done",
+		"ON":        "CUSTOM",
+		"STATE":     "DONE",
+		"LCM_STATE": "LCM_INIT",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
+	{
+		"NAME":      "nocloud.inactive-poweroff",
+		"ON":        "CUSTOM",
+		"STATE":     "POWEROFF",
+		"LCM_STATE": "LCM_INIT",
+		"ARGUMENTS": "record $TEMPLATE",
+		"TYPE":      "state",
+		"RESOURCE":  "VM",
+	},
 }
 
 // hooksCmd represents the hooks command
@@ -129,7 +129,7 @@ var hooksCmd = &cobra.Command{
 		ctrl := goca.NewController(client)
 
 		hkc := ctrl.Hooks()
-		
+
 		pool, err := hkc.Info()
 		if err != nil {
 			return err
@@ -156,7 +156,7 @@ var hooksCmd = &cobra.Command{
 }
 
 var hooksCleanupCmd = &cobra.Command{
-	Use: "cleanup",
+	Use:   "cleanup",
 	Short: "Remove NoCloud Hooks",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cred, err := GetAuth()
@@ -174,7 +174,7 @@ var hooksCleanupCmd = &cobra.Command{
 		ctrl := goca.NewController(client)
 
 		hkc := ctrl.Hooks()
-		
+
 		pool, err := hkc.Info()
 		if err != nil {
 			return err

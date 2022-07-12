@@ -35,13 +35,13 @@ import (
 var (
 	log *zap.Logger
 
-	ctx context.Context
+	ctx       context.Context
 	srvClient pb.EdgeServiceClient
 
-	host string
+	host     string
 	insecure bool
 )
-	
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "nocloud-ione",

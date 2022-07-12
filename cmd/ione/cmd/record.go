@@ -45,13 +45,13 @@ var recordCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-	
+
 		utmpl := vm.UserTemplate
 		if v, err := utmpl.GetStr(string(shared.NOCLOUD_VM)); err != nil || v != "TRUE" {
 			log.Info("Not a NoCloud VM", zap.String("attribute", v), zap.Error(err))
 			return nil
 		}
-		
+
 		st, lcm_st, err := vm.State()
 		if err != nil {
 			return err
@@ -62,7 +62,7 @@ var recordCmd = &cobra.Command{
 		lcm_state := int(lcm_st)
 		lcm_state_str := lcm_st.String()
 
-		log.Info("Storing Instance State", 
+		log.Info("Storing Instance State",
 			zap.Int("vmid", vm.ID), zap.String("instance", vm.Name),
 			zap.Int("state", state), zap.String("state_str", state_str),
 			zap.Int("lcm_state", lcm_state), zap.String("lcm_state_str", lcm_state_str),
@@ -86,7 +86,7 @@ var recordCmd = &cobra.Command{
 		}
 
 		req := actions.MakePostStateRequest(vm.Name, data.GetFields())
-		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "bearer " + token)
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "bearer "+token)
 		_, err = srvClient.PostState(ctx, req)
 		return err
 	},
