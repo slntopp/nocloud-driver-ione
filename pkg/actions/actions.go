@@ -32,11 +32,93 @@ type ServiceAction func(
 ) (*ipb.InvokeResponse, error)
 
 var Actions = map[string]ServiceAction{
-	"poweroff": Poweroff,
-	"suspend":  Suspend,
-	"reboot":   Reboot,
-	"resume":   Resume,
-	"state":    State,
+	"poweroff":   Poweroff,
+	"suspend":    Suspend,
+	"reboot":     Reboot,
+	"resume":     Resume,
+	"state":      State,
+	"snapcreate": SnapCreate,
+	"snapdelete": SnapDelete,
+	"snaprevert": SnapRevert,
+}
+
+// Creates new snapshot of vm
+func SnapCreate(
+	client *one.ONeClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+
+	vmid, err := one.GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	snapName := ""
+	if v, ok := data["snap_name"]; ok {
+		snapName = v.GetStringValue()
+	}
+
+	err = client.SnapCreate(snapName, vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't Create Snapshot, error: %v", err)
+	}
+
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+}
+
+// Deletes Snapshot by ID
+func SnapDelete(
+	client *one.ONeClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+
+	vmid, err := one.GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	snapID := -1
+	if v, ok := data["snap_id"]; ok {
+		snapID = int(v.GetNumberValue())
+	} else {
+		return nil, status.Errorf(codes.InvalidArgument, "No Snapshot id, error: %v", err)
+	}
+
+	err = client.SnapDelete(snapID, vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't Delete Snapshot, error: %v", err)
+	}
+
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+}
+
+// Reverts Snapshot by ID
+func SnapRevert(
+	client *one.ONeClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+
+	vmid, err := one.GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	snapID := -1
+	if v, ok := data["snap_id"]; ok {
+		snapID = int(v.GetNumberValue())
+	} else {
+		return nil, status.Errorf(codes.InvalidArgument, "No Snapshot id, error: %v", err)
+	}
+
+	err = client.SnapRevert(snapID, vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't Create Snapshot, error: %v", err)
+	}
+
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
 // Powers off a running VM

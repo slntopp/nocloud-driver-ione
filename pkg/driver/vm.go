@@ -35,6 +35,21 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func (c *ONeClient) SnapCreate(name string, vmid int) error {
+	vmc := c.ctrl.VM(vmid)
+	return vmc.SnapshotCreate(name)
+}
+
+func (c *ONeClient) SnapDelete(snapId, vmid int) error {
+	vmc := c.ctrl.VM(vmid)
+	return vmc.SnapshotDelete(snapId)
+}
+
+func (c *ONeClient) SnapRevert(snapId, vmid int) error {
+	vmc := c.ctrl.VM(vmid)
+	return vmc.SnapshotRevert(snapId)
+}
+
 func (c *ONeClient) GetVMByName(name string) (id int, err error) {
 	vmsc := c.ctrl.VMs()
 	return vmsc.ByName(name)
