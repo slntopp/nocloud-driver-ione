@@ -323,6 +323,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 }
 
 func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
+
 	log := s.log.Named("Monitoring")
 	sp := req.GetServicesProvider()
 	log.Info("Starting Monitoring Routine", zap.String("sp", sp.GetUuid()))
@@ -334,6 +335,29 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	secrets := sp.GetSecrets()
 	vars := sp.GetVars()
+
+	// test snap actions
+	log.Debug("Start snap testing")
+	inst := req.GetGroups()[0].GetInstances()[0]
+	if inst != nil {
+
+		if inst.Data == nil {
+			inst.Data = make(map[string]*structpb.Value)
+			log.Debug("INST DATA ALLOCATED")
+		}
+		inst.Data["snap_name"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: "test create snapshot"}}
+		inst.Data["vmid"] = &structpb.Value{Kind: &structpb.Value_NumberValue{NumberValue: 5236}}
+
+		resp, err := actions.SnapCreate(client, inst, inst.Data)
+		if err != nil {
+			log.Debug("!!!! Snap create error", zap.Error(err))
+		} else {
+			log.Debug("Snap tests", zap.Bool("created", resp.Result))
+		}
+	} else {
+		log.Debug("!!!!!!!!!inst var is nil!!!!!!!!!!!!")
+	}
+	log.Debug("End snap testing")
 
 	client.SetSecrets(secrets)
 	client.SetVars(vars)
