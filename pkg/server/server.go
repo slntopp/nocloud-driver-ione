@@ -341,13 +341,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	inst := req.GetGroups()[0].GetInstances()[0]
 	if inst != nil {
 
-		if inst.Data == nil {
-			inst.Data = make(map[string]*structpb.Value)
-			log.Debug("INST DATA ALLOCATED")
-		}
 		inst.Data["snap_name"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: "test create snapshot"}}
-		inst.Data["vmid"] = &structpb.Value{Kind: &structpb.Value_NumberValue{NumberValue: 5236}}
-
+		
 		resp, err := actions.SnapCreate(client, inst, inst.Data)
 		if err != nil {
 			log.Debug("!!!! Snap create error", zap.Error(err))
