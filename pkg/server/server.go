@@ -339,23 +339,23 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	client.SetSecrets(secrets)
 	client.SetVars(vars)
 
-	// test snap actions
-	log.Debug("Start snap testing")
-	inst := req.GetGroups()[0].GetInstances()[0]
-	if inst != nil {
+	// // test snap actions
+	// log.Debug("Start snap testing")
+	// inst := req.GetGroups()[0].GetInstances()[0]
+	// if inst != nil {
 
-		inst.Data["snap_name"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: "test create snapshot"}}
+	// 	inst.Data["snap_name"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: "test create snapshot"}}
 
-		resp, err := actions.SnapCreate(client, inst, inst.Data)
-		if err != nil {
-			log.Debug("!!!! Snap create error", zap.Error(err))
-		} else {
-			log.Debug("Snap tests", zap.Bool("created", resp.Result))
-		}
-	} else {
-		log.Debug("!!!!!!!!!inst var is nil!!!!!!!!!!!!")
-	}
-	log.Debug("End snap testing")
+	// 	resp, err := actions.SnapCreate(client, inst, inst.Data)
+	// 	if err != nil {
+	// 		log.Debug("!!!! Snap create error", zap.Error(err))
+	// 	} else {
+	// 		log.Debug("Snap tests", zap.Bool("created", resp.Result))
+	// 	}
+	// } else {
+	// 	log.Debug("!!!!!!!!!inst var is nil!!!!!!!!!!!!")
+	// }
+	// log.Debug("End snap testing")
 
 	group := secrets["group"].GetNumberValue()
 
