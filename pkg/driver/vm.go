@@ -53,7 +53,7 @@ func (c *ONeClient) GetInstSnapshots(inst *pb.Instance) (map[string]interface{},
 		if err != nil {
 			return nil, err
 		}
-		time, err := snapV.GetStr("TIME")
+		time, err := snapV.GetInt("TIME")
 		if err != nil {
 			return nil, err
 		}
