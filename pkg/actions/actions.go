@@ -254,6 +254,11 @@ func State(
 		return nil, status.Errorf(codes.Internal, "Can't get Networking VM, error: %v", err)
 	}
 
+	m["snapshots"], err = client.GetInstSnapshots(inst)
+	if err != nil {
+		return nil, err
+	}
+
 make_value:
 	meta, err := structpb.NewValue(m)
 	if err != nil {

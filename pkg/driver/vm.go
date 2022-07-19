@@ -35,6 +35,39 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func (c *ONeClient) GetInstSnapshots(inst *pb.Instance) (map[string]interface{}, error) {
+	vm, err := c.FindVMByInstance(inst)
+	if err != nil {
+		return nil, err
+	}
+
+	snaps := make(map[string]interface{}, 0)
+
+	snapsV := vm.Template.GetVectors("SNAPSHOT")
+	for _, snapV := range snapsV {
+		id, err := snapV.GetStr("SNAPSHOT_ID")
+		if err != nil {
+			return nil, err
+		}
+		name, err := snapV.GetStr("NAME")
+		if err != nil {
+			return nil, err
+		}
+		time, err := snapV.GetStr("TIME")
+		if err != nil {
+			return nil, err
+		}
+
+		snap := make(map[string]interface{}, 0)
+		snap["name"] = name
+		snap["ts"] = time
+
+		snaps[id] = snap
+	}
+
+	return snaps, nil
+}
+
 func (c *ONeClient) SnapCreate(name string, vmid int) error {
 	vmc := c.ctrl.VM(vmid)
 	return vmc.SnapshotCreate(name)

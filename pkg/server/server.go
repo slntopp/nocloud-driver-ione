@@ -385,7 +385,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))
 		for _, inst := range ig.GetInstances() {
 			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
-			_, err := actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
+			_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
