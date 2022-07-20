@@ -17,7 +17,6 @@ package one
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	tmpl "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/template"
@@ -120,7 +119,6 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 		return -1, err
 	}
 	req := sched.GetStringValue()
-	req = strings.ReplaceAll(req, "\"", "\\\"")
 	// Set Host(s) to deploy Instance to
 	tmpl.Placement(keys.SchedRequirements, req)
 
@@ -135,7 +133,6 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	}
 	// Getting Datastores scheduler requirements
 	ds_req := sched_ds.GetStringValue()
-	ds_req = strings.ReplaceAll(ds_req, "\"", "\\\"")
 	// Setting Datastore(s) to deploy Instance to
 	tmpl.Placement(keys.SchedDSRequirements, ds_req)
 

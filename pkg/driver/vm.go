@@ -402,6 +402,10 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		res.Uuid = inst.GetUuid()
 		res.Title = inst.GetTitle()
 		res.Status = inst.GetStatus()
+		res.BillingPlan = inst.GetBillingPlan()
+		res.Product = inst.Product
+		res.Data = nil
+		res.State = nil
 
 		err = hasher.SetHash(res.ProtoReflect())
 		if err != nil {
@@ -410,6 +414,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 
 		if res.Hash != inst.Hash {
+			c.log.Debug("comparing", zap.Any("res", res), zap.Any("inst", inst))
 			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
 		} else {
 			resp.Valid = append(resp.Valid, inst)
