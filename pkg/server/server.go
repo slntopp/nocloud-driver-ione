@@ -323,6 +323,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 }
 
 func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
+
 	log := s.log.Named("Monitoring")
 	sp := req.GetServicesProvider()
 	log.Info("Starting Monitoring Routine", zap.String("sp", sp.GetUuid()))
@@ -337,6 +338,24 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	client.SetSecrets(secrets)
 	client.SetVars(vars)
+
+	// // test snap actions
+	// log.Debug("Start snap testing")
+	// inst := req.GetGroups()[0].GetInstances()[0]
+	// if inst != nil {
+
+	// 	inst.Data["snap_name"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: "test create snapshot"}}
+
+	// 	resp, err := actions.SnapCreate(client, inst, inst.Data)
+	// 	if err != nil {
+	// 		log.Debug("!!!! Snap create error", zap.Error(err))
+	// 	} else {
+	// 		log.Debug("Snap tests", zap.Bool("created", resp.Result))
+	// 	}
+	// } else {
+	// 	log.Debug("!!!!!!!!!inst var is nil!!!!!!!!!!!!")
+	// }
+	// log.Debug("End snap testing")
 
 	group := secrets["group"].GetNumberValue()
 
@@ -366,7 +385,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))
 		for _, inst := range ig.GetInstances() {
 			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
-			_, err := actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
+			_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 			if err != nil {
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
