@@ -158,7 +158,7 @@ func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 	o, _ := vm()
 	ram := Lazy(func() float64 {
 		ram, _ := o.Template.GetMemory()
-		return float64(ram)
+		return float64(ram) / 1024
 	})
 	return handleCapacityBilling(log.Named("RAM"), ram, ltl, i, vm, res, last)
 }
