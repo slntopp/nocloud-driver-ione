@@ -460,10 +460,9 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 			continue
 		}
 
-		c.log.Debug("[CHECKING] instance for hash [CHECKING]", zap.Any("inst", res))
+		c.log.Debug("instance for hash calculating while Monitoring Checking", zap.Any("inst", res))
 
 		if res.Hash != inst.Hash {
-			c.log.Debug("HASHES DON'T MATCH")
 			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
 		} else {
 			resp.Valid = append(resp.Valid, inst)
