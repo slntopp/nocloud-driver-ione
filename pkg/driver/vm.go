@@ -447,15 +447,20 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 			c.log.Error("Error Converting VM to Instance", zap.Error(err))
 			continue
 		}
-		res.Uuid = inst.GetUuid()
+		res.Uuid = ""
 		res.Title = inst.GetTitle()
-		res.Status = inst.GetStatus()
+		res.Status = pb.InstanceStatus_INIT
+		res.BillingPlan = inst.BillingPlan
+		res.Data = nil
+		res.State = nil
 
 		err = hasher.SetHash(res.ProtoReflect())
 		if err != nil {
 			c.log.Error("Error Setting Instance Hash", zap.Error(err))
 			continue
 		}
+
+		c.log.Debug("instance for hash calculating while Monitoring Checking", zap.Any("inst", res))
 
 		if res.Hash != inst.Hash {
 			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
