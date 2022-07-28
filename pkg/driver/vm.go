@@ -404,34 +404,31 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	var userId int
 	if id, ok := IG.Data["userid"]; ok {
 		userId = int(id.GetNumberValue())
-	} else {
-		return nil, status.Errorf(codes.InvalidArgument, "Error User ID Not Found, IG, %v", IG)
-	}
-
-	vmsc := c.ctrl.VMs()
-	vms_pool, err := vmsc.Info(userId)
-	if err != nil {
-		c.log.Error("Error Getting VMs Info by UserId", zap.Any("userId", userId), zap.Error(err))
-		return nil, err
-	}
-	instMapForFastSearch := make(map[int]*pb.Instance, len(IG.GetInstances()))
-	for _, inst := range IG.GetInstances() {
-		vmid, err := GetVMIDFromData(c, inst)
+		vmsc := c.ctrl.VMs()
+		vms_pool, err := vmsc.Info(userId)
 		if err != nil {
-			continue
+			c.log.Error("Error Getting VMs Info by UserId", zap.Any("userId", userId), zap.Error(err))
+			return nil, err
 		}
-		instMapForFastSearch[vmid] = inst
-	}
-
-	for _, vm := range vms_pool.VMs {
-		if _, ok := instMapForFastSearch[vm.ID]; !ok {
-			vmInst, err := c.VMToInstance(vm.ID)
+		instMapForFastSearch := make(map[int]*pb.Instance, len(IG.GetInstances()))
+		for _, inst := range IG.GetInstances() {
+			vmid, err := GetVMIDFromData(c, inst)
 			if err != nil {
-				c.log.Error("Error Converting VM to Instance", zap.Error(err))
 				continue
 			}
+			instMapForFastSearch[vmid] = inst
+		}
 
-			resp.ToBeDeleted = append(resp.ToBeDeleted, vmInst)
+		for _, vm := range vms_pool.VMs {
+			if _, ok := instMapForFastSearch[vm.ID]; !ok {
+				vmInst, err := c.VMToInstance(vm.ID)
+				if err != nil {
+					c.log.Error("Error Converting VM to Instance", zap.Error(err))
+					continue
+				}
+
+				resp.ToBeDeleted = append(resp.ToBeDeleted, vmInst)
+			}
 		}
 	}
 
