@@ -237,29 +237,6 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	client.SetSecrets(sp.GetSecrets())
 	client.SetVars(sp.GetVars())
 
-	secrets := sp.GetSecrets()
-	group := secrets["group"].GetNumberValue()
-
-	data := igroup.GetData()
-	if data == nil {
-		data = make(map[string]*structpb.Value)
-		igroup.Data = data
-	}
-
-	if data["userid"] == nil {
-		data, err = s.PrepareService(ctx, sp, igroup, client, group)
-		if err != nil {
-			log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
-			return nil, err
-		}
-
-		igroup.Data = data
-		datas.IGPub(&ipb.ObjectData{
-			Uuid: igroup.Uuid,
-			Data: igroup.Data,
-		})
-	}
-
 	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp, Scheduled: false})
 
 	log.Debug("Up request completed", zap.Any("instances_group", igroup))
@@ -379,6 +356,29 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 		} else {
 			log.Debug("Check Instances Group Response", zap.Any("resp", resp))
+
+			if len(resp.ToBeCreated) > 0 {
+				group := secrets["group"].GetNumberValue()
+
+				data := ig.GetData()
+				if data == nil {
+					data = make(map[string]*structpb.Value)
+					ig.Data = data
+				}
+
+				data, err = s.PrepareService(ctx, sp, ig, client, group)
+				if err != nil {
+					log.Error("Error Preparing Service", zap.Any("group", ig), zap.Error(err))
+					return nil, err
+				}
+
+				ig.Data = data
+				datas.IGPub(&ipb.ObjectData{
+					Uuid: ig.Uuid,
+					Data: ig.Data,
+				})
+			}
+
 			client.CheckInstancesGroupResponseProcess(resp, ig.GetData(), int(group))
 		}
 
