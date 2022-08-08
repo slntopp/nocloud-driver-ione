@@ -234,7 +234,6 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
-	client.SetSecrets(sp.GetSecrets())
 	client.SetVars(sp.GetVars())
 
 	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp, Scheduled: false})
@@ -313,7 +312,6 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	secrets := sp.GetSecrets()
 	vars := sp.GetVars()
 
-	client.SetSecrets(secrets)
 	client.SetVars(vars)
 
 	group := secrets["group"].GetNumberValue()

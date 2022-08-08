@@ -54,14 +54,22 @@ func NewClientFromSP(sp *sppb.ServicesProvider, log *zap.Logger) (*ONeClient, er
 	if host == "" || user == "" || pass == "" {
 		return nil, errors.New("host or Credentials are empty")
 	}
-	return NewClient(user, pass, host, log), nil
+	c := NewClient(user, pass, host, log)
+	c.secrets = secrets
+	return c, nil
 }
 
 func (c *ONeClient) SetSecrets(secrets map[string]*structpb.Value) {
 	c.secrets = secrets
 }
+func (c *ONeClient) GetSecrets() map[string]*structpb.Value {
+	return c.secrets
+}
 func (c *ONeClient) SetVars(vars map[string]*sppb.Var) {
 	c.vars = vars
+}
+func (c *ONeClient) Logger(n string) *zap.Logger {
+	return c.log.Named(n)
 }
 
 type LocationState struct {
