@@ -16,10 +16,15 @@ limitations under the License.
 package actions
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"time"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -266,4 +271,64 @@ make_value:
 	}
 
 	return &ipb.InvokeResponse{Result: true, Meta: meta.GetStructValue().Fields}, nil
+}
+
+func StartVNC(
+	client *one.ONeClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+
+	log := client.Logger("StartVNC")
+
+	secrets := client.GetSecrets()
+	host := secrets["host"].GetStringValue()
+	user := secrets["user"].GetStringValue()
+	pass := secrets["pass"].GetStringValue()
+
+	kind := "vnc"
+	if _, ok := data["kind"]; ok {
+		kind = data["kind"].GetStringValue()
+	}
+
+	vmid, err := one.GetVMIDFromData(client, inst)
+	if err != nil {
+		log.Debug("Error finding VM ID", zap.Error(err))
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	url := fmt.Sprintf("%s/vnc?kind=%s&vmid=%d", host, kind, vmid)
+
+	hc := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Debug("Cannot build request", zap.Error(err))
+		return nil, status.Error(codes.Internal, "Cannot build request")
+	}
+	req.SetBasicAuth(user, pass)
+
+	res, err := hc.Do(req)
+	if err != nil {
+		log.Debug("Error performing request", zap.Error(err))
+		return nil, status.Error(codes.Internal, "Error performing Request")
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Debug("Error reading response body", zap.Error(err))
+		return nil, status.Error(codes.Internal, "Cannot read Body")
+	}
+
+	var token_data map[string]interface{}
+	err = json.Unmarshal(body, &token_data)
+	if err != nil {
+		log.Debug("Error Unmarshaling response", zap.Error(err))
+		return nil, status.Error(codes.Internal, "Cannot Unmarshal Body")
+	}
+
+	res_struct, _ := structpb.NewStruct(token_data)
+	return &ipb.InvokeResponse{
+		Result: true, Meta: res_struct.GetFields(),
+	}, nil
 }
