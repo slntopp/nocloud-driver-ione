@@ -14,13 +14,23 @@ var (
 )
 
 func init() {
+	viper.AddConfigPath("/etc/one")
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("ione")
+
 	viper.AutomaticEnv()
 	log = nocloud.NewLogger()
 
 	viper.SetDefault("SUNSTONE_VNC_TOKENS_DIR", "/var/lib/one/sunstone_vnc_tokens/")
 	viper.SetDefault("SUNSTONE_VMRC_TOKENS_DIR", "/var/lib/one/sunstone_vmrc_tokens/")
-	viper.SetDefault("SOCKET_VMRC_ENDPOINT", "wss://sunstone.demo.support.pl/fireedge/vmrc/")
-	viper.SetDefault("SOCKET_VNC_ENDPOINT", "wss://sunstone.demo.support.pl:29876")
+	viper.SetDefault("SOCKET_VMRC_ENDPOINT", "ws://localhost/fireedge/vmrc/")
+	viper.SetDefault("SOCKET_VNC_ENDPOINT", "ws://localhost:29876")
+
+	if err := viper.ReadInConfig(); err == nil {
+		log.Info("Using config file", zap.String("file", viper.ConfigFileUsed()))
+	} else {
+		log.Fatal("Error reading Config", zap.Error(err))
+	}
 
 	vnc_tokens_dir = viper.GetString("SUNSTONE_VNC_TOKENS_DIR")
 	vmrc_tokens_dir = viper.GetString("SUNSTONE_VMRC_TOKENS_DIR")
