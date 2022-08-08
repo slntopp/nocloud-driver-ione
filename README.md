@@ -50,9 +50,35 @@ mv nocloud-ione ~oneadmin/remotes/hooks
 
 ## Setup VNC
 
+### Install & Configure
+
 `nocloud-ione-vnc` gives an API endpoint to generate VNC tokens consumable by Driver VNC Proxy and Tunnel.
 
 1. Get the Archive from Releases page
 2. Unpack it
 3. Run `sh install.sh` (`install.sh` is included into Archive)
 4. Fill `/etc/one/ione.yaml`
+
+Configure nginx. This API must be available as `<ONe RPC2 endpoint>/vnc`(for example `https://one.example.com/RPC2/vnc`).
+
+You could achieve this by adding:
+
+```nginx
+    location /RPC2/vnc {
+        proxy_pass              http://127.0.0.1:8010;
+        proxy_http_version      1.1;
+        proxy_set_header        X-Real-IP               $remote_addr;
+        proxy_set_header        X-Forwarded-For         $proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Server      $host;
+        proxy_set_header        host                    $host;
+        proxy_set_header        Upgrade                 $http_upgrade;
+        proxy_set_header        Connection              $connection_upgrade;
+        add_header              Access-Control-Allow-Origin *;
+    }
+```
+
+### Uninstall
+
+1. Stop daemon `systemctl stop nocloud-ione-vnc`
+2. Delete `/usr/lib/systemd/system/nocloud-ione-vnc.service`
+3. Delete binary (`/usr/bin/nocloud-ione-vnc`)
