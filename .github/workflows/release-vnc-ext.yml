@@ -27,6 +27,6 @@ jobs:
           goversion: 1.18
           ldflags: -s -w -X main.version=${{ steps.make_context.outputs.tag }}
           executable_compression: upx
-          project_path: cmd/vnc
+          project_path: cmd/ione-vnc
           binary_name: "nocloud-ione-vnc"
-          extra_files: LICENSE cmd/vnc/nocloud-ione-vnc.service install.sh
+          extra_files: LICENSE cmd/ione-vnc/nocloud-ione-vnc.service install.sh
