@@ -47,3 +47,11 @@ mv nocloud-ione ~oneadmin/remotes/hooks
 
 1. Run `nocloud-ione hooks cleanup`
 2. Delete binary
+
+## Setup VNC
+
+`nocloud-ione-vnc` gives an API endpoint to generate VNC tokens consumable by Driver VNC Proxy and Tunnel.
+
+1. Get the Archive from Releases page
+2. Unpack it
+3. Run `sh install.sh` (`install.sh` is included into Archive)
