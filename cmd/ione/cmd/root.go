@@ -38,8 +38,9 @@ var (
 	ctx       context.Context
 	srvClient pb.EdgeServiceClient
 
-	host     string
-	insecure bool
+	host                                                         string
+	insecure                                                     bool
+	vnc_tokens_dir, vmrc_tokens_dir, vmrc_endpoint, vnc_endpoint string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -69,6 +70,11 @@ func initConfig() {
 
 	viper.AutomaticEnv() // read in environment variables that match
 
+	viper.SetDefault("SUNSTONE_VNC_TOKENS_DIR", "/var/lib/one/sunstone_vnc_tokens/")
+	viper.SetDefault("SUNSTONE_VMRC_TOKENS_DIR", "/var/lib/one/sunstone_vmrc_tokens/")
+	viper.SetDefault("SOCKET_VMRC_ENDPOINT", "ws://localhost/fireedge/vmrc/")
+	viper.SetDefault("SOCKET_VNC_ENDPOINT", "ws://localhost:29876")
+
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
@@ -88,4 +94,10 @@ func initConfig() {
 
 	ctx = context.Background()
 	srvClient = pb.NewEdgeServiceClient(conn)
+
+	vnc_tokens_dir = viper.GetString("SUNSTONE_VNC_TOKENS_DIR")
+	vmrc_tokens_dir = viper.GetString("SUNSTONE_VMRC_TOKENS_DIR")
+	vmrc_endpoint = viper.GetString("SOCKET_VMRC_ENDPOINT")
+	vnc_endpoint = viper.GetString("SOCKET_VNC_ENDPOINT")
+
 }

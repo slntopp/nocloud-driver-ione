@@ -28,11 +28,16 @@ mv nocloud-ione ~oneadmin/remotes/hooks
 ### Configure
 
 1. Create `/etc/one/ione.yaml`
-2. Fill in host and insecure
+2. Fill in host and insecure (and vnc/vmrc data to add VNC support)
 
     ```yaml
     host: api.your.nocloud:8080
     insecure: false
+
+    SUNSTONE_VNC_TOKENS_DIR: /var/lib/one/sunstone_vnc_tokens
+    SUNSTONE_VMRC_TOKENS_DIR: /var/lib/one/sunstone_vmrc_tokens/
+    SOCKET_VMRC_ENDPOINT: ws://localhost/fireedge/vmrc/
+    SOCKET_VNC_ENDPOINT: ws://localhost:29876
     ```
 
 3. Run `nocloud-ione test`. Result must be `true`.
