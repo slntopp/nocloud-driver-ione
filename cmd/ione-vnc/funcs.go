@@ -143,7 +143,7 @@ func HandleGenerateToken(w http.ResponseWriter, req *http.Request) {
 	fmt.Println(user, pass)
 
 	c := goca.NewController(
-		goca.NewDefaultClient(goca.NewConfig(user, pass, "https://sunstone.demo.support.pl/RPC2")),
+		goca.NewDefaultClient(goca.NewConfig(user, pass, "")),
 	)
 
 	query := req.URL.Query()
