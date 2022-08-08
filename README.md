@@ -55,3 +55,4 @@ mv nocloud-ione ~oneadmin/remotes/hooks
 1. Get the Archive from Releases page
 2. Unpack it
 3. Run `sh install.sh` (`install.sh` is included into Archive)
+4. Fill `/etc/one/ione.yaml`
