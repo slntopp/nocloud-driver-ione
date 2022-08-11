@@ -36,8 +36,6 @@ mv nocloud-ione ~oneadmin/remotes/hooks
 
     SUNSTONE_VNC_TOKENS_DIR: /var/lib/one/sunstone_vnc_tokens
     SUNSTONE_VMRC_TOKENS_DIR: /var/lib/one/sunstone_vmrc_tokens/
-    SOCKET_VMRC_ENDPOINT: ws://localhost/fireedge/vmrc/
-    SOCKET_VNC_ENDPOINT: ws://localhost:29876
     ```
 
 3. Run `nocloud-ione test`. Result must be `true`.
