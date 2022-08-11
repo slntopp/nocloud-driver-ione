@@ -29,4 +29,4 @@ jobs:
           executable_compression: upx
           project_path: cmd/ione-vnc
           binary_name: "nocloud-ione-vnc"
-          extra_files: LICENSE cmd/ione-vnc/nocloud-ione-vnc.service install.sh
+          extra_files: LICENSE cmd/ione-vnc/nocloud-ione-vnc.service cmd/ione-vnc/install.sh
