@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	log                                                          *zap.Logger
-	vnc_tokens_dir, vmrc_tokens_dir, vmrc_endpoint, vnc_endpoint string
+	log                             *zap.Logger
+	vnc_tokens_dir, vmrc_tokens_dir string
 )
 
 func init() {
@@ -23,8 +23,6 @@ func init() {
 
 	viper.SetDefault("SUNSTONE_VNC_TOKENS_DIR", "/var/lib/one/sunstone_vnc_tokens/")
 	viper.SetDefault("SUNSTONE_VMRC_TOKENS_DIR", "/var/lib/one/sunstone_vmrc_tokens/")
-	viper.SetDefault("SOCKET_VMRC_ENDPOINT", "ws://localhost/fireedge/vmrc/")
-	viper.SetDefault("SOCKET_VNC_ENDPOINT", "ws://localhost:29876")
 
 	if err := viper.ReadInConfig(); err == nil {
 		log.Info("Using config file", zap.String("file", viper.ConfigFileUsed()))
@@ -34,8 +32,6 @@ func init() {
 
 	vnc_tokens_dir = viper.GetString("SUNSTONE_VNC_TOKENS_DIR")
 	vmrc_tokens_dir = viper.GetString("SUNSTONE_VMRC_TOKENS_DIR")
-	vmrc_endpoint = viper.GetString("SOCKET_VMRC_ENDPOINT")
-	vnc_endpoint = viper.GetString("SOCKET_VNC_ENDPOINT")
 }
 
 func main() {

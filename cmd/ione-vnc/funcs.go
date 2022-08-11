@@ -105,11 +105,11 @@ func GenToken(c *goca.Controller, vmid, kind string) *TokenData {
 	if kind == "vnc" {
 		filename = path.Join(vnc_tokens_dir, fmt.Sprintf("one-%d", vm.ID))
 		token_file = fmt.Sprintf("%s: %s:%s", token, host, port)
-		url = fmt.Sprintf("%s?encrypt=true&password=null&token=%s&info=%s", vnc_endpoint, token, info64)
+		url = fmt.Sprintf("encrypt=true&password=null&token=%s&info=%s", token, info64)
 	} else if kind == "vmrc" {
 		filename = path.Join(vmrc_tokens_dir, token)
 		token_file = fmt.Sprintf("%s:%s", host, port)
-		url = fmt.Sprintf("%s%s?info=%s", vmrc_endpoint, token, info64)
+		url = fmt.Sprintf("%s?info=%s", token, info64)
 	} else {
 		return nil
 	}
