@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -194,7 +194,10 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 	if data["address_range_id"] != nil {
 		address_range_id = int(data["address_range_id"].GetNumberValue())
 	}*/
-	if private_ips_amount > 0 {
+
+	_, err := client.GetUserPrivateVNet(oneID)
+
+	if private_ips_amount > 0 && err.Error() == "resource not found" {
 		vnMad, freeVlan, err := client.FindFreeVlan(sp)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Private IP addresses",
