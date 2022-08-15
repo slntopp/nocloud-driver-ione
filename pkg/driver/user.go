@@ -18,7 +18,6 @@ package one
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
 	"time"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
@@ -67,12 +66,12 @@ func transferOwnership(c *ONeClient, inst *pb.Instance, newUserID int, oldUserID
 
 	publicNet, err := c.GetUserPrivateVNet(oldUserID)
 	if err != nil {
-		return status.Error(codes.NotFound, fmt.Sprintf("Can't find private net while creating new user. Old user id = %d", oldUserID))
+		return status.Errorf(codes.NotFound, "Can't find private net while creating new user. Old user id = %d", oldUserID)
 	}
 
 	privateNet, err := c.GetUserPublicVNet(oldUserID)
 	if err != nil {
-		return status.Error(codes.NotFound, fmt.Sprintf("Can't find public net while creating new user. Old user id = %d", oldUserID))
+		return status.Errorf(codes.NotFound, "Can't find public net while creating new user. Old user id = %d", oldUserID)
 	}
 
 	if err := c.Chown("vn", privateNet, newUserID, int(userGroup)); err != nil {
