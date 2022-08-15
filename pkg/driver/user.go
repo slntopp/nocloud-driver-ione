@@ -18,6 +18,7 @@ package one
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"time"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
@@ -53,25 +54,16 @@ func (c *ONeClient) UserAddAttribute(id int, data map[string]interface{}) error 
 	return uc.Update(tmpl.String(), parameters.Merge)
 }
 
-// Transfer ownership of vm, public and private networks from old user to new.
-func transferOwnership(c *ONeClient, inst *pb.Instance, newUserID int, oldUserID int, userGroup int) error {
-	vmid, err := GetVMIDFromData(c, inst)
-	if err != nil {
-		return status.Error(codes.NotFound, "Can't get vm id by data")
-	}
-
-	if err := c.Chown("vm", vmid, newUserID, int(userGroup)); err != nil {
-		return status.Error(codes.Internal, "Can't change ownership of the vm")
-	}
-
+// Transfer ownership of public and private networks from old user to new.
+func changeOwnershipOfNetworks(c *ONeClient, newUserID int, oldUserID int, userGroup int) error {
 	publicNet, err := c.GetUserPrivateVNet(oldUserID)
 	if err != nil {
-		return status.Errorf(codes.NotFound, "Can't find private net while creating new user. Old user id = %d", oldUserID)
+		return status.Errorf(codes.NotFound, "Can't find private net. Old user id = %d", oldUserID)
 	}
 
 	privateNet, err := c.GetUserPublicVNet(oldUserID)
 	if err != nil {
-		return status.Errorf(codes.NotFound, "Can't find public net while creating new user. Old user id = %d", oldUserID)
+		return status.Errorf(codes.NotFound, "Can't find public net. Old user id = %d", oldUserID)
 	}
 
 	if err := c.Chown("vn", privateNet, newUserID, int(userGroup)); err != nil {
@@ -81,6 +73,34 @@ func transferOwnership(c *ONeClient, inst *pb.Instance, newUserID int, oldUserID
 	if err := c.Chown("vn", publicNet, newUserID, int(userGroup)); err != nil {
 		return status.Error(codes.Internal, "Can't change ownership of old public network")
 	}
+
+	privateNetController := c.ctrl.VirtualNetwork(privateNet)
+	publicNetController := c.ctrl.VirtualNetwork(publicNet)
+
+	if err := privateNetController.Rename(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, newUserID)); err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	if err := publicNetController.Rename(fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, newUserID)); err != nil {
+		privateNetController.Rename(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, oldUserID))
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	return nil
+}
+
+// Transfer ownership of vm from old user to new.
+func changeOwnershipOfVM(c *ONeClient, inst *pb.Instance, newUserID int, userGroup int) error {
+	vmid, err := GetVMIDFromData(c, inst)
+	if err != nil {
+		return status.Error(codes.NotFound, "Can't get vm id by data")
+	}
+
+	if err := c.Chown("vm", vmid, newUserID, int(userGroup)); err != nil {
+		return status.Error(codes.Internal, "Can't change ownership of the vm")
+	}
+
+	vmc := c.ctrl.VM(vmid)
+	vmc.Reboot()
 
 	return nil
 }
@@ -105,8 +125,15 @@ func (c *ONeClient) CheckOrphanInstanceGroup(instanceGroup *pb.InstancesGroup, u
 		return status.Error(codes.Internal, err.Error())
 	}
 
+	if err := changeOwnershipOfNetworks(c, newUserID, oldUserID, int(userGroup)); err != nil {
+		uc := c.ctrl.User(newUserID)
+		uc.Delete()
+		uc.Info(true)
+		return err
+	}
+
 	for _, inst := range instanceGroup.GetInstances() {
-		if err := transferOwnership(c, inst, newUserID, oldUserID, int(userGroup)); err != nil {
+		if err := changeOwnershipOfVM(c, inst, newUserID, int(userGroup)); err != nil {
 			uc := c.ctrl.User(newUserID)
 			uc.Delete()
 			return err
