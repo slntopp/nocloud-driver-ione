@@ -140,7 +140,10 @@ func Reinstall(
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
 
-	client.Reinstall(vmid)
+	err = client.Reinstall(vmid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Can't Reinstall VM, error: %v", err)
+	}
 
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
