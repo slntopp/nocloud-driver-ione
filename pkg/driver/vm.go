@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -76,6 +76,12 @@ func (c *ONeClient) SnapCreate(name string, vmid int) error {
 func (c *ONeClient) SnapDelete(snapId, vmid int) error {
 	vmc := c.ctrl.VM(vmid)
 	return vmc.SnapshotDelete(snapId)
+}
+
+func (c *ONeClient) Reinstall(vmid int) error {
+	vm := c.ctrl.VM(vmid)
+	err := vm.RecoverDeleteRecreate()
+	return err
 }
 
 func (c *ONeClient) SnapRevert(snapId, vmid int) error {

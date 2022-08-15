@@ -41,6 +41,7 @@ var Actions = map[string]ServiceAction{
 	"suspend":    Suspend,
 	"reboot":     Reboot,
 	"resume":     Resume,
+	"reinstall":  Reinstall,
 	"state":      State,
 	"snapcreate": SnapCreate,
 	"snapdelete": SnapDelete,
@@ -123,6 +124,23 @@ func SnapRevert(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't Create Snapshot, error: %v", err)
 	}
+
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+}
+
+// Remove VM and create with same specs and user
+func Reinstall(
+	client *one.ONeClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+
+	vmid, err := one.GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	client.Reinstall(vmid)
 
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
