@@ -401,6 +401,10 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		Valid:       make([]*pb.Instance, 0),
 	}
 
+	if IG.Status != pb.InstanceStatus_UP {
+		return &resp, nil
+	}
+
 	var userId int
 	if id, ok := IG.Data["userid"]; ok {
 		userId = int(id.GetNumberValue())
