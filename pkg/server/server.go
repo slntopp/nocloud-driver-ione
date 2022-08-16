@@ -331,6 +331,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			s.rdb.HSet(ctx, redisKey, ig.Uuid, "MONITORED")
 		}
 
+		err = client.CheckOrphanInstanceGroup(ig, group)
+		if err != nil {
+			log.Error("Error Checking Orphan User of Instance Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
+		}
+
 		resp, err := client.CheckInstancesGroup(ig)
 		if err != nil {
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
@@ -360,11 +365,6 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			}
 
 			client.CheckInstancesGroupResponseProcess(resp, ig.GetData(), int(group))
-		}
-
-		err = client.CheckOrphanInstanceGroup(ig, group)
-		if err != nil {
-			log.Error("Error Checking Orphan User of Instance Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 		}
 
 		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))

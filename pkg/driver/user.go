@@ -19,11 +19,14 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -54,64 +57,38 @@ func (c *ONeClient) UserAddAttribute(id int, data map[string]interface{}) error 
 	return uc.Update(tmpl.String(), parameters.Merge)
 }
 
-// Transfer ownership of public and private networks from old user to new.
-func changeOwnershipOfNetworks(c *ONeClient, newUserID int, oldUserID int, userGroup int) error {
-	publicNet, err := c.GetUserPrivateVNet(oldUserID)
-	if err != nil {
-		return status.Errorf(codes.NotFound, "Can't find private net. Old user id = %d", oldUserID)
+func (c *ONeClient) waitForHotplugFinish(vmid int) {
+	for {
+		_, _, lcmState, _, _ := c.StateVM(vmid)
+		if lcmState == int(vm.HotplugNic) {
+			time.Sleep(time.Second * 1)
+		} else {
+			return
+		}
 	}
-
-	privateNet, err := c.GetUserPublicVNet(oldUserID)
-	if err != nil {
-		return status.Errorf(codes.NotFound, "Can't find public net. Old user id = %d", oldUserID)
-	}
-
-	if err := c.Chown("vn", privateNet, newUserID, int(userGroup)); err != nil {
-		return status.Error(codes.Internal, "Can't change ownership of old private network")
-	}
-
-	if err := c.Chown("vn", publicNet, newUserID, int(userGroup)); err != nil {
-		return status.Error(codes.Internal, "Can't change ownership of old public network")
-	}
-
-	privateNetController := c.ctrl.VirtualNetwork(privateNet)
-	publicNetController := c.ctrl.VirtualNetwork(publicNet)
-
-	if err := privateNetController.Rename(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, newUserID)); err != nil {
-		return status.Error(codes.Internal, err.Error())
-	}
-	if err := publicNetController.Rename(fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, newUserID)); err != nil {
-		privateNetController.Rename(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, oldUserID))
-		return status.Error(codes.Internal, err.Error())
-	}
-
-	return nil
-}
-
-// Transfer ownership of vm from old user to new.
-func changeOwnershipOfVM(c *ONeClient, inst *pb.Instance, newUserID int, userGroup int) error {
-	vmid, err := GetVMIDFromData(c, inst)
-	if err != nil {
-		return status.Error(codes.NotFound, "Can't get vm id by data")
-	}
-
-	if err := c.Chown("vm", vmid, newUserID, int(userGroup)); err != nil {
-		return status.Error(codes.Internal, "Can't change ownership of the vm")
-	}
-
-	vmc := c.ctrl.VM(vmid)
-	vmc.Reboot()
-
-	return nil
 }
 
 // Check if user related to the Instance Group exists.
 //
 // If not, create a new user and change ownership of virtual machines to this user.
 func (c *ONeClient) CheckOrphanInstanceGroup(instanceGroup *pb.InstancesGroup, userGroup float64) error {
-	data := instanceGroup.Data
+	instances := instanceGroup.GetInstances()
+	if len(instances) == 0 || instanceGroup.Data["userid"] == nil {
+		return nil
+	}
 
-	oldUserID := int(data["userid"].GetNumberValue())
+	vmid, err := GetVMIDFromData(c, instances[0])
+	vmc := c.ctrl.VM(vmid)
+	if err != nil {
+		return status.Error(codes.NotFound, "Can't get VM id by data")
+	}
+
+	vmInfo, err := vmc.Info(true)
+	if err != nil {
+		return err
+	}
+
+	oldUserID := vmInfo.UID
 	username := instanceGroup.GetUuid()
 	if _, err := c.ctrl.Users().ByName(username); err == nil {
 		return nil
@@ -125,23 +102,95 @@ func (c *ONeClient) CheckOrphanInstanceGroup(instanceGroup *pb.InstancesGroup, u
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	if err := changeOwnershipOfNetworks(c, newUserID, oldUserID, int(userGroup)); err != nil {
-		uc := c.ctrl.User(newUserID)
-		uc.Delete()
-		uc.Info(true)
-		return err
+	privateNet, err := c.GetUserPrivateVNet(oldUserID)
+	if err != nil {
+		return status.Errorf(codes.NotFound, "Can't find private net. Old user id = %d", oldUserID)
 	}
 
-	for _, inst := range instanceGroup.GetInstances() {
-		if err := changeOwnershipOfVM(c, inst, newUserID, int(userGroup)); err != nil {
-			uc := c.ctrl.User(newUserID)
-			uc.Delete()
+	publicNet, err := c.GetUserPublicVNet(oldUserID)
+	if err != nil {
+		return status.Errorf(codes.NotFound, "Can't find public net. Old user id = %d", oldUserID)
+	}
+
+	if err := c.Chown("vn", privateNet, newUserID, int(userGroup)); err != nil {
+		return status.Error(codes.Internal, "Can't change ownership of old private network")
+	}
+
+	if err := c.Chown("vn", publicNet, newUserID, int(userGroup)); err != nil {
+		return status.Error(codes.Internal, "Can't change ownership of old public network")
+	}
+
+	for _, inst := range instances {
+		vmid, err := GetVMIDFromData(c, inst)
+		vmc := c.ctrl.VM(vmid)
+		if err != nil {
+			return status.Error(codes.NotFound, "Can't get VM id by data")
+		}
+
+		vm, err := vmc.Info(true)
+		if err != nil {
 			return err
+		}
+		for _, nic := range vm.Template.GetNICs() {
+
+			value, _ := nic.Get(shared.NICID)
+			id, _ := strconv.Atoi(value)
+
+			if err := vmc.DetachNIC(id); err != nil {
+				return err
+			}
+			c.waitForHotplugFinish(vmid)
+		}
+	}
+
+	privateNetController := c.ctrl.VirtualNetwork(privateNet)
+	publicNetController := c.ctrl.VirtualNetwork(publicNet)
+
+	if err := privateNetController.Rename(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, newUserID)); err != nil {
+		c.DeleteUser(newUserID)
+		return status.Error(codes.Internal, err.Error())
+	}
+	if err := publicNetController.Rename(fmt.Sprintf(USER_PUBLIC_VNET_NAME_PATTERN, newUserID)); err != nil {
+		c.DeleteUser(newUserID)
+		privateNetController.Rename(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, newUserID))
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	for _, inst := range instances {
+		vmid, err := GetVMIDFromData(c, inst)
+		resources := instanceGroup.Resources
+		vmc := c.ctrl.VM(vmid)
+		if err != nil {
+			return status.Error(codes.NotFound, "Can't get VM id by data")
+		}
+
+		if err := c.Chown("vm", vmid, newUserID, int(userGroup)); err != nil {
+			return status.Error(codes.Internal, "Can't change ownership of the vm")
+		}
+
+		for i := 0; i < int(resources["ips_private"].GetNumberValue()); i++ {
+			template := vm.NewTemplate()
+			nic := template.AddNIC()
+			nic.Add(shared.NetworkID, privateNet)
+			if err := vmc.AttachNIC(template.String()); err != nil {
+				return err
+			}
+			c.waitForHotplugFinish(vmid)
+		}
+
+		for i := 0; i < int(resources["ips_public"].GetNumberValue()); i++ {
+			template := vm.NewTemplate()
+			nic := template.AddNIC()
+			nic.Add(shared.NetworkID, publicNet)
+			if err := vmc.AttachNIC(template.String()); err != nil {
+				return err
+			}
+			c.waitForHotplugFinish(vmid)
 		}
 	}
 
 	// Should only happen if everything is ok
-	data["userid"] = structpb.NewNumberValue(float64(newUserID))
+	instanceGroup.Data["userid"] = structpb.NewNumberValue(float64(newUserID))
 
 	return nil
 }
