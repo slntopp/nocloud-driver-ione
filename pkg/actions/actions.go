@@ -324,28 +324,28 @@ func StartVNC(
 	hc := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Debug("Cannot build request", zap.Error(err))
+		log.Warn("Cannot build request", zap.Error(err))
 		return nil, status.Error(codes.Internal, "Cannot build request")
 	}
 	req.SetBasicAuth(user, pass)
 
 	res, err := hc.Do(req)
 	if err != nil {
-		log.Debug("Error performing request", zap.Error(err))
+		log.Warn("Error performing request", zap.Error(err))
 		return nil, status.Error(codes.Internal, "Error performing Request")
 	}
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Debug("Error reading response body", zap.Error(err))
+		log.Warn("Error reading response body", zap.Error(err))
 		return nil, status.Error(codes.Internal, "Cannot read Body")
 	}
 
 	var token_data map[string]interface{}
 	err = json.Unmarshal(body, &token_data)
 	if err != nil {
-		log.Debug("Error Unmarshaling response", zap.Error(err))
+		log.Warn("Error Unmarshaling response", zap.ByteString("body", body), zap.Error(err))
 		return nil, status.Error(codes.Internal, "Cannot Unmarshal Body")
 	}
 
