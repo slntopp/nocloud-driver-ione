@@ -400,6 +400,8 @@ type CheckInstancesGroupResponse struct {
 }
 
 func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesGroupResponse, error) {
+	log := c.log.Named("CheckInstancesGroup").Named(IG.Uuid)
+	log.Debug("Begin Monitoring InstancesGroup")
 	resp := CheckInstancesGroupResponse{
 		ToBeCreated: make([]*pb.Instance, 0),
 		ToBeDeleted: make([]*pb.Instance, 0),
@@ -408,6 +410,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	if IG.Status != pb.InstanceStatus_UP {
+		log.Info("InstancesGroup is not in the status UP, skipping", zap.String("status", IG.Status.String()))
 		return &resp, nil
 	}
 
@@ -417,23 +420,29 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		vmsc := c.ctrl.VMs()
 		vms_pool, err := vmsc.Info(userId)
 		if err != nil {
-			c.log.Error("Error Getting VMs Info by UserId", zap.Any("userId", userId), zap.Error(err))
+			log.Warn("Error Getting VMs Info by UserId", zap.Any("userId", userId), zap.Error(err))
 			return nil, err
 		}
 		instMapForFastSearch := make(map[int]*pb.Instance, len(IG.GetInstances()))
 		for _, inst := range IG.GetInstances() {
 			vmid, err := GetVMIDFromData(c, inst)
 			if err != nil {
+				log.Warn("Coudln't get VM ID from Instance Data, Instance is not initialized", zap.String("instance", inst.Uuid))
 				continue
 			}
 			instMapForFastSearch[vmid] = inst
 		}
+		log.Debug("Instances Sync Pre-Flight Check",
+			zap.Int("total", len(IG.GetInstances())),
+			zap.Int("initialized", len(instMapForFastSearch)),
+			zap.Int("vms_found", len(vms_pool.VMs)))
 
 		for _, vm := range vms_pool.VMs {
 			if _, ok := instMapForFastSearch[vm.ID]; !ok {
+				log.Debug("VM not found among initialized Instances", zap.Int("vmid", vm.ID))
 				vmInst, err := c.VMToInstance(vm.ID)
 				if err != nil {
-					c.log.Error("Error Converting VM to Instance", zap.Error(err))
+					log.Warn("Error Converting VM to Instance", zap.Error(err))
 					continue
 				}
 
