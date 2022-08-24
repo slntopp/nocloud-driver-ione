@@ -41,8 +41,13 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	vmid, err := one.GetVMIDFromData(client, req.Instance)
 	if err != nil {
 		s.log.Sugar().Errorf("VM id obtaining failed for id=%s", req.Instance.Uuid)
+		return &ipb.InvokeResponse{}, err
 	}
+
 	_, state, _, _, err := client.StateVM(vmid)
+	if err != nil {
+		return &ipb.InvokeResponse{}, err
+	}
 
 	// Machines are suspended when service is unpaid and shouldn't be available
 	if state == "SUSPENDED" && method != "resume" {
