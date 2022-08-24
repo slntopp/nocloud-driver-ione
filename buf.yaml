@@ -1,4 +1,0 @@
-version: v1
-name: buf.build/slntopp/nocloud-driver-ione
-deps:
-  - buf.build/googleapis/googleapis
