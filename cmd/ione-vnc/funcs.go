@@ -140,8 +140,6 @@ func HandleGenerateToken(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Println(user, pass)
-
 	c := goca.NewController(
 		goca.NewDefaultClient(goca.NewConfig(user, pass, "")),
 	)
@@ -178,6 +176,4 @@ func HandleGenerateToken(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
-
-	fmt.Println(kind, vmid)
 }
