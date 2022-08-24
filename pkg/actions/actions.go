@@ -49,6 +49,11 @@ var Actions = map[string]ServiceAction{
 	"start_vnc":  StartVNC,
 }
 
+var AdminActions = map[string]bool{
+	"suspend": true,
+	"resume":  true,
+}
+
 // Creates new snapshot of vm
 func SnapCreate(
 	client *one.ONeClient,
