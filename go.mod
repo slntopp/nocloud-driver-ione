@@ -1,6 +1,6 @@
 module github.com/slntopp/nocloud-driver-ione
 
-go 1.18
+go 1.19
 
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20220705094146-89ce359739b3
