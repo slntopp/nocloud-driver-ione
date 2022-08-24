@@ -38,6 +38,17 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 
 	method := req.GetMethod()
 
+	vmid, err := one.GetVMIDFromData(client, req.Instance)
+	if err != nil {
+		s.log.Sugar().Errorf("VM id obtaining failed for id=%s", req.Instance.Uuid)
+	}
+	_, state, _, _, err := client.StateVM(vmid)
+
+	// Machines are suspended when service is unpaid and shouldn't be available
+	if state == "SUSPENDED" && method != "resume" {
+		return nil, status.Errorf(codes.PermissionDenied, "Action %s is forbidden for suspended machines", method)
+	}
+
 	if _, ok := actions.AdminActions[method]; ok && (req.Instance.AccessLevel == nil || *req.Instance.AccessLevel < access.SUDO) {
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
