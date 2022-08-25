@@ -32,30 +32,20 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	s.log.Debug("Invoke request received", zap.Any("instance", req.Instance.Uuid), zap.Any("action", req.Method))
 	sp := req.GetServicesProvider()
 	client, err := one.NewClientFromSP(sp, s.log)
+	instance := req.GetInstance()
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
 
 	method := req.GetMethod()
 
-	vmid, err := one.GetVMIDFromData(client, req.Instance)
-	if err != nil {
-		s.log.Sugar().Errorf("VM id obtaining failed for id=%s", req.Instance.Uuid)
-		return &ipb.InvokeResponse{}, err
-	}
-
-	_, state, _, _, err := client.StateVM(vmid)
-	if err != nil {
-		return &ipb.InvokeResponse{}, err
+	if _, ok := actions.AdminActions[method]; ok && (instance.GetAccessLevel() < access.SUDO) {
+		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
 	// Machines are suspended when service is unpaid and shouldn't be available
-	if state == "SUSPENDED" && method != "resume" {
+	if instance.GetStatus() == ipb.InstanceStatus_SUS && method != "resume" {
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is forbidden for suspended machines", method)
-	}
-
-	if _, ok := actions.AdminActions[method]; ok && (req.Instance.AccessLevel == nil || *req.Instance.AccessLevel < access.SUDO) {
-		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
 	action, ok := actions.Actions[method]
@@ -63,5 +53,5 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
 	}
-	return action(client, req.Instance, req.GetParams())
+	return action(client, instance, req.GetParams())
 }
