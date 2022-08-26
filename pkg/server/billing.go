@@ -49,7 +49,7 @@ type RecordsPublisherFunc func([]*billingpb.Record)
 
 func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client *one.ONeClient, i *ipb.Instance) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
-	log.Debug("Initiazing")
+	log.Debug("Initializing")
 
 	plan := i.BillingPlan
 	if plan == nil {
@@ -60,6 +60,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 	vmid, err := one.GetVMIDFromData(client, i)
 	if err != nil {
 		log.Error("Failed to get VM ID", zap.Error(err))
+		return
 	}
 
 	vm := GetVM(func() (*onevm.VM, error) { return client.GetVM(vmid) })
@@ -82,6 +83,28 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 
 	var records []*billingpb.Record
 
+	for _, resource := range plan.Resources {
+		var last int64
+		if _, ok := i.Data[resource.Key+"_last_monitoring"]; ok {
+			last = int64(i.Data[resource.Key+"_last_monitoring"].GetNumberValue())
+		} else {
+			last = created
+		}
+
+		handler, ok := handlers[resource.Key]
+		if !ok {
+			log.Warn("Handler not found", zap.String("resource", resource.Key))
+			continue
+		}
+		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
+		new, last := handler(log, timeline, i, vm, resource, last)
+
+		if len(new) != 0 {
+			records = append(records, new...)
+			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
+		}
+	}
+
 	if plan.Kind == billingpb.PlanKind_STATIC {
 		var last int64
 		if _, ok := i.Data["last_monitoring"]; ok {
@@ -93,33 +116,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		new, last := handleStaticBilling(log, i, last)
 		if len(new) != 0 {
 			records = append(records, new...)
-			i.Data["last_monitoring"] = &structpb.Value{
-				Kind: &structpb.Value_NumberValue{NumberValue: float64(last)},
-			}
-		}
-	} else {
-		for _, resource := range plan.Resources {
-			var last int64
-			if _, ok := i.Data[resource.Key+"_last_monitoring"]; ok {
-				last = int64(i.Data[resource.Key+"_last_monitoring"].GetNumberValue())
-			} else {
-				last = created
-			}
-
-			handler, ok := handlers[resource.Key]
-			if !ok {
-				log.Warn("Handler not found", zap.String("resource", resource.Key))
-				continue
-			}
-			log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
-			new, last := handler(log, timeline, i, vm, resource, last)
-
-			if len(new) == 0 {
-				continue
-			}
-
-			records = append(records, new...)
-			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
+			i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
 	}
 
@@ -141,8 +138,34 @@ type BillingHandlerFunc func(
 ) ([]*billingpb.Record, int64)
 
 var handlers = map[string]BillingHandlerFunc{
-	"cpu": handleCPUBilling,
-	"ram": handleRAMBilling,
+	"cpu":       handleCPUBilling,
+	"ram":       handleRAMBilling,
+	"drive_ssd": handleSSDDriveBilling,
+	"drive_hdd": handleHDDDriveBilling,
+}
+
+var handleSSDDriveBilling BillingHandlerFunc = makeDriveBillingHandler("SSD")
+var handleHDDDriveBilling BillingHandlerFunc = makeDriveBillingHandler("HDD")
+
+func makeDriveBillingHandler(driveKind string) BillingHandlerFunc {
+	return func(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+		o, _ := vm()
+		storage := Lazy(func() float64 {
+			disks := o.Template.GetDisks()
+			total := 0.0
+			for _, disk := range disks {
+				capacity, _ := disk.GetFloat("SIZE")
+				driveType, _ := disk.GetStr("DRIVE_TYPE")
+
+				if driveType == driveKind {
+					total += capacity / 1000
+				}
+			}
+			return total
+		})
+
+		return handleCapacityBilling(log.Named("DRIVE"), storage, ltl, i, vm, res, last)
+	}
 }
 
 func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
