@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -140,6 +141,7 @@ type BillingHandlerFunc func(
 var handlers = map[string]BillingHandlerFunc{
 	"cpu":       handleCPUBilling,
 	"ram":       handleRAMBilling,
+	"ip":        handleIPBilling,
 	"drive_ssd": handleSSDDriveBilling,
 	"drive_hdd": handleHDDDriveBilling,
 }
@@ -166,6 +168,25 @@ func makeDriveBillingHandler(driveKind string) BillingHandlerFunc {
 
 		return handleCapacityBilling(log.Named("DRIVE"), storage, ltl, i, vm, res, last)
 	}
+}
+
+func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+	o, _ := vm()
+	ip := Lazy(func() float64 {
+		publicNetworks := 0.0
+		nics := o.Template.GetNICs()
+		for _, nic := range nics {
+			name, err := nic.GetStr("NETWORK")
+			if err != nil {
+				continue
+			}
+			if strings.Contains(name, "pub") {
+				publicNetworks += 1.0
+			}
+		}
+		return publicNetworks
+	})
+	return handleCapacityBilling(log.Named("IP"), ip, ltl, i, vm, res, last)
 }
 
 func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
