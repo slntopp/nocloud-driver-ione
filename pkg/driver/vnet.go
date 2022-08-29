@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -123,7 +123,13 @@ func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeV
 		}
 		size := int(sizeValue.GetNumberValue())
 
-		networking, ok := sp.GetState().Meta["networking"]
+		state := sp.GetState()
+		if state == nil {
+			err := fmt.Errorf("Couldn't get state of SP with id=%s", sp.GetUuid())
+			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
+			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+		}
+		networking, ok := state.Meta["networking"]
 		if !ok {
 			err := fmt.Errorf("networking not found, sp uuid: %s", sp.GetUuid())
 			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
@@ -261,10 +267,11 @@ func (c *ONeClient) UpdateVNet(id int, tmpl string, uType parameters.UpdateType)
 }
 
 // Reserve Addresses to the other VNet
-// 	id - VNet ID to reserve from
-// 	size - amount of addresses to reserve
-// 	to - VNet ID to reserve to, if set to -1 new will be created
-// 	name - name of the new VNet, if set to "", either existing will be used or new - generated
+//
+//	id - VNet ID to reserve from
+//	size - amount of addresses to reserve
+//	to - VNet ID to reserve to, if set to -1 new will be created
+//	name - name of the new VNet, if set to "", either existing will be used or new - generated
 func (c *ONeClient) ReserveVNet(id, size, to int, name string) (int, error) {
 	vnc := c.ctrl.VirtualNetwork(id)
 	tmpl := fmt.Sprintf("SIZE=%d\n", size)
