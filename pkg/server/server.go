@@ -27,6 +27,7 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
+	"github.com/slntopp/nocloud/pkg/instances/proto"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
@@ -325,7 +326,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		log.Debug("Monitoring group", zap.String("group", ig.GetUuid()), zap.String("title", ig.GetTitle()))
 		l := log.Named(ig.Uuid)
 
-		// checking for unscheduled monitoring\
+		// checking for unscheduled monitoring
 		if req.Scheduled {
 			if monitoredRecently := s.rdb.HExists(ctx, redisKey, ig.Uuid).Val(); monitoredRecently {
 				continue
@@ -400,5 +401,48 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	actions.PostServicesProviderPublicData(pd)
 
 	log.Info("Monitoring Routine Done", zap.String("sp", sp.GetUuid()))
+	return &pb.MonitoringResponse{}, nil
+}
+
+func (s *DriverServiceServer) SuspendMonitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
+	log := s.log.Named("Monitoring")
+	sp := req.GetServicesProvider()
+	log.Info("Starting Monitoring Routine", zap.String("sp", sp.GetUuid()))
+
+	c, err := one.NewClientFromSP(sp, log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
+
+	for _, group := range req.GetGroups() {
+		for _, inst := range group.GetInstances() {
+
+			vmid, err := one.GetVMIDFromData(c, inst)
+			if err != nil {
+				log.Warn("Failed to obtain VM ID", zap.String("instance", inst.Uuid), zap.Error(err))
+				continue
+			}
+
+			_, state, _, _, err := c.StateVM(vmid)
+			if err != nil {
+				log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
+				continue
+			}
+
+			if group.Status != proto.InstanceStatus_SUS && state == "SUSPENDED" {
+				if err := c.ResumeVM(vmid); err != nil {
+					log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
+					continue
+				}
+			}
+
+			if group.Status == proto.InstanceStatus_SUS && state != "SUSPENDED" {
+				if err := c.SuspendVM(vmid); err != nil {
+					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+					continue
+				}
+			}
+		}
+	}
 	return &pb.MonitoringResponse{}, nil
 }
