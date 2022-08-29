@@ -43,11 +43,6 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
-	// Machines are suspended when service is unpaid and shouldn't be available
-	if instance.GetStatus() == ipb.InstanceStatus_SUS && method != "resume" {
-		return nil, status.Errorf(codes.PermissionDenied, "Action %s is forbidden for suspended machines", method)
-	}
-
 	action, ok := actions.Actions[method]
 
 	if !ok {
