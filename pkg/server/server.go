@@ -416,27 +416,30 @@ func (s *DriverServiceServer) SuspendMonitoring(ctx context.Context, req *pb.Mon
 
 	for _, group := range req.GetGroups() {
 		for _, inst := range group.GetInstances() {
+
 			vmid, err := one.GetVMIDFromData(c, inst)
 			if err != nil {
 				log.Warn("Failed to obtain VM ID", zap.String("instance", inst.Uuid), zap.Error(err))
-				return nil, err
+				continue
 			}
+
 			_, state, _, _, err := c.StateVM(vmid)
 			if err != nil {
 				log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
-				return nil, err
+				continue
 			}
+
 			if group.Status != proto.InstanceStatus_SUS && state == "SUSPENDED" {
 				if err := c.ResumeVM(vmid); err != nil {
 					log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
-					return nil, err
+					continue
 				}
 			}
 
 			if group.Status == proto.InstanceStatus_SUS && state != "SUSPENDED" {
 				if err := c.SuspendVM(vmid); err != nil {
 					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
-					return nil, err
+					continue
 				}
 			}
 		}
