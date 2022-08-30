@@ -93,7 +93,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 			last = created
 		}
 
-		handler, ok := handlers[resource.Key]
+		handler, ok := handlers.Get(resource.Key)
 		if !ok {
 			log.Warn("Handler not found", zap.String("resource", resource.Key))
 			continue
@@ -140,13 +140,26 @@ type BillingHandlerFunc func(
 	int64,
 ) ([]*billingpb.Record, int64)
 
-var handlers = map[string]BillingHandlerFunc{
-	"cpu":        handleCPUBilling,
-	"ram":        handleRAMBilling,
-	"ip":         handleIPBilling,
-	"drive_ssd":  handleDriveBilling,
-	"drive_hdd":  handleDriveBilling,
-	"drive_nvme": handleDriveBilling,
+var handlers = BillingMap{
+	handlers: map[string]BillingHandlerFunc{
+		"cpu": handleCPUBilling,
+		"ram": handleRAMBilling,
+		"ip":  handleIPBilling,
+		// See BillingMap.Get for other handlers
+		// e.g. drive_${driveKind}
+	},
+}
+
+type BillingMap struct {
+	handlers map[string]BillingHandlerFunc
+}
+
+func (m *BillingMap) Get(key string) (BillingHandlerFunc, bool) {
+	if strings.Contains(key, "drive_") {
+		return handleDriveBilling, true
+	}
+	handler, ok := m.handlers[key]
+	return handler, ok
 }
 
 func resourceKeyToDriveKind(key string) (string, error) {
