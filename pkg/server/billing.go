@@ -141,13 +141,12 @@ type BillingHandlerFunc func(
 ) ([]*billingpb.Record, int64)
 
 var handlers = map[string]BillingHandlerFunc{
-	"cpu":           handleCPUBilling,
-	"ram":           handleRAMBilling,
-	"ip":            handleIPBilling,
-	"drive_ssd":     handleDriveBilling,
-	"drive_hdd":     handleDriveBilling,
-	"drive_nvme":    handleDriveBilling,
-	"drive_joemama": handleDriveBilling,
+	"cpu":        handleCPUBilling,
+	"ram":        handleRAMBilling,
+	"ip":         handleIPBilling,
+	"drive_ssd":  handleDriveBilling,
+	"drive_hdd":  handleDriveBilling,
+	"drive_nvme": handleDriveBilling,
 }
 
 func resourceKeyToDriveKind(key string) (string, error) {
