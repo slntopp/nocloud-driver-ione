@@ -1,6 +1,8 @@
 package server
 
 import (
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -49,7 +51,7 @@ type RecordsPublisherFunc func([]*billingpb.Record)
 
 func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client *one.ONeClient, i *ipb.Instance) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
-	log.Debug("Initiazing")
+	log.Debug("Initializing")
 
 	plan := i.BillingPlan
 	if plan == nil {
@@ -60,6 +62,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 	vmid, err := one.GetVMIDFromData(client, i)
 	if err != nil {
 		log.Error("Failed to get VM ID", zap.Error(err))
+		return
 	}
 
 	vm := GetVM(func() (*onevm.VM, error) { return client.GetVM(vmid) })
@@ -82,6 +85,28 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 
 	var records []*billingpb.Record
 
+	for _, resource := range plan.Resources {
+		var last int64
+		if _, ok := i.Data[resource.Key+"_last_monitoring"]; ok {
+			last = int64(i.Data[resource.Key+"_last_monitoring"].GetNumberValue())
+		} else {
+			last = created
+		}
+
+		handler, ok := handlers.Get(resource.Key)
+		if !ok {
+			log.Warn("Handler not found", zap.String("resource", resource.Key))
+			continue
+		}
+		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
+		new, last := handler(log, timeline, i, vm, resource, client, last)
+
+		if len(new) != 0 {
+			records = append(records, new...)
+			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
+		}
+	}
+
 	if plan.Kind == billingpb.PlanKind_STATIC {
 		var last int64
 		if _, ok := i.Data["last_monitoring"]; ok {
@@ -93,33 +118,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		new, last := handleStaticBilling(log, i, last)
 		if len(new) != 0 {
 			records = append(records, new...)
-			i.Data["last_monitoring"] = &structpb.Value{
-				Kind: &structpb.Value_NumberValue{NumberValue: float64(last)},
-			}
-		}
-	} else {
-		for _, resource := range plan.Resources {
-			var last int64
-			if _, ok := i.Data[resource.Key+"_last_monitoring"]; ok {
-				last = int64(i.Data[resource.Key+"_last_monitoring"].GetNumberValue())
-			} else {
-				last = created
-			}
-
-			handler, ok := handlers[resource.Key]
-			if !ok {
-				log.Warn("Handler not found", zap.String("resource", resource.Key))
-				continue
-			}
-			log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
-			new, last := handler(log, timeline, i, vm, resource, last)
-
-			if len(new) == 0 {
-				continue
-			}
-
-			records = append(records, new...)
-			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
+			i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
 	}
 
@@ -137,33 +136,120 @@ type BillingHandlerFunc func(
 	*ipb.Instance,
 	LazyVM,
 	*billingpb.ResourceConf,
+	*one.ONeClient,
 	int64,
 ) ([]*billingpb.Record, int64)
 
-var handlers = map[string]BillingHandlerFunc{
-	"cpu": handleCPUBilling,
-	"ram": handleRAMBilling,
+var handlers = BillingMap{
+	handlers: map[string]BillingHandlerFunc{
+		"cpu": handleCPUBilling,
+		"ram": handleRAMBilling,
+		"ip":  handleIPBilling,
+		// See BillingMap.Get for other handlers
+		// e.g. drive_${driveKind}
+	},
 }
 
-func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+type BillingMap struct {
+	handlers map[string]BillingHandlerFunc
+}
+
+func (m *BillingMap) Get(key string) (BillingHandlerFunc, bool) {
+	if strings.Contains(key, "drive_") {
+		return handleDriveBilling, true
+	}
+	handler, ok := m.handlers[key]
+	return handler, ok
+}
+
+func resourceKeyToDriveKind(key string) (string, error) {
+	r, err := regexp.Compile(`drive.*_([A-Za-z]+)`)
+	if err != nil {
+		return "", err
+	}
+
+	rs := r.FindStringSubmatch(key)
+	if len(rs) == 0 {
+		return "UNKNOWN", nil
+	}
+
+	return strings.ToUpper(string(rs[1])), nil
+}
+
+func handleDriveBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
+
+	driveKind, _ := resourceKeyToDriveKind(res.Key)
+
+	o, _ := vm()
+	storage := Lazy(func() float64 {
+		disks := o.Template.GetDisks()
+		total := 0.0
+		for _, disk := range disks {
+			capacity, _ := disk.GetFloat("SIZE")
+			driveType, _ := disk.GetStr("DRIVE_TYPE")
+
+			if driveType == driveKind {
+				total += capacity / 1000
+			}
+		}
+		return total
+	})
+
+	return handleCapacityBilling(log.Named("DRIVE"), storage, ltl, i, vm, res, c, last)
+}
+
+func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
+	o, _ := vm()
+	ip := Lazy(func() float64 {
+		publicNetworks := 0.0
+		nics := o.Template.GetNICs()
+		for _, nic := range nics {
+			id, err := nic.GetInt("NETWORK_ID")
+			if err != nil {
+				log.Warn("Can't get NETWORK_ID from VM template", zap.String("Instance id", i.GetUuid()), zap.Int("VM id", o.ID))
+				continue
+			}
+
+			vnet, err := c.GetVNet(id)
+			if err != nil {
+				log.Warn("Can't get vnet by id", zap.String("Instance id", i.GetUuid()), zap.Int("vnet id", id))
+				continue
+			}
+
+			vnetType, err := vnet.Template.GetStr("TYPE")
+			if err != nil {
+				log.Warn("Can't get vnet type from vnet attributes", zap.String("Instance id", i.GetUuid()), zap.Int("vnet id", id))
+				continue
+			}
+
+			if vnetType == "PUBLIC" {
+				publicNetworks += 1.0
+			}
+		}
+		return publicNetworks
+	})
+	return handleCapacityBilling(log.Named("IP"), ip, ltl, i, vm, res, c, last)
+}
+
+func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	cpu := Lazy(func() float64 {
 		cpu, _ := o.Template.GetCPU()
 		return cpu
 	})
-	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, vm, res, last)
+	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, vm, res, c, last)
 }
 
-func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	ram := Lazy(func() float64 {
 		ram, _ := o.Template.GetMemory()
 		return float64(ram) / 1024
 	})
-	return handleCapacityBilling(log.Named("RAM"), ram, ltl, i, vm, res, last)
+	return handleCapacityBilling(log.Named("RAM"), ram, ltl, i, vm, res, c, last)
 }
 
-func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, last int64) ([]*billingpb.Record, int64) {
+func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
 	now := int64(time.Now().Unix())
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
