@@ -9,6 +9,7 @@ import (
 	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 )
+
+var clock utils.Clock = &utils.RealClock{}
 
 func Lazy[T any](f func() T) func() T {
 	var o T
@@ -195,7 +198,7 @@ func handleDriveBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm L
 		return total
 	})
 
-	return handleCapacityBilling(log.Named("DRIVE"), storage, ltl, i, vm, res, c, last)
+	return handleCapacityBilling(log.Named("DRIVE"), storage, ltl, i, res, last, clock)
 }
 
 func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
@@ -228,7 +231,7 @@ func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Lazy
 		}
 		return publicNetworks
 	})
-	return handleCapacityBilling(log.Named("IP"), ip, ltl, i, vm, res, c, last)
+	return handleCapacityBilling(log.Named("IP"), ip, ltl, i, res, last, clock)
 }
 
 func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
@@ -237,7 +240,7 @@ func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 		cpu, _ := o.Template.GetCPU()
 		return cpu
 	})
-	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, vm, res, c, last)
+	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, res, last, clock)
 }
 
 func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
@@ -246,10 +249,10 @@ func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 		ram, _ := o.Template.GetMemory()
 		return float64(ram) / 1024
 	})
-	return handleCapacityBilling(log.Named("RAM"), ram, ltl, i, vm, res, c, last)
+	return handleCapacityBilling(log.Named("RAM"), ram, ltl, i, res, last, clock)
 }
 
-func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c *one.ONeClient, last int64) ([]*billingpb.Record, int64) {
+func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, res *billingpb.ResourceConf, last int64, time utils.Clock) ([]*billingpb.Record, int64) {
 	now := int64(time.Now().Unix())
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
