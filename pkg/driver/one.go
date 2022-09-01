@@ -20,11 +20,71 @@ import (
 	"time"
 
 	goca "github.com/OpenNebula/one/src/oca/go/src/goca"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/group"
+	img "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/image"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
+	tmpl "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/template"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
+	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
+	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+type VMClient interface {
+	CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesGroupResponse, error)
+	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, data map[string]*structpb.Value, group int)
+	Chmod(class string, oid int, perm *shared.Permissions) error
+	Chown(class string, oid, uid, gid int) error
+	CreateUser(name, pass string, groups []int) (id int, err error)
+	DeleteUser(id int) error
+	DeleteUserAndVNets(id int) error
+	DeleteVNet(id int) error
+	FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeVlan int, err error)
+	FindVMByInstance(inst *pb.Instance) (*vm.VM, error)
+	GetGroup(id int) (*group.Group, error)
+	GetImage(id int) (*img.Image, error)
+	GetInstSnapshots(inst *pb.Instance) (map[string]interface{}, error)
+	GetSecrets() map[string]*structpb.Value
+	GetTemplate(id int) (*tmpl.Template, error)
+	GetUser(id int) (*user.User, error)
+	GetUserPrivateVNet(user int) (id int, err error)
+	GetUserPublicVNet(user int) (id int, err error)
+	GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, error)
+	GetVM(vmid int) (*vm.VM, error)
+	GetVMByName(name string) (id int, err error)
+	GetVNet(id int) (*vnet.VirtualNetwork, error)
+	InstantiateTemplate(id int, vmname, tmpl string, pending bool) (vmid int, err error)
+	InstantiateTemplateHelper(instance *instpb.Instance, group_data map[string]*structpb.Value, token string) (vmid int, err error)
+	ListImages() ([]img.Image, error)
+	ListTemplates() ([]tmpl.Template, error)
+	Logger(n string) *zap.Logger
+	MonitorLocation(sp *sppb.ServicesProvider) (st *LocationState, pd *LocationPublicData, err error)
+	NetworkingVM(id int) (map[string]interface{}, error)
+	PoweroffVM(id int, hard bool) error
+	RebootVM(id int, hard bool) error
+	ReservePrivateIP(u int, vnMad string, vlanID int) (pool_id int, err error)
+	ReservePublicIP(u, n int) (pool_id int, err error)
+	ReserveVNet(id, size, to int, name string) (int, error)
+	ResumeVM(id int) error
+	Reinstall(id int) error
+	SetSecrets(secrets map[string]*structpb.Value)
+	SetVars(vars map[string]*sppb.Var)
+	SnapCreate(name string, vmid int) error
+	SnapDelete(snapId, vmid int) error
+	SnapRevert(snapId, vmid int) error
+	StateVM(id int) (state int, state_str string, lcm_state int, lcm_state_str string, err error)
+	SuspendVM(id int) error
+	TerminateVM(id int, hard bool) error
+	UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error
+	UserAddAttribute(id int, data map[string]interface{}) error
+	VMToInstance(id int) (*pb.Instance, error)
+}
 
 type ONeClient struct {
 	*goca.Client

@@ -31,7 +31,7 @@ import (
 )
 
 type ServiceAction func(
-	*one.ONeClient,
+	one.VMClient,
 	*ipb.Instance,
 	map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error)
@@ -56,7 +56,7 @@ var AdminActions = map[string]bool{
 
 // Creates new snapshot of vm
 func SnapCreate(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -81,7 +81,7 @@ func SnapCreate(
 
 // Deletes Snapshot by ID
 func SnapDelete(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -108,7 +108,7 @@ func SnapDelete(
 
 // Reverts Snapshot by ID
 func SnapRevert(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -135,7 +135,7 @@ func SnapRevert(
 
 // Remove VM and create with same specs and user
 func Reinstall(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -155,7 +155,7 @@ func Reinstall(
 
 // Powers off a running VM
 func Poweroff(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -181,7 +181,7 @@ func Poweroff(
 
 // Saves a running VM
 func Suspend(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -202,7 +202,7 @@ func Suspend(
 
 // Reboots an already deployed VM
 func Reboot(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -228,7 +228,7 @@ func Reboot(
 
 // Resumes the execution of a saved VM.
 func Resume(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -249,7 +249,7 @@ func Resume(
 
 // Returns the VM state of the VirtualMachine
 func State(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
@@ -301,7 +301,7 @@ make_value:
 }
 
 func StartVNC(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {

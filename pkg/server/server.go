@@ -130,7 +130,7 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 	return &sppb.TestResponse{Result: true}, nil
 }
 
-func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.ServicesProvider, igroup *ipb.InstancesGroup, client *one.ONeClient, group float64) (map[string]*structpb.Value, error) {
+func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.ServicesProvider, igroup *ipb.InstancesGroup, client one.VMClient, group float64) (map[string]*structpb.Value, error) {
 	data := igroup.GetData()
 	username := igroup.GetUuid()
 

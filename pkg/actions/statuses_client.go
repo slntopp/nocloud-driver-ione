@@ -67,7 +67,7 @@ var LCM_STATE_REF = map[int32]stpb.NoCloudState{
 
 // Returns the VM state of the VirtualMachine to statuses server
 func StatusesClient(
-	client *one.ONeClient,
+	client one.VMClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 	result *ipb.InvokeResponse,
