@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	oneshared "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -102,7 +103,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 			continue
 		}
 		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
-		new, last := handler(log, timeline, i, vm, resource, client, last)
+		new, last := handler(log, timeline, i, vm, resource, client, last, clock)
 
 		if len(new) != 0 {
 			records = append(records, new...)
@@ -141,6 +142,7 @@ type BillingHandlerFunc func(
 	*billingpb.ResourceConf,
 	one.VMClient,
 	int64,
+	utils.Clock,
 ) ([]*billingpb.Record, int64)
 
 var handlers = BillingMap{
@@ -179,7 +181,7 @@ func resourceKeyToDriveKind(key string) (string, error) {
 	return strings.ToUpper(string(rs[1])), nil
 }
 
-func handleDriveBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64) ([]*billingpb.Record, int64) {
+func handleDriveBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64, clock utils.Clock) ([]*billingpb.Record, int64) {
 
 	driveKind, _ := resourceKeyToDriveKind(res.Key)
 
@@ -201,13 +203,13 @@ func handleDriveBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm L
 	return handleCapacityBilling(log.Named("DRIVE"), storage, ltl, i, res, last, clock)
 }
 
-func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64) ([]*billingpb.Record, int64) {
+func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64, clock utils.Clock) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	ip := Lazy(func() float64 {
 		publicNetworks := 0.0
 		nics := o.Template.GetNICs()
 		for _, nic := range nics {
-			id, err := nic.GetInt("NETWORK_ID")
+			id, err := nic.GetInt(string(oneshared.NetworkID))
 			if err != nil {
 				log.Warn("Can't get NETWORK_ID from VM template", zap.String("Instance id", i.GetUuid()), zap.Int("VM id", o.ID))
 				continue
@@ -234,7 +236,7 @@ func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Lazy
 	return handleCapacityBilling(log.Named("IP"), ip, ltl, i, res, last, clock)
 }
 
-func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64) ([]*billingpb.Record, int64) {
+func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64, clock utils.Clock) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	cpu := Lazy(func() float64 {
 		cpu, _ := o.Template.GetCPU()
@@ -243,7 +245,7 @@ func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, res, last, clock)
 }
 
-func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64) ([]*billingpb.Record, int64) {
+func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.VMClient, last int64, clock utils.Clock) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	ram := Lazy(func() float64 {
 		ram, _ := o.Template.GetMemory()

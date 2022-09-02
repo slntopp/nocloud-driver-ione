@@ -1,9 +1,13 @@
 package server
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
@@ -14,6 +18,38 @@ import (
 
 type TestClock struct {
 	time time.Time
+}
+
+type TestNetworkClient struct {
+	one.VMClient
+}
+
+func (c TestNetworkClient) GetVNet(id int) (*virtualnetwork.VirtualNetwork, error) {
+	privateTemplate := virtualnetwork.Template{}
+	privateTemplate.Add("TYPE", "PRIVATE")
+
+	publicTemplate := virtualnetwork.Template{}
+	publicTemplate.Add("TYPE", "PUBLIC")
+
+	networks := map[int]*virtualnetwork.VirtualNetwork{
+		1: {
+			Template: privateTemplate,
+		},
+		2: {
+			Template: publicTemplate,
+		},
+		3: {
+			Template: privateTemplate,
+		},
+		4: {
+			Template: publicTemplate,
+		},
+	}
+	net, ok := networks[id]
+	if !ok {
+		return net, errors.New("Can't get network")
+	}
+	return net, nil
 }
 
 func (c *TestClock) Now() time.Time { return c.time }
@@ -59,13 +95,15 @@ func TestSingletone(t *testing.T) {
 
 func TestHandleCapacityBilling(t *testing.T) {
 	type Test struct {
-		clock   utils.Clock
-		amount  func() float64
-		res     *billingpb.ResourceConf
-		ltl     LazyTimeline
-		i       *ipb.Instance
+		// Input
+		clock  utils.Clock
+		amount func() float64
+		res    *billingpb.ResourceConf
+		ltl    LazyTimeline
+		i      *ipb.Instance
+		prev   int64
+		// Want
 		records []*billingpb.Record
-		prev    int64
 		last    int64
 	}
 
@@ -123,5 +161,85 @@ func TestHandleCapacityBilling(t *testing.T) {
 			t.Errorf("Total sums don't match. Wanted %f, got %f", wantSum, sum)
 		}
 
+	}
+}
+
+func TestHandleIPBilling(t *testing.T) {
+
+	type Test struct {
+		// Input
+		ltl    LazyTimeline
+		i      *ipb.Instance
+		vm     LazyVM
+		res    *billingpb.ResourceConf
+		client one.VMClient
+		prev   int64
+		clock  utils.Clock
+		// Want
+		records []*billingpb.Record
+		last    int64
+	}
+
+	tests := []Test{
+		{
+			client: TestNetworkClient{},
+			vm: func() (*vm.VM, error) {
+				template := vm.NewTemplate()
+
+				first := template.AddVector("NIC")
+				first.AddPair(string(shared.NetworkID), 1)
+
+				second := template.AddVector("NIC")
+				second.AddPair(string(shared.NetworkID), 2)
+
+				third := template.AddVector("NIC")
+				third.AddPair(string(shared.NetworkID), 3)
+
+				fourth := template.AddVector("NIC")
+				fourth.AddPair(string(shared.NetworkID), 4)
+
+				vm := &vm.VM{
+					Template: *template,
+				}
+
+				return vm, nil
+			},
+
+			last:  120,
+			prev:  60,
+			clock: &TestClock{time: time.Unix(135, 0)},
+			i:     &ipb.Instance{Uuid: "1"},
+			ltl:   func() []one.Record { return []one.Record{{Start: 58, End: 131, State: 1}} },
+			res: &billingpb.ResourceConf{
+				On:     []proto.NoCloudState{1},
+				Kind:   1,
+				Period: 60,
+				Price:  1.0,
+			},
+			records: []*billingpb.Record{{Total: 2.0}},
+		},
+	}
+
+	log := nocloud.NewLogger()
+	for _, test := range tests {
+		records, last := handleIPBilling(log, test.ltl, test.i, test.vm, test.res, test.client, test.prev, test.clock)
+		if len(records) != len(test.records) {
+			t.Error("Amount of payment records doesn't match")
+		}
+		if last != test.last {
+			t.Errorf("Last billing handling timestamp doesn't match. Wanted %d, got %d", test.last, last)
+		}
+
+		wantSum := 0.0
+		sum := 0.0
+
+		for i := range records {
+			sum += records[i].Total
+			wantSum += test.records[i].Total
+		}
+
+		if wantSum != sum {
+			t.Errorf("Total sums don't match. Wanted %f, got %f", wantSum, sum)
+		}
 	}
 }
