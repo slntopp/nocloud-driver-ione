@@ -279,11 +279,15 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 		}
 	} else {
 		for end := last + res.Period; last <= int64(time.Now().Unix()); end += res.Period {
+			md := map[string]*structpb.Value{
+				"instance_title": structpb.NewStringValue(i.GetTitle()),
+			}
 			records = append(records, &billingpb.Record{
 				Resource: res.Key,
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
 				Total: res.Price,
+				Meta:  md,
 			})
 			last = end
 		}
