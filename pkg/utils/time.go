@@ -2,10 +2,10 @@ package utils
 
 import "time"
 
-type Clock interface {
+type IClock interface {
 	Now() time.Time
 }
 
-type RealClock struct{}
+type Clock struct{}
 
-func (RealClock) Now() time.Time { return time.Now() }
+func (Clock) Now() time.Time { return time.Now() }

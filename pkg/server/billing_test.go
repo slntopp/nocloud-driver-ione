@@ -21,7 +21,7 @@ type TestClock struct {
 }
 
 type TestNetworkClient struct {
-	one.VMClient
+	one.IClient
 }
 
 func (c TestNetworkClient) GetVNet(id int) (*virtualnetwork.VirtualNetwork, error) {
@@ -96,7 +96,7 @@ func TestSingletone(t *testing.T) {
 func TestHandleCapacityBilling(t *testing.T) {
 	type Test struct {
 		// Input
-		clock  utils.Clock
+		clock  utils.IClock
 		amount func() float64
 		res    *billingpb.ResourceConf
 		ltl    LazyTimeline
@@ -172,9 +172,9 @@ func TestHandleIPBilling(t *testing.T) {
 		i      *ipb.Instance
 		vm     LazyVM
 		res    *billingpb.ResourceConf
-		client one.VMClient
+		client one.IClient
 		prev   int64
-		clock  utils.Clock
+		clock  utils.IClock
 		// Want
 		records []*billingpb.Record
 		last    int64

@@ -617,7 +617,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 	}
 }
 
-func GetVMIDFromData(client VMClient, inst *pb.Instance) (vmid int, err error) {
+func GetVMIDFromData(client IClient, inst *pb.Instance) (vmid int, err error) {
 	data := inst.GetData()
 	if data == nil {
 		return -1, errors.New("data is empty")
