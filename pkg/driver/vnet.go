@@ -68,9 +68,10 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 	c.Chmod(
 		"vn", user_pub_net_id,
 		&shared.Permissions{
-			1, 1, 0,
-			0, 0, 0,
-			0, 0, 0},
+			OwnerU: 1, OwnerM: 1, OwnerA: 0,
+			GroupU: 0, GroupM: 0, GroupA: 0,
+			OtherU: 0, OtherM: 0, OtherA: 0,
+		},
 	)
 	c.UpdateVNet(user_pub_net_id, "TYPE=\"PUBLIC\"", parameters.Merge)
 
@@ -209,9 +210,10 @@ func (c *ONeClient) ReservePrivateIP(u int, vnMad string, vlanID int) (pool_id i
 	c.Chmod(
 		"vn", user_private_net_id,
 		&shared.Permissions{
-			1, 1, 0,
-			0, 0, 0,
-			0, 0, 0},
+			OwnerU: 1, OwnerM: 1, OwnerA: 0,
+			GroupU: 0, GroupM: 0, GroupA: 0,
+			OtherU: 0, OtherM: 0, OtherA: 0,
+		},
 	)
 	c.UpdateVNet(user_private_net_id, "TYPE=\"PRIVATE\"", parameters.Merge)
 
