@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -187,14 +187,14 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 
 			vnet, err := c.GetVNet(vnet_id)
 			if err != nil {
-				log.Info("Getting VNet", zap.Error(err))
+				log.Debug("Getting VNet", zap.Error(err))
 				continue
 			}
 
 			vn_mad := vnet.VNMad
 			vlanID, err := strconv.Atoi(vnet.VlanID)
 			if err != nil {
-				log.Info("Getting VlanID", zap.Error(err))
+				log.Debug("Getting VlanID", zap.Error(err))
 				continue
 			}
 
@@ -210,7 +210,7 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 				state[vn_mad] = free.String()
 			}
 
-			log.Info("private_state", zap.Any("state", state))
+			log.Debug("private_state", zap.Any("state", state))
 			return state
 		}()
 
