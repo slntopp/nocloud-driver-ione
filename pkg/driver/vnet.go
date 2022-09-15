@@ -126,27 +126,27 @@ func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeV
 
 		state := sp.GetState()
 		if state == nil {
-			err := fmt.Errorf("Couldn't get state of SP with id=%s", sp.GetUuid())
+			err := fmt.Errorf("coulnd't get State of the ServicesProvider(%s)", sp.GetUuid())
 			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
 			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
 		networking, ok := state.Meta["networking"]
 		if !ok {
-			err := fmt.Errorf("networking not found, sp uuid: %s", sp.GetUuid())
+			err := fmt.Errorf("networking not found for ServicesProvider(%s)", sp.GetUuid())
 			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
 			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
 
 		privateVnet, ok := networking.GetStructValue().Fields["private_vnet"]
 		if !ok {
-			err := fmt.Errorf("private vnet state not found, sp uuid: %s", sp.GetUuid())
+			err := fmt.Errorf("private VNet Template ID not found for ServicesProvider(%s)", sp.GetUuid())
 			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
 			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
 
 		freeVlans, ok := privateVnet.GetStructValue().Fields["free_vlans"]
 		if !ok {
-			err := fmt.Errorf("free vlans state not found, sp uuid: %s", sp.GetUuid())
+			err := fmt.Errorf("VLans config not found for ServicesProvider(%s)", sp.GetUuid())
 			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
 			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
@@ -158,7 +158,7 @@ func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeV
 
 		freeVlansBitSet, ok := big.NewInt(0).SetString(vnMadFreeVlans.GetStringValue(), 10)
 		if !ok {
-			err := fmt.Errorf("can't convert free vlans info to big.Int, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vnMad)
+			err := fmt.Errorf("can't convert free vlans info to big.Int, ServicesProvider(%s), vn_mad: %s", sp.GetUuid(), vnMad)
 			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
 			return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 		}
@@ -172,7 +172,7 @@ func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeV
 	}
 
 	if freeVlan == -1 {
-		err := fmt.Errorf("free vlan not found, sp uuid: %s, vn_mad: %s", sp.GetUuid(), vnMad)
+		err := fmt.Errorf("free VLan not found, ServicesProvider(%s), vn_mad: %s", sp.GetUuid(), vnMad)
 		c.log.Error("Can't Reserve Private IPs", zap.Error(err))
 		return "", -1, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 	}
