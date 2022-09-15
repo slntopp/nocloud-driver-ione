@@ -27,7 +27,6 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	"github.com/slntopp/nocloud/pkg/instances/proto"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
@@ -70,6 +69,12 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 			{Error: fmt.Sprintf("Group type(%s) isn't matching Driver type(%s)", igroup.GetType(), DRIVER_TYPE)},
 		}
 		return &ipb.TestInstancesGroupConfigResponse{Result: false, Errors: Errors}, nil
+	}
+
+	for _, inst := range igroup.GetInstances() {
+		if err := EnsureSPBounds(s.log.Named("Ensure SP limits"), inst, request.Sp); err != nil {
+			return &ipb.TestInstancesGroupConfigResponse{Result: false}, err
+		}
 	}
 
 	return &ipb.TestInstancesGroupConfigResponse{Result: true}, nil
@@ -198,7 +203,8 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 
 	_, err := client.GetUserPrivateVNet(oneID)
 
-	if private_ips_amount > 0 && err.Error() == "resource not found" {
+	// nets are requested but are not reserved yet
+	if private_ips_amount > 0 && (err != nil && err.Error() == "resource not found") {
 		vnMad, freeVlan, err := client.FindFreeVlan(sp)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Private IP addresses",
@@ -429,14 +435,14 @@ func (s *DriverServiceServer) SuspendMonitoring(ctx context.Context, req *pb.Mon
 				continue
 			}
 
-			if group.Status != proto.InstanceStatus_SUS && state == "SUSPENDED" {
+			if group.Status != ipb.InstanceStatus_SUS && state == "SUSPENDED" {
 				if err := c.ResumeVM(vmid); err != nil {
 					log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 					continue
 				}
 			}
 
-			if group.Status == proto.InstanceStatus_SUS && state != "SUSPENDED" {
+			if group.Status == ipb.InstanceStatus_SUS && state != "SUSPENDED" {
 				if err := c.SuspendVM(vmid); err != nil {
 					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 					continue
