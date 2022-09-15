@@ -29,7 +29,6 @@ import (
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
@@ -37,7 +36,7 @@ import (
 )
 
 type IClient interface {
-	CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesGroupResponse, error)
+	CheckInstancesGroup(IG *instpb.InstancesGroup) (*CheckInstancesGroupResponse, error)
 	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, data map[string]*structpb.Value, group int)
 	Chmod(class string, oid int, perm *shared.Permissions) error
 	Chown(class string, oid, uid, gid int) error
@@ -46,16 +45,16 @@ type IClient interface {
 	DeleteUserAndVNets(id int) error
 	DeleteVNet(id int) error
 	FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeVlan int, err error)
-	FindVMByInstance(inst *pb.Instance) (*vm.VM, error)
+	FindVMByInstance(inst *instpb.Instance) (*vm.VM, error)
 	GetGroup(id int) (*group.Group, error)
 	GetImage(id int) (*img.Image, error)
-	GetInstSnapshots(inst *pb.Instance) (map[string]interface{}, error)
+	GetInstSnapshots(inst *instpb.Instance) (map[string]interface{}, error)
 	GetSecrets() map[string]*structpb.Value
 	GetTemplate(id int) (*tmpl.Template, error)
 	GetUser(id int) (*user.User, error)
 	GetUserPrivateVNet(user int) (id int, err error)
 	GetUserPublicVNet(user int) (id int, err error)
-	GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, error)
+	GetUserVMsInstancesGroup(userId int) (*instpb.InstancesGroup, error)
 	GetVM(vmid int) (*vm.VM, error)
 	GetVMByName(name string) (id int, err error)
 	GetVNet(id int) (*vnet.VirtualNetwork, error)
@@ -83,7 +82,7 @@ type IClient interface {
 	TerminateVM(id int, hard bool) error
 	UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error
 	UserAddAttribute(id int, data map[string]interface{}) error
-	VMToInstance(id int) (*pb.Instance, error)
+	VMToInstance(id int) (*instpb.Instance, error)
 }
 
 type ONeClient struct {
