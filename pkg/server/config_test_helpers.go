@@ -1,7 +1,7 @@
 package server
 
 import (
-	"errors"
+	"fmt"
 	"strings"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -12,7 +12,7 @@ import (
 )
 
 func EnsureSPLimits(log *zap.Logger, instance *proto.Instance, sp *pb.ServicesProvider) error {
-	log.Info("Running bounds check")
+	log.Debug("Running bounds check")
 	resources := instance.GetResources()
 	size, ok := resources["drive_size"]
 	if !ok {
@@ -28,18 +28,18 @@ func EnsureSPLimits(log *zap.Logger, instance *proto.Instance, sp *pb.ServicesPr
 	if ok {
 		min, err := one.GetVarValue(minVar, driveType)
 		if err == nil && size.GetNumberValue() < min.GetNumberValue() {
-			log.Warn("requested drive size is smaller than sp min limit")
-			return errors.New("requested drive size is smaller than sp min limit")
+			return fmt.Errorf("requested Drive Size is smaller than ServicesProvider Min limit(%.f)", min.GetNumberValue())
 		}
+		log.Warn("Couldn't get limits(min) config", zap.String("drive_type", driveType), zap.String("sp", sp.GetUuid()))
 	}
 
 	maxVar, ok := sp.GetVars()[one.MAX_DRIVE_SIZE]
 	if ok {
 		max, err := one.GetVarValue(maxVar, driveType)
 		if err == nil && size.GetNumberValue() > max.GetNumberValue() {
-			log.Warn("requested drive size is larger than sp max limit")
-			return errors.New("requested drive size is larger than sp max limit")
+			return fmt.Errorf("requested Drive Size is larger than ServicesProvider Min limit(%.f)", max.GetNumberValue())
 		}
+		log.Warn("Couldn't get limits(max) config", zap.String("drive_type", driveType), zap.String("sp", sp.GetUuid()))
 	}
 
 	return nil

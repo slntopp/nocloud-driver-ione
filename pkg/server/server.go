@@ -72,11 +72,11 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 	}
 
 	for _, inst := range igroup.GetInstances() {
-		if err := EnsureSPLimits(s.log.Named("Ensure SP limits"), inst, request.Sp); err != nil {
+		if err := EnsureSPLimits(s.log.Named("EnsureSPLimits"), inst, request.Sp); err != nil {
 			return &ipb.TestInstancesGroupConfigResponse{
 				Result: false,
 				Errors: []*ipb.TestInstancesGroupConfigError{
-					{Error: fmt.Sprintf("Failed SP limits check %v", err)},
+					{Error: fmt.Sprintf("Failed to check limits for ServicesProvider %v", err)},
 				},
 			}, nil
 		}
@@ -314,10 +314,9 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 }
 
 func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
-
 	log := s.log.Named("Monitoring")
 	sp := req.GetServicesProvider()
-	log.Info("Starting Monitoring Routine", zap.String("sp", sp.GetUuid()))
+	log.Info("Starting Routine", zap.String("sp", sp.GetUuid()))
 
 	client, err := one.NewClientFromSP(sp, log)
 	if err != nil {
@@ -411,14 +410,14 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	actions.PostServicesProviderState(st)
 	actions.PostServicesProviderPublicData(pd)
 
-	log.Info("Monitoring Routine Done", zap.String("sp", sp.GetUuid()))
+	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil
 }
 
 func (s *DriverServiceServer) SuspendMonitoring(ctx context.Context, req *pb.MonitoringRequest) (*pb.MonitoringResponse, error) {
-	log := s.log.Named("Monitoring")
+	log := s.log.Named("SuspendMonitoring")
 	sp := req.GetServicesProvider()
-	log.Info("Starting Monitoring Routine", zap.String("sp", sp.GetUuid()))
+	log.Info("Starting Routine", zap.String("sp", sp.GetUuid()))
 
 	c, err := one.NewClientFromSP(sp, log)
 	if err != nil {
@@ -455,5 +454,6 @@ func (s *DriverServiceServer) SuspendMonitoring(ctx context.Context, req *pb.Mon
 			}
 		}
 	}
+	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil
 }
