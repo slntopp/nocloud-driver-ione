@@ -72,8 +72,13 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 	}
 
 	for _, inst := range igroup.GetInstances() {
-		if err := EnsureSPBounds(s.log.Named("Ensure SP limits"), inst, request.Sp); err != nil {
-			return &ipb.TestInstancesGroupConfigResponse{Result: false}, err
+		if err := EnsureSPLimits(s.log.Named("Ensure SP limits"), inst, request.Sp); err != nil {
+			return &ipb.TestInstancesGroupConfigResponse{
+				Result: false,
+				Errors: []*ipb.TestInstancesGroupConfigError{
+					{Error: fmt.Sprintf("Failed SP limits check %v", err)},
+				},
+			}, nil
 		}
 	}
 
