@@ -24,8 +24,14 @@ func EnsureSPBounds(log *zap.Logger, instance *proto.Instance, sp *pb.ServicesPr
 	}
 	driveType := strings.ToLower(drive.String())
 
-	minVar := sp.GetVars()[one.MIN_DRIVE_SIZE]
-	maxVar := sp.GetVars()[one.MAX_DRIVE_SIZE]
+	minVar, ok := sp.GetVars()[one.MIN_DRIVE_SIZE]
+	if !ok {
+		return nil
+	}
+	maxVar, ok := sp.GetVars()[one.MAX_DRIVE_SIZE]
+	if !ok {
+		return nil
+	}
 
 	min, err := one.GetVarValue(minVar, driveType)
 	if err != nil {
