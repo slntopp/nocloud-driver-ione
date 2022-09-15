@@ -269,12 +269,12 @@ cpu:
 		// that's why we don't return error
 		driveType, err := diskInfo.GetStr("DRIVE_TYPE")
 		if err != nil {
-			c.log.Info("VMToInstance", zap.Any("Error", err))
+			c.log.Warn("Error getting Drive Type", zap.Error(err))
 			driveType = "NOT FOUND"
 		}
 		driveSize, err := diskInfo.GetFloat("SIZE")
 		if err != nil {
-			c.log.Info("VMToInstance", zap.Any("Error", err))
+			c.log.Warn("Error getting Drive Size", zap.Error(err))
 			driveSize = -1
 		}
 		inst.Resources["drive_type"] = structpb.NewStringValue(driveType)
@@ -410,7 +410,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	if IG.Status != pb.InstanceStatus_UP {
-		log.Info("InstancesGroup is not in the status UP, skipping", zap.String("status", IG.Status.String()))
+		log.Debug("InstancesGroup is not in the status UP, skipping", zap.String("status", IG.Status.String()))
 		return &resp, nil
 	}
 

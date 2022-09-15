@@ -126,7 +126,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		}
 	}
 
-	log.Info("Putting new Records", zap.Any("records", records))
+	log.Debug("Putting new Records", zap.Any("records", records))
 	go publish(records)
 	go datas.Pub(&ipb.ObjectData{
 		Uuid: i.Uuid,
