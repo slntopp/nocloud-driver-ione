@@ -51,7 +51,6 @@ var Actions = map[string]ServiceAction{
 
 var AdminActions = map[string]bool{
 	"suspend": true,
-	"resume":  true,
 }
 
 // Creates new snapshot of vm
