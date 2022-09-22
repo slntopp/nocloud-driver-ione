@@ -72,6 +72,7 @@ type IClient interface {
 	ReserveVNet(id, size, to int, name string) (int, error)
 	ResumeVM(id int) error
 	Reinstall(id int) error
+	Monitoring(id int) (*vm.Monitoring, error)
 	SetSecrets(secrets map[string]*structpb.Value)
 	SetVars(vars map[string]*sppb.Var)
 	SnapCreate(name string, vmid int) error
