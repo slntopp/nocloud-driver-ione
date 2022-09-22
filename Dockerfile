@@ -19,5 +19,6 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 EXPOSE 8080
 LABEL org.opencontainers.image.source https://github.com/slntopp/nocloud-driver-ione
+LABEL nocloud.update "true"
 
 ENTRYPOINT ["/nocloud-driver-ione"]
