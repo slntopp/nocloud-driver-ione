@@ -42,6 +42,7 @@ var Actions = map[string]ServiceAction{
 	"reboot":     Reboot,
 	"resume":     Resume,
 	"reinstall":  Reinstall,
+	"monitoring": Monitoring,
 	"state":      State,
 	"snapcreate": SnapCreate,
 	"snapdelete": SnapDelete,
@@ -357,4 +358,37 @@ func StartVNC(
 	return &ipb.InvokeResponse{
 		Result: true, Meta: res_struct.GetFields(),
 	}, nil
+}
+
+// Fetches data of the VM
+func Monitoring(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+
+	vmid, err := one.GetVMIDFromData(client, inst)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
+	}
+
+	monitoring, err := client.Monitoring(vmid)
+	if err != nil {
+		log.Warn("Error getting monitoring data", zap.Int("vmid", vmid), zap.Error(err))
+		return nil, status.Error(codes.Internal, "Cannot get monitoring data")
+
+	}
+
+	if data == nil {
+		data = make(map[string]*structpb.Value)
+	}
+
+	for _, record := range monitoring.Records {
+		for _, el := range record.Elements {
+			log.Debug("Got record", zap.String(el.Key(), el.String()))
+			data[el.Key()] = structpb.NewStringValue(el.String())
+		}
+	}
+
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
