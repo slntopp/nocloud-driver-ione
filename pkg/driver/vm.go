@@ -16,7 +16,6 @@ limitations under the License.
 package one
 
 import (
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"strconv"
@@ -86,18 +85,8 @@ func (c *ONeClient) Reinstall(vmid int) error {
 }
 
 func (c *ONeClient) Monitoring(vmid int) (*vm.Monitoring, error) {
-	monitorData, err := c.Client.Call("one.vm.monitoring", vmid, "NETRX", "NETCX")
-	if err != nil {
-		return nil, err
-	}
-
-	vmMon := &vm.Monitoring{}
-	err = xml.Unmarshal([]byte(monitorData.Body()), &vmMon)
-	if err != nil {
-		return nil, err
-	}
-
-	return vmMon, nil
+	vm := c.ctrl.VM(vmid)
+	return vm.Monitoring()
 }
 
 func (c *ONeClient) SnapRevert(snapId, vmid int) error {
