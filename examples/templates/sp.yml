@@ -1,21 +1,20 @@
 type: ione
-title: IONe VDC
+title: IONe VDC-2
 secrets:
-  host: https://ione-api.example.com
-  user: "oneadmin:token"
-  pass: token
-  group: 100
+  host: https://sunstone.demo.support.pl/RPC2
+  user: "oneadmin"
+  pass: 72cf91142b4593541993b02b9bfc22a9d4666afd09f95b1f268f4204dee3b1c4
+  group: 1
 vars:
   private_vnets_pool: # this is actually a template ID, key will be changed soon
     value:
-      default: 1
+      default: 0
   public_ip_pool:
     value:
-      default: 0
+      default: 406
   sched:
     value:
-      default: "ID=\"1\""
+      default: "ID=\"6\""
   sched_ds:
     value:
-      default: "ID=\"101\""
-      ssd: "ID=\"101\""
+      default: "ID=\"105\""

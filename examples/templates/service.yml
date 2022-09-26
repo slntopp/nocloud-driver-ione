@@ -9,12 +9,12 @@ instances_groups:
     instances:
       - title: master-vm
         config:
-          template_id: 4
+          template_id: 15
           password: sup3rS3cr3tP4$$W0rD
         resources:
           cpu: 1
           ram: 1024
           drive_type: SSD
-          drive_size: 10000
+          drive_size: 13000
           ips_public: 1
-          ips_private: 1
+          ips_private: 0
