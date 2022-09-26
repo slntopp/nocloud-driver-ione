@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,6 +68,14 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	vm_tmpl, err := c.GetTemplate(template_id)
 	if err != nil {
 		return 0, err
+	}
+
+	if pair, err := vm_tmpl.Template.GetPair("NOCLOUD_ENABLED"); err == nil && pair.Value == "FALSE" {
+		return -1, errors.New("cannot instantiate VM for template disabled by Nocloud")
+	}
+
+	if pair, err := vm_tmpl.Template.GetPair("LOGO"); err == nil {
+		data[DATA_LOGO] = structpb.NewStringValue(pair.Value)
 	}
 
 	id := instance.GetUuid()
