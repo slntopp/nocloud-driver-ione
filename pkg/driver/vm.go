@@ -18,6 +18,7 @@ package one
 import (
 	"errors"
 	"fmt"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	"strconv"
 	"strings"
 	"time"
@@ -558,6 +559,30 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		if vmInst.Resources["ram"].GetNumberValue() != inst.Resources["ram"].GetNumberValue() {
 			tmpl.Memory(int(inst.Resources["ram"].GetNumberValue()))
 			updated = append(updated, "ram")
+		}
+
+		/*if vmInst.Resources["ips_private"].GetNumberValue() != inst.Resources["ips_private"].GetNumberValue() {
+			private_vn := int(data["private_vn"].GetNumberValue())
+			for i := 0; i < int(inst.Resources["ips_private"].GetNumberValue()); i++ {
+				nic := networkTemplate.AddNIC()
+				nic.Add(shared.NetworkID, private_vn)
+			}
+		}*/
+
+		if vmInst.Resources["ips_public"].GetNumberValue() != inst.Resources["ips_public"].GetNumberValue() {
+			public_vn := int(data["public_vn"].GetNumberValue())
+			uid := int(data["userid"].GetNumberValue())
+			_, err := c.ReservePublicIP(uid, 1)
+			if err != nil {
+				c.log.Error("Wrong ip reserv")
+			}
+			networkTemplate := vm.NewTemplate()
+			nic := networkTemplate.AddNIC()
+			nic.Add(shared.NetworkID, public_vn)
+			err = vmc.AttachNIC(networkTemplate.String())
+			if err != nil {
+				c.log.Error("Wrong ip attach")
+			}
 		}
 
 		if len(updated) > 0 {
