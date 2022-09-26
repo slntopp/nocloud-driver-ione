@@ -85,6 +85,11 @@ func (c *ONeClient) Reinstall(vmid int) error {
 	return err
 }
 
+func (c *ONeClient) Monitoring(vmid int) (*vm.Monitoring, error) {
+	vm := c.ctrl.VM(vmid)
+	return vm.Monitoring()
+}
+
 func (c *ONeClient) SnapRevert(snapId, vmid int) error {
 	vmc := c.ctrl.VM(vmid)
 	return vmc.SnapshotRevert(snapId)
