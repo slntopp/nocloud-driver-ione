@@ -592,9 +592,12 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			}
 		}
 
-		if vmInst.Resources["ips_private"].GetNumberValue() != inst.Resources["ips_private"].GetNumberValue() {
+		/*vmInstIpsPrivate := int(vmInst.Resources["ips_private"].GetNumberValue())
+		instIpsPrivate := int(inst.Resources["ips_private"].GetNumberValue())
 
-		}
+		if vmInstIpsPrivate != instIpsPrivate {
+
+		}*/
 
 		if len(updated) > 0 {
 			if lcmState == vm.Running {
