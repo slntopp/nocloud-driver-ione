@@ -561,28 +561,39 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			updated = append(updated, "ram")
 		}
 
-		/*if vmInst.Resources["ips_private"].GetNumberValue() != inst.Resources["ips_private"].GetNumberValue() {
-			private_vn := int(data["private_vn"].GetNumberValue())
-			for i := 0; i < int(inst.Resources["ips_private"].GetNumberValue()); i++ {
-				nic := networkTemplate.AddNIC()
-				nic.Add(shared.NetworkID, private_vn)
-			}
-		}*/
+		vmInstIpsPublic := int(vmInst.Resources["ips_public"].GetNumberValue())
+		instIpsPublic := int(inst.Resources["ips_public"].GetNumberValue())
 
-		if vmInst.Resources["ips_public"].GetNumberValue() != inst.Resources["ips_public"].GetNumberValue() {
+		if vmInstIpsPublic != instIpsPublic {
 			public_vn := int(data["public_vn"].GetNumberValue())
-			uid := int(data["userid"].GetNumberValue())
-			_, err := c.ReservePublicIP(uid, 1)
-			if err != nil {
-				c.log.Error("Wrong ip reserv")
+			if vmInstIpsPublic < instIpsPublic {
+				uid := int(data["userid"].GetNumberValue())
+				_, err := c.ReservePublicIP(uid, 1)
+				if err != nil {
+					c.log.Error("Wrong ip reserv")
+				}
+				networkTemplate := vm.NewTemplate()
+				nic := networkTemplate.AddNIC()
+				nic.Add(shared.NetworkID, public_vn)
+				err = vmc.AttachNIC(networkTemplate.String())
+				if err != nil {
+					c.log.Error("Wrong ip attach")
+				}
+			} else {
+				network := c.ctrl.VirtualNetwork(public_vn)
+				err := vmc.DetachNIC(instIpsPublic - 1)
+				if err != nil {
+					c.log.Error("Wrong ip detach")
+				}
+				err = network.FreeAR(instIpsPublic - 1)
+				if err != nil {
+					c.log.Error("Wrong Net free ip")
+				}
 			}
-			networkTemplate := vm.NewTemplate()
-			nic := networkTemplate.AddNIC()
-			nic.Add(shared.NetworkID, public_vn)
-			err = vmc.AttachNIC(networkTemplate.String())
-			if err != nil {
-				c.log.Error("Wrong ip attach")
-			}
+		}
+
+		if vmInst.Resources["ips_private"].GetNumberValue() != inst.Resources["ips_private"].GetNumberValue() {
+
 		}
 
 		if len(updated) > 0 {
