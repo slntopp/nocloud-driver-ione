@@ -26,6 +26,7 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
@@ -160,7 +161,8 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		data["userid"] = structpb.NewNumberValue(float64(oneID))
 
 		client.UserAddAttribute(oneID, map[string]interface{}{
-			"NOCLOUD": "TRUE",
+			"NOCLOUD":                       "TRUE",
+			string(shared.NOCLOUD_IG_TITLE): igroup.GetTitle(),
 		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
@@ -378,7 +380,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				})
 			}
 
-			client.CheckInstancesGroupResponseProcess(resp, ig.GetData(), int(group))
+			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
 		}
 
 		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))
