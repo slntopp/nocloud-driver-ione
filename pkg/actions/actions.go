@@ -291,13 +291,6 @@ func State(
 		return nil, err
 	}
 
-	// Merge meta and data
-	for key, value := range data {
-		if _, ok := m[key]; !ok {
-			m[key] = value.String()
-		}
-	}
-
 make_value:
 	meta, err := structpb.NewValue(m)
 	if err != nil {
@@ -432,5 +425,17 @@ func Monitoring(
 		}
 	}
 
-	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+	resp, err := StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge meta and data
+	for key, value := range data {
+		if _, ok := resp.Meta[key]; !ok {
+			resp.Meta[key] = value
+		}
+	}
+
+	return resp, nil
 }
