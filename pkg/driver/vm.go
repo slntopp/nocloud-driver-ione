@@ -566,8 +566,29 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		vmInstIpsPublic := int(vmInst.Resources["ips_public"].GetNumberValue())
 		instIpsPublic := int(inst.Resources["ips_public"].GetNumberValue())
 
+		vmInstIpsPrivate := int(vmInst.Resources["ips_private"].GetNumberValue())
+		instIpsPrivate := int(inst.Resources["ips_private"].GetNumberValue())
+
+		public_vn := int(data["public_vn"].GetNumberValue())
+		private_vn := int(data["private_vn"].GetNumberValue())
+
+		publicNetwork := c.ctrl.VirtualNetwork(public_vn)
+		publicNetworkInfo, err := publicNetwork.Info(true)
+		if err != nil {
+			return
+		}
+
+		for _, val := range publicNetworkInfo.ARs {
+			if val.UsedLeases == "0" {
+				ipId, _ := strconv.Atoi(val.ID)
+				err := publicNetwork.FreeAR(ipId)
+				if err != nil {
+					c.log.Error("Bruh free ip in public network", zap.Int("ip_id", ipId))
+				}
+			}
+		}
+
 		if vmInstIpsPublic != instIpsPublic {
-			public_vn := int(data["public_vn"].GetNumberValue())
 			if vmInstIpsPublic < instIpsPublic {
 				uid := int(data["userid"].GetNumberValue())
 				_, err := c.ReservePublicIP(uid, 1)
@@ -582,24 +603,74 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 					c.log.Error("Wrong ip attach")
 				}
 			} else {
-				network := c.ctrl.VirtualNetwork(public_vn)
-				err := vmc.DetachNIC(instIpsPublic - 1)
-				if err != nil {
-					c.log.Error("Wrong ip detach")
+				nics := VM.Template.GetNICs()
+				for i := len(nics) - 1; i > 0; i-- {
+					nicId, netType := -1, ""
+					pairs := nics[i].Vector.Pairs
+					for j := 0; j < len(pairs); j++ {
+						if pairs[j].XMLName.Local == "NETWORK" {
+							if strings.Contains(pairs[j].Value, "pub-vnet") {
+								netType = "pub-vnet"
+							} else {
+								netType = "private-vnet"
+							}
+							continue
+						}
+						if pairs[j].XMLName.Local == "NIC_ID" {
+							nicId, _ = strconv.Atoi(pairs[j].Value)
+						}
+					}
+
+					if netType == "pub-vnet" {
+						err := vmc.DetachNIC(nicId)
+						if err != nil {
+							c.log.Error("id", zap.Int("id", nicId))
+							c.log.Error("Wrong ip detach")
+						}
+						break
+					}
 				}
-				err = network.FreeAR(instIpsPublic - 1)
+			}
+		} else if vmInstIpsPrivate != instIpsPrivate {
+			if vmInstIpsPrivate < instIpsPrivate {
+				networkTemplate := vm.NewTemplate()
+				nic := networkTemplate.AddNIC()
+				nic.Add(shared.NetworkID, private_vn)
+				err = vmc.AttachNIC(networkTemplate.String())
 				if err != nil {
-					c.log.Error("Wrong Net free ip")
+					c.log.Error("Wrong ip attach")
+				}
+			} else {
+				nics := VM.Template.GetNICs()
+
+				for i := len(nics) - 1; i > 0; i-- {
+					nicId, netType := -1, ""
+					pairs := nics[i].Vector.Pairs
+					for j := 0; j < len(pairs); j++ {
+						if pairs[j].XMLName.Local == "NETWORK" {
+							if strings.Contains(pairs[j].Value, "pub-vnet") {
+								netType = "pub-vnet"
+							} else {
+								netType = "private-vnet"
+							}
+							continue
+						}
+						if pairs[j].XMLName.Local == "NIC_ID" {
+							nicId, _ = strconv.Atoi(pairs[j].Value)
+						}
+					}
+
+					if netType == "private-vnet" {
+						err := vmc.DetachNIC(nicId)
+						if err != nil {
+							c.log.Error("id", zap.Int("id", nicId))
+							c.log.Error("Wrong ip detach")
+						}
+						break
+					}
 				}
 			}
 		}
-
-		/*vmInstIpsPrivate := int(vmInst.Resources["ips_private"].GetNumberValue())
-		instIpsPrivate := int(inst.Resources["ips_private"].GetNumberValue())
-
-		if vmInstIpsPrivate != instIpsPrivate {
-
-		}*/
 
 		if len(updated) > 0 {
 			if lcmState == vm.Running {
