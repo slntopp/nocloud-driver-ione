@@ -583,11 +583,11 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 				}
 			} else {
 				network := c.ctrl.VirtualNetwork(public_vn)
-				err := vmc.DetachNIC(instIpsPublic - 1)
+				err := vmc.DetachNIC(vmInstIpsPublic - 1)
 				if err != nil {
 					c.log.Error("Wrong ip detach")
 				}
-				err = network.FreeAR(instIpsPublic - 1)
+				err = network.FreeAR(vmInstIpsPublic - 1)
 				if err != nil {
 					c.log.Error("Wrong Net free ip")
 				}
