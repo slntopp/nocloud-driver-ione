@@ -291,6 +291,13 @@ func State(
 		return nil, err
 	}
 
+	// Merge meta and data
+	for key, value := range data {
+		if _, ok := m[key]; !ok {
+			m[key] = value.String()
+		}
+	}
+
 make_value:
 	meta, err := structpb.NewValue(m)
 	if err != nil {
@@ -364,7 +371,7 @@ func StartVNC(
 func Monitoring(
 	client one.IClient,
 	inst *ipb.Instance,
-	data map[string]*structpb.Value,
+	params map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 
 	vmid, err := one.GetVMIDFromData(client, inst)
@@ -372,21 +379,56 @@ func Monitoring(
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
 
-	monitoring, err := client.Monitoring(vmid)
+	m, err := client.Monitoring(vmid)
 	if err != nil {
 		log.Warn("Error getting monitoring data", zap.Int("vmid", vmid), zap.Error(err))
 		return nil, status.Error(codes.Internal, "Cannot get monitoring data")
-
 	}
 
-	if data == nil {
-		data = make(map[string]*structpb.Value)
+	mon := map[string][]any{}
+	if len(m.Records) != 0 {
+		for _, el := range m.Records[0].Elements {
+			if el.Key() != "TIMESTAMP" {
+				mon[el.Key()] = []any{}
+			}
+		}
 	}
 
-	for _, record := range monitoring.Records {
-		for _, el := range record.Elements {
-			log.Debug("Got record", zap.String(el.Key(), el.String()))
-			data[el.Key()] = structpb.NewStringValue(el.String())
+	for _, record := range m.Records {
+		pair, err := record.GetPair("TIMESTAMP")
+		if err != nil {
+			continue
+		}
+		timestamp := pair.Value
+
+		for param := range mon {
+			field, err := record.GetPair(param)
+			if err != nil {
+				continue
+			}
+
+			current := mon[field.Key()]
+			mon[field.Key()] = append(current, []any{timestamp, field.Value})
+		}
+	}
+
+	data := make(map[string]*structpb.Value)
+	for param := range mon {
+		log.Debug("Writing monitoring fields values", zap.String("field", param))
+		value, err := structpb.NewValue(mon[param])
+		if err != nil {
+			log.Warn("Error while creating list value", zap.Error(err))
+			continue
+		}
+
+		// Include all options if no params are provided
+		if params == nil {
+			data[param] = value
+			continue
+		}
+
+		if _, ok := params[param]; ok {
+			data[param] = value
 		}
 	}
 
