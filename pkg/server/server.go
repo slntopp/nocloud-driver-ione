@@ -203,15 +203,8 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		private_ips_amount = int(resources["ips_private"].GetNumberValue())
 	}
 
-	/*var address_range_id int = -1
-	if data["address_range_id"] != nil {
-		address_range_id = int(data["address_range_id"].GetNumberValue())
-	}*/
-
 	_, err := client.GetUserPrivateVNet(oneID)
-
-	// nets are requested but are not reserved yet
-	if private_ips_amount > 0 && (err != nil && err.Error() == "resource not found") {
+	if data["private_vn"] == nil && (err != nil && err.Error() == "resource not found") {
 		vnMad, freeVlan, err := client.FindFreeVlan(sp)
 		if err != nil {
 			s.log.Debug("Couldn't reserve Private IP addresses",
