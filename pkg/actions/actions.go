@@ -294,7 +294,7 @@ func State(
 	// Merge meta and data
 	for key, value := range data {
 		if _, ok := m[key]; !ok {
-			m[key] = value.String()
+			m[key] = value
 		}
 	}
 
