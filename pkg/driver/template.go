@@ -74,6 +74,14 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, ig *pb.
 		return 0, err
 	}
 
+	if pair, err := vm_tmpl.Template.GetPair("NOCLOUD_ENABLED"); err == nil && pair.Value == "FALSE" {
+		return -1, errors.New("cannot instantiate VM for template disabled by Nocloud")
+	}
+
+	if pair, err := vm_tmpl.Template.GetPair("LOGO"); err == nil {
+		data[DATA_LOGO] = structpb.NewStringValue(pair.Value)
+	}
+
 	id := instance.GetUuid()
 	vmname := id
 	data[DATA_VM_NAME] = structpb.NewStringValue(vmname)
