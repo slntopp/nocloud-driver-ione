@@ -37,6 +37,9 @@ var (
 	// OpenNebula VM ID Data Key
 	DATA_VM_ID = "vmid"
 
+	// Logo of OpenNebula Template
+	DATA_LOGO = "logo"
+
 	// OpenNebula minimal drive size
 	MIN_DRIVE_SIZE = "min_drive_size"
 	// OpenNebula maximum drive size

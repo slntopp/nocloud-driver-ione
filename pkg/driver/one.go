@@ -29,6 +29,7 @@ import (
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
@@ -37,7 +38,7 @@ import (
 
 type IClient interface {
 	CheckInstancesGroup(IG *instpb.InstancesGroup) (*CheckInstancesGroupResponse, error)
-	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, data map[string]*structpb.Value, group int)
+	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int)
 	Chmod(class string, oid int, perm *shared.Permissions) error
 	Chown(class string, oid, uid, gid int) error
 	CreateUser(name, pass string, groups []int) (id int, err error)
@@ -59,7 +60,7 @@ type IClient interface {
 	GetVMByName(name string) (id int, err error)
 	GetVNet(id int) (*vnet.VirtualNetwork, error)
 	InstantiateTemplate(id int, vmname, tmpl string, pending bool) (vmid int, err error)
-	InstantiateTemplateHelper(instance *instpb.Instance, group_data map[string]*structpb.Value, token string) (vmid int, err error)
+	InstantiateTemplateHelper(instance *instpb.Instance, ig *pb.InstancesGroup, token string) (vmid int, err error)
 	ListImages() ([]img.Image, error)
 	ListTemplates() ([]tmpl.Template, error)
 	Logger(n string) *zap.Logger

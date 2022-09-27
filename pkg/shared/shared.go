@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,8 +20,11 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 )
 
-const DRIVE_TYPE shared.DiskKeys = "DRIVE_TYPE"
-const NOCLOUD_VM keys.Template = "NOCLOUD"
-const NOCLOUD_VM_TOKEN keys.Template = "NOCLOUD_VM_TOKEN"
-
-const VM_CREATED = "created_time"
+const (
+	DRIVE_TYPE         shared.DiskKeys = "DRIVE_TYPE"
+	NOCLOUD_VM         keys.Template   = "NOCLOUD"
+	NOCLOUD_VM_TOKEN   keys.Template   = "NOCLOUD_VM_TOKEN"
+	NOCLOUD_INST_TITLE keys.Template   = "NOCLOUD_INST_TITLE"
+	NOCLOUD_IG_TITLE   keys.Template   = "NOCLOUD_IG_TITLE"
+	VM_CREATED                         = "created_time"
+)

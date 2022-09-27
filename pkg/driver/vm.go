@@ -18,10 +18,11 @@ package one
 import (
 	"errors"
 	"fmt"
-	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
@@ -494,7 +495,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
-func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, data map[string]*structpb.Value, group int) {
+func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) {
+	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
 	for _, inst := range resp.ToBeCreated {
 		token, err := auth.MakeTokenInstance(inst.GetUuid())
@@ -502,7 +504,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			c.log.Error("Error generating VM token", zap.String("instance", inst.GetUuid()), zap.Error(err))
 			continue
 		}
-		vmid, err := c.InstantiateTemplateHelper(inst, data, token)
+		vmid, err := c.InstantiateTemplateHelper(inst, ig, token)
 		if err != nil {
 			c.log.Error("Error deploying VM", zap.String("instance", inst.GetUuid()), zap.Error(err))
 			continue

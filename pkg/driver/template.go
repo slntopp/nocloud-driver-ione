@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	driver_shared "github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
+	pb "github.com/slntopp/nocloud/pkg/instances/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -42,7 +43,8 @@ func (c *ONeClient) ListTemplates() ([]tmpl.Template, error) {
 	return p.Templates, nil
 }
 
-func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_data map[string]*structpb.Value, token string) (vmid int, err error) {
+func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, ig *pb.InstancesGroup, token string) (vmid int, err error) {
+	group_data := ig.GetData()
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
 	data := make(map[string]*structpb.Value)
@@ -50,6 +52,8 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 
 	tmpl.Add(driver_shared.NOCLOUD_VM, "TRUE")
 	tmpl.Add(driver_shared.NOCLOUD_VM_TOKEN, token)
+	tmpl.Add(driver_shared.NOCLOUD_INST_TITLE, instance.GetTitle())
+	tmpl.Add(driver_shared.NOCLOUD_IG_TITLE, instance.GetTitle())
 
 	if pass := conf["password"].GetStringValue(); pass != "" {
 		tmpl.Add(keys.Template("PASSWORD"), pass)
@@ -68,6 +72,14 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, group_d
 	vm_tmpl, err := c.GetTemplate(template_id)
 	if err != nil {
 		return 0, err
+	}
+
+	if pair, err := vm_tmpl.Template.GetPair("NOCLOUD_ENABLED"); err == nil && pair.Value == "FALSE" {
+		return -1, errors.New("cannot instantiate VM for template disabled by Nocloud")
+	}
+
+	if pair, err := vm_tmpl.Template.GetPair("LOGO"); err == nil {
+		data[DATA_LOGO] = structpb.NewStringValue(pair.Value)
 	}
 
 	id := instance.GetUuid()
