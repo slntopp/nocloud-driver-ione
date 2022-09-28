@@ -484,6 +484,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 
 		c.log.Debug("instance for hash calculating while Monitoring Checking", zap.Any("inst", res))
+		c.log.Debug("res.Hash", zap.String("hash", res.Hash))
+		c.log.Debug("inst.Hash", zap.String("hash", inst.Hash))
 
 		if res.Hash != inst.Hash {
 			resp.ToBeUpdated = append(resp.ToBeUpdated, inst)
