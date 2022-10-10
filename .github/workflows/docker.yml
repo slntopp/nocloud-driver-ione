@@ -3,10 +3,16 @@ name: Build Docker Image
 on:
   push:
     branches:
-      - 'master'
+      - "master"
+      - "dev"
+    paths-ignore:
+      - "examples"
+      - "**/*.md"
+      - ".github/**"
 
 env:
   REGISTRY: ghcr.io
+  IMAGE_TAG: ${{github.ref_name == 'master' && 'latest' || github.ref_name}}
 
 jobs:
   build-and-push:
@@ -23,7 +29,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3.6.1
         with:
-          tags: type=raw,value=latest
+          tags: type=raw,value=${{env.IMAGE_TAG}}
           images: ${{ env.REGISTRY }}/slntopp/nocloud-driver-ione
 
       - name: Log in to the Container registry
