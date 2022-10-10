@@ -4,10 +4,10 @@ go 1.19
 
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20220705094146-89ce359739b3
-	github.com/slntopp/nocloud v0.0.16-r02
+	github.com/rabbitmq/amqp091-go v1.5.0
+	github.com/slntopp/nocloud v0.0.16-r03
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.13.0
-	github.com/streadway/amqp v1.0.0
 	go.uber.org/zap v1.23.0
 	google.golang.org/grpc v1.50.0
 	google.golang.org/protobuf v1.28.1
@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/arangodb/go-driver v1.3.3 // indirect
+	github.com/arangodb/go-driver v1.4.0 // indirect
 	github.com/arangodb/go-velocypack v0.0.0-20200318135517-5af53c29c67e // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-redis/redis/v8 v8.11.5

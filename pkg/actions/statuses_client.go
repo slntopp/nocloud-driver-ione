@@ -18,11 +18,11 @@ package actions
 import (
 	"strings"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	s "github.com/slntopp/nocloud/pkg/states"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
-	"github.com/streadway/amqp"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
