@@ -203,28 +203,39 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		private_ips_amount = int(resources["ips_private"].GetNumberValue())
 	}
 
-	_, err := client.GetUserPrivateVNet(oneID)
-	if data["private_vn"] == nil && (err != nil && err.Error() == "resource not found") {
-		vnMad, freeVlan, err := client.FindFreeVlan(sp)
-		if err != nil {
-			s.log.Debug("Couldn't reserve Private IP addresses",
-				zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
+	private_vn_ban, ok := sp.Vars[one.PRIVATE_VN_BAN]
+	if !ok {
+		return data, nil
+	}
+	private_vn_ban_value, err := one.GetVarValue(private_vn_ban, "default")
+	if err != nil {
+		return data, nil
+	}
 
-			client.DeleteUserAndVNets(oneID)
+	if !private_vn_ban_value.GetBoolValue() {
+		_, err := client.GetUserPrivateVNet(oneID)
+		if data["private_vn"] == nil && (err != nil && err.Error() == "resource not found") {
+			vnMad, freeVlan, err := client.FindFreeVlan(sp)
+			if err != nil {
+				s.log.Debug("Couldn't reserve Private IP addresses",
+					zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
 
-			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+				client.DeleteUserAndVNets(oneID)
+
+				return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+			}
+
+			private_ips_pool_id, err := client.ReservePrivateIP(oneID, vnMad, freeVlan)
+			if err != nil {
+				s.log.Debug("Couldn't reserve Private IP addresses",
+					zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
+
+				client.DeleteUserAndVNets(oneID)
+
+				return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+			}
+			data["private_vn"] = structpb.NewNumberValue(float64(private_ips_pool_id))
 		}
-
-		private_ips_pool_id, err := client.ReservePrivateIP(oneID, vnMad, freeVlan)
-		if err != nil {
-			s.log.Debug("Couldn't reserve Private IP addresses",
-				zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
-
-			client.DeleteUserAndVNets(oneID)
-
-			return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
-		}
-		data["private_vn"] = structpb.NewNumberValue(float64(private_ips_pool_id))
 	}
 
 	return data, nil
