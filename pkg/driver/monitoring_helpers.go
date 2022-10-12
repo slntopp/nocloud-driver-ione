@@ -17,6 +17,7 @@ package one
 
 import (
 	"fmt"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"math/big"
 	"strconv"
 
@@ -172,27 +173,15 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 
 		free_vlans := make(map[string]*big.Int)
 
-		user_pool, err := c.ctrl.Users().Info()
+		networks_pull, err := c.ctrl.VirtualNetworks().Info(parameters.PoolWhoAll)
 		if err != nil {
 			state["error"] = "Can't get users pool"
 			return state
 		}
 
-		for _, user := range user_pool.Users {
-			id := user.ID
-			vnet_id, err := c.GetUserPrivateVNet(id)
-			if err != nil {
-				continue
-			}
-
-			vnet, err := c.GetVNet(vnet_id)
-			if err != nil {
-				log.Debug("Getting VNet", zap.Error(err))
-				continue
-			}
-
-			vn_mad := vnet.VNMad
-			vlanID, err := strconv.Atoi(vnet.VlanID)
+		for _, network := range networks_pull.VirtualNetworks {
+			vn_mad := network.VNMad
+			vlanID, err := strconv.Atoi(network.VlanID)
 			if err != nil {
 				log.Debug("Getting VlanID", zap.Error(err))
 				continue
