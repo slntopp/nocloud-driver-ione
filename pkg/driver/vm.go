@@ -523,6 +523,16 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			continue
 		}
 		c.TerminateVM(vmid, true)
+		ips_free := data["public_ips_free"].GetNumberValue()
+		ips_total := data["public_ips_total"].GetNumberValue()
+
+		ips_free_new, _ := structpb.NewValue(ips_free - 1)
+		ips_total_new, _ := structpb.NewValue(ips_total - 1)
+
+		data["public_ips_free"] = ips_free_new
+		data["public_ips_total"] = ips_total_new
+
+		go datas.PostIGData(ig.Uuid, data)
 	}
 
 	for _, inst := range resp.ToBeUpdated {
