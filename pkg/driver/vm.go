@@ -500,6 +500,10 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) {
 	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
+
+	instDatasPublisher := datas.DataPublisher(datas.POST_INST_DATA)
+	igDatasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+
 	for _, inst := range resp.ToBeCreated {
 		token, err := auth.MakeTokenInstance(inst.GetUuid())
 		if err != nil {
@@ -513,7 +517,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		}
 		c.Chown("vm", vmid, userid, group)
 
-		go datas.PostInstData(inst.Uuid, inst.Data)
+		go instDatasPublisher(inst.Uuid, inst.Data)
 	}
 
 	for _, inst := range resp.ToBeDeleted {
@@ -535,7 +539,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		data["public_ips_free"] = ips_free_new
 		data["public_ips_total"] = ips_total_new
 
-		go datas.PostIGData(ig.Uuid, data)
+		go igDatasPublisher(ig.Uuid, data)
 	}
 
 	for _, inst := range resp.ToBeUpdated {
