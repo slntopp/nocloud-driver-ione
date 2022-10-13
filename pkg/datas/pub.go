@@ -47,18 +47,18 @@ func Configure(logger *zap.Logger, rbmq *amqp.Connection) {
 	DIPub = i.Publisher(ich, "datas", "instances")
 	DIGPub = i.Publisher(ich, "datas", "instances-groups")
 
+	log = logger.Named("PublicData")
+	pd := pd.NewPublicDataPubSub(log, nil, rbmq)
+	ch := pd.Channel()
+	pd.TopicExchange(ch, "public_data")
+	PdSpPub = pd.Publisher(ch, "public_data", "sp")
+
 	log = logger.Named("States")
 	s := s.NewStatesPubSub(log, nil, rbmq)
 	sch := s.Channel()
 	s.TopicExchange(sch, "states")
 	StIPub = s.Publisher(sch, "states", "instances")
 	StSpPub = s.Publisher(sch, "states", "sp")
-
-	log = logger.Named("PublicData")
-	pd := pd.NewPublicDataPubSub(log, nil, rbmq)
-	ch := pd.Channel()
-	pd.TopicExchange(ch, "public_data")
-	PdSpPub = pd.Publisher(ch, "public_data", "sp")
 }
 
 func postInstData(uuid string, data map[string]*structpb.Value) {
