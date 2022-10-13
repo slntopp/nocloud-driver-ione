@@ -517,17 +517,20 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 	}
 
 	for _, inst := range resp.ToBeDeleted {
+		inst_res := inst.GetResources()
 		vmid, err := GetVMIDFromData(c, inst)
 		if err != nil {
 			c.log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
 		}
 		c.TerminateVM(vmid, true)
-		ips_free := data["public_ips_free"].GetNumberValue()
-		ips_total := data["public_ips_total"].GetNumberValue()
+		ips_free := int(data["public_ips_free"].GetNumberValue())
+		ips_total := int(data["public_ips_total"].GetNumberValue())
 
-		ips_free_new, _ := structpb.NewValue(ips_free - 1)
-		ips_total_new, _ := structpb.NewValue(ips_total - 1)
+		ips := int(inst_res["ips_public"].GetNumberValue())
+
+		ips_free_new, _ := structpb.NewValue(ips_free - ips)
+		ips_total_new, _ := structpb.NewValue(ips_total - ips)
 
 		data["public_ips_free"] = ips_free_new
 		data["public_ips_total"] = ips_total_new
