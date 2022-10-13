@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"time"
 
 	redis "github.com/go-redis/redis/v8"
@@ -279,6 +280,9 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
 
+	instDatasPublisher := datas.DataPublisher(datas.POST_INST_DATA)
+	igDatasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+
 	for i, instance := range igroup.GetInstances() {
 		data := instance.GetData()
 		if _, ok := data["vmid"]; !ok {
@@ -292,10 +296,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 
 		igroup.Instances[i] = instance
 
-		go datas.Pub(&ipb.ObjectData{
-			Uuid: instance.Uuid,
-			Data: instance.Data,
-		})
+		go instDatasPublisher(instance.Uuid, instance.Data)
 	}
 
 	data := igroup.GetData()
@@ -310,10 +311,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	}
 
 	igroup.Data = make(map[string]*structpb.Value)
-	go datas.IGPub(&ipb.ObjectData{
-		Uuid: igroup.Uuid,
-		Data: igroup.Data,
-	})
+	go igDatasPublisher(igroup.Uuid, igroup.Data)
 
 	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
 	return &pb.DownResponse{Group: igroup}, nil
@@ -362,6 +360,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		} else {
 			log.Debug("Check Instances Group Response", zap.Any("resp", resp))
 
+			datasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+
 			if len(resp.ToBeCreated) > 0 {
 				group := secrets["group"].GetNumberValue()
 
@@ -378,10 +378,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 
 				ig.Data = data
-				datas.IGPub(&ipb.ObjectData{
-					Uuid: ig.Uuid,
-					Data: ig.Data,
-				})
+				datasPublisher(ig.Uuid, ig.Data)
 			}
 
 			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
@@ -413,8 +410,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
 
-	actions.PostServicesProviderState(st)
-	actions.PostServicesProviderPublicData(pd)
+	datasPublisher := datas.DataPublisher(datas.POST_SP_PUBLIC_DATA)
+	statePublisher := datas.StatePublisher(datas.POST_SP_STATE)
+
+	statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
+	datasPublisher(pd.Uuid, pd.PublicData)
 
 	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil

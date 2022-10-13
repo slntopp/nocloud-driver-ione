@@ -500,6 +500,10 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) {
 	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
+
+	instDatasPublisher := datas.DataPublisher(datas.POST_INST_DATA)
+	igDatasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+
 	for _, inst := range resp.ToBeCreated {
 		token, err := auth.MakeTokenInstance(inst.GetUuid())
 		if err != nil {
@@ -513,19 +517,29 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		}
 		c.Chown("vm", vmid, userid, group)
 
-		go datas.Pub(&pb.ObjectData{
-			Uuid: inst.Uuid,
-			Data: inst.Data,
-		})
+		go instDatasPublisher(inst.Uuid, inst.Data)
 	}
 
 	for _, inst := range resp.ToBeDeleted {
+		inst_res := inst.GetResources()
 		vmid, err := GetVMIDFromData(c, inst)
 		if err != nil {
 			c.log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
 		}
 		c.TerminateVM(vmid, true)
+		ips_free := int(data["public_ips_free"].GetNumberValue())
+		ips_total := int(data["public_ips_total"].GetNumberValue())
+
+		ips := int(inst_res["ips_public"].GetNumberValue())
+
+		ips_free_new, _ := structpb.NewValue(ips_free - ips)
+		ips_total_new, _ := structpb.NewValue(ips_total - ips)
+
+		data["public_ips_free"] = ips_free_new
+		data["public_ips_total"] = ips_total_new
+
+		go igDatasPublisher(ig.Uuid, data)
 	}
 
 	for _, inst := range resp.ToBeUpdated {
