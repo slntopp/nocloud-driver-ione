@@ -26,7 +26,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
 
@@ -86,9 +85,7 @@ func main() {
 	}
 	defer rbmq.Close()
 
-	actions.ConfigureStatusesClient(log, rbmq)
 	datas.Configure(log, rbmq)
-	actions.ConfigurePublicDataClient(log, rbmq)
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)

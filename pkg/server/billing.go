@@ -128,10 +128,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 
 	log.Debug("Putting new Records", zap.Any("records", records))
 	go publish(records)
-	go datas.Pub(&ipb.ObjectData{
-		Uuid: i.Uuid,
-		Data: i.Data,
-	})
+	go datas.PostInstData(i.Uuid, i.Data)
 }
 
 type BillingHandlerFunc func(

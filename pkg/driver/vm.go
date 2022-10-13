@@ -513,10 +513,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		}
 		c.Chown("vm", vmid, userid, group)
 
-		go datas.Pub(&pb.ObjectData{
-			Uuid: inst.Uuid,
-			Data: inst.Data,
-		})
+		go datas.PostInstData(inst.Uuid, inst.Data)
 	}
 
 	for _, inst := range resp.ToBeDeleted {

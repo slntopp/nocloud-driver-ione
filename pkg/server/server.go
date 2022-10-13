@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"time"
 
 	redis "github.com/go-redis/redis/v8"
@@ -292,10 +293,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 
 		igroup.Instances[i] = instance
 
-		go datas.Pub(&ipb.ObjectData{
-			Uuid: instance.Uuid,
-			Data: instance.Data,
-		})
+		go datas.PostInstData(instance.Uuid, instance.Data)
 	}
 
 	data := igroup.GetData()
@@ -310,10 +308,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	}
 
 	igroup.Data = make(map[string]*structpb.Value)
-	go datas.IGPub(&ipb.ObjectData{
-		Uuid: igroup.Uuid,
-		Data: igroup.Data,
-	})
+	go datas.PostIGData(igroup.Uuid, igroup.Data)
 
 	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
 	return &pb.DownResponse{Group: igroup}, nil
@@ -378,10 +373,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 
 				ig.Data = data
-				datas.IGPub(&ipb.ObjectData{
-					Uuid: ig.Uuid,
-					Data: ig.Data,
-				})
+				datas.PostIGData(ig.Uuid, ig.Data)
 			}
 
 			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
@@ -413,8 +405,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
 
-	actions.PostServicesProviderState(st)
-	actions.PostServicesProviderPublicData(pd)
+	datas.PostSPState(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
+	datas.PostSPPublicData(pd.Uuid, pd.PublicData)
 
 	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil
