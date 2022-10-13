@@ -634,41 +634,52 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 				}
 			}
 		} else if vmInstIpsPrivate != instIpsPrivate {
-			if vmInstIpsPrivate < instIpsPrivate {
-				networkTemplate := vm.NewTemplate()
-				nic := networkTemplate.AddNIC()
-				nic.Add(shared.NetworkID, private_vn)
-				err = vmc.AttachNIC(networkTemplate.String())
-				if err != nil {
-					c.log.Error("Wrong ip attach")
-				}
-			} else {
-				nics := VM.Template.GetNICs()
+			private_vn_ban, ok := c.vars[PRIVATE_VN_BAN]
+			if !ok {
+				break
+			}
+			private_vn_ban_value, err := GetVarValue(private_vn_ban, "default")
+			if err != nil {
+				break
+			}
 
-				for i := len(nics) - 1; i > 0; i-- {
-					nicId, netType := -1, ""
-					pairs := nics[i].Vector.Pairs
-					for j := 0; j < len(pairs); j++ {
-						if pairs[j].XMLName.Local == "NETWORK" {
-							if strings.Contains(pairs[j].Value, "pub-vnet") {
-								netType = "pub-vnet"
-							} else {
-								netType = "private-vnet"
-							}
-							continue
-						}
-						if pairs[j].XMLName.Local == "NIC_ID" {
-							nicId, _ = strconv.Atoi(pairs[j].Value)
-						}
+			if !private_vn_ban_value.GetBoolValue() {
+				if vmInstIpsPrivate < instIpsPrivate {
+					networkTemplate := vm.NewTemplate()
+					nic := networkTemplate.AddNIC()
+					nic.Add(shared.NetworkID, private_vn)
+					err = vmc.AttachNIC(networkTemplate.String())
+					if err != nil {
+						c.log.Error("Wrong ip attach")
 					}
+				} else {
+					nics := VM.Template.GetNICs()
 
-					if netType == "private-vnet" {
-						err := vmc.DetachNIC(nicId)
-						if err != nil {
-							c.log.Error("id", zap.Int("id", nicId))
-							c.log.Error("Wrong ip detach")
+					for i := len(nics) - 1; i > 0; i-- {
+						nicId, netType := -1, ""
+						pairs := nics[i].Vector.Pairs
+						for j := 0; j < len(pairs); j++ {
+							if pairs[j].XMLName.Local == "NETWORK" {
+								if strings.Contains(pairs[j].Value, "pub-vnet") {
+									netType = "pub-vnet"
+								} else {
+									netType = "private-vnet"
+								}
+								continue
+							}
+							if pairs[j].XMLName.Local == "NIC_ID" {
+								nicId, _ = strconv.Atoi(pairs[j].Value)
+							}
 						}
-						break
+
+						if netType == "private-vnet" {
+							err := vmc.DetachNIC(nicId)
+							if err != nil {
+								c.log.Error("id", zap.Int("id", nicId))
+								c.log.Error("Wrong ip detach")
+							}
+							break
+						}
 					}
 				}
 			}
