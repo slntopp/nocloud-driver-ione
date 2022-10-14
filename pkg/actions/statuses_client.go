@@ -14,10 +14,9 @@ limitations under the License.
 package actions
 
 import (
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
-	s "github.com/slntopp/nocloud/pkg/states"
 	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"strings"
 
@@ -28,18 +27,11 @@ import (
 )
 
 var (
-	log   *zap.Logger
-	Pub   s.Pub
-	SPPub s.Pub
+	log *zap.Logger
 )
 
-func ConfigureStatusesClient(logger *zap.Logger, rbmq *amqp.Connection) {
-	log = logger.Named("States")
-	s := s.NewStatesPubSub(log, nil, rbmq)
-	ch := s.Channel()
-	s.TopicExchange(ch, "states")
-	Pub = s.Publisher(ch, "states", "instances")
-	SPPub = s.Publisher(ch, "states", "sp")
+func ConfigureStatusesClient(logger *zap.Logger) {
+	log = logger.Named("Client statuses")
 }
 
 var STATES_REF = map[int32]stpb.NoCloudState{
@@ -79,7 +71,7 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
-	err = Pub(request)
+	err = datas.StIPub(request)
 	if err != nil {
 		log.Error("Failed to post State", zap.Error(err))
 	}

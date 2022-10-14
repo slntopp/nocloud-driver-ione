@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"net"
 
 	"github.com/go-redis/redis/v8"
@@ -86,6 +87,7 @@ func main() {
 	defer rbmq.Close()
 
 	datas.Configure(log, rbmq)
+	actions.ConfigureStatusesClient(log)
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
