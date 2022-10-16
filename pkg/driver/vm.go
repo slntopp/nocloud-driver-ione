@@ -647,6 +647,15 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 					}
 				}
 			}
+
+			ips_free_new, _ := structpb.NewValue(instIpsPublic)
+			ips_total_new, _ := structpb.NewValue(instIpsPublic)
+
+			data["public_ips_free"] = ips_free_new
+			data["public_ips_total"] = ips_total_new
+
+			go igDatasPublisher(ig.Uuid, data)
+
 		} else if vmInstIpsPrivate != instIpsPrivate {
 			private_vn_ban, ok := c.vars[PRIVATE_VN_BAN]
 			if !ok {
