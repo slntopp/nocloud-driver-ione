@@ -499,10 +499,24 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 
 func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) {
 	data := ig.GetData()
+	res := ig.GetResources()
 	userid := int(data["userid"].GetNumberValue())
 
 	instDatasPublisher := datas.DataPublisher(datas.POST_INST_DATA)
 	igDatasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+
+	ips_res := int(res["ips_public"].GetNumberValue())
+	ips_data := int(data["public_ips_total"].GetNumberValue())
+
+	if ips_res != ips_data{
+		ips_free_new, _ := structpb.NewValue(ips_res)
+		ips_total_new, _ := structpb.NewValue(ips_res)
+	
+		data["public_ips_free"] = ips_free_new
+		data["public_ips_total"] = ips_total_new
+	
+		go igDatasPublisher(ig.Uuid, data)
+	}
 
 	for _, inst := range resp.ToBeCreated {
 		token, err := auth.MakeTokenInstance(inst.GetUuid())
@@ -647,15 +661,6 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 					}
 				}
 			}
-
-			ips_free_new, _ := structpb.NewValue(instIpsPublic)
-			ips_total_new, _ := structpb.NewValue(instIpsPublic)
-
-			data["public_ips_free"] = ips_free_new
-			data["public_ips_total"] = ips_total_new
-
-			go igDatasPublisher(ig.Uuid, data)
-
 		} else if vmInstIpsPrivate != instIpsPrivate {
 			private_vn_ban, ok := c.vars[PRIVATE_VN_BAN]
 			if !ok {
