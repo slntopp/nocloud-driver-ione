@@ -618,6 +618,17 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 				if err != nil {
 					c.log.Error("Wrong ip attach")
 				}
+
+				ips := int(data["public_ips_total"].GetNumberValue())
+
+				ips_free_new, _ := structpb.NewValue(ips + 1)
+				ips_total_new, _ := structpb.NewValue(ips + 1)
+
+				data["public_ips_free"] = ips_free_new
+				data["public_ips_total"] = ips_total_new
+
+				go igDatasPublisher(ig.Uuid, data)
+
 			} else {
 				nics := VM.Template.GetNICs()
 				for i := len(nics) - 1; i > 0; i-- {
@@ -643,6 +654,17 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 							c.log.Error("id", zap.Int("id", nicId))
 							c.log.Error("Wrong ip detach")
 						}
+
+						ips := int(data["public_ips_total"].GetNumberValue())
+
+						ips_free_new, _ := structpb.NewValue(ips - 1)
+						ips_total_new, _ := structpb.NewValue(ips - 1)
+
+						data["public_ips_free"] = ips_free_new
+						data["public_ips_total"] = ips_total_new
+
+						go igDatasPublisher(ig.Uuid, data)
+						
 						break
 					}
 				}
