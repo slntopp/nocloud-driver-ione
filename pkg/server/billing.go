@@ -290,7 +290,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 				Resource: res.Key,
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
-				Total: res.Price,
+				Total: res.Price * amount(),
 				Meta:  md,
 			})
 			last = end
