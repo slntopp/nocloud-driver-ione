@@ -225,6 +225,12 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		desc, _ := tmpl.Template.GetStr("DESCRIPTION")
 		state["desc"] = desc
 
+		state["is_public"] = true
+		nocloud_enable, e := tmpl.Template.GetStr("NOCLOUD_ENABLED")
+		if e == nil && nocloud_enable == "FALSE" {
+			state["is_public"] = false
+		}
+
 		var img *image.Image
 		var img_id int
 		var err error
