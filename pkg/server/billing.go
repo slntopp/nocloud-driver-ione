@@ -255,6 +255,9 @@ func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 
 func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, res *billingpb.ResourceConf, last int64, time utils.IClock) ([]*billingpb.Record, int64) {
 	now := int64(time.Now().Unix())
+	log.Debug("last", zap.Any("last", last))
+	log.Debug("now", zap.Any("now", now))
+	log.Debug("ltl", zap.Any("ltl", ltl()))
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
 
