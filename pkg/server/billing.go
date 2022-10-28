@@ -146,9 +146,9 @@ type BillingHandlerFunc func(
 
 var handlers = BillingMap{
 	handlers: map[string]BillingHandlerFunc{
-		"cpu": handleCPUBilling,
-		"ram": handleRAMBilling,
-		"ip":  handleIPBilling,
+		"cpu":        handleCPUBilling,
+		"ram":        handleRAMBilling,
+		"ips_public": handleIPBilling,
 		// See BillingMap.Get for other handlers
 		// e.g. drive_${driveKind}
 	},
