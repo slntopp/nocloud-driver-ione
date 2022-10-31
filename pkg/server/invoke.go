@@ -20,9 +20,9 @@ import (
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	accesspb "github.com/slntopp/nocloud/pkg/access"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
-	"github.com/slntopp/nocloud/pkg/nocloud/access"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,7 +39,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 
 	method := req.GetMethod()
 
-	if _, ok := actions.AdminActions[method]; ok && (instance.GetAccessLevel() < access.SUDO) {
+	if _, ok := actions.AdminActions[method]; ok && instance.Access.GetLevel() < accesspb.Level_ROOT {
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
