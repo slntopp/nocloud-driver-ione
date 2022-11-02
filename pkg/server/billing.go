@@ -106,7 +106,26 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		new, last := handler(log, timeline, i, vm, resource, client, last, clock)
 
 		if len(new) != 0 {
-			records = append(records, new...)
+			if plan.Kind == billingpb.PlanKind_DYNAMIC {
+				instState := stpb.NoCloudState_INIT
+				if i.State != nil {
+					instState = i.State.State
+				}
+				inStates := false
+
+				for _, val := range resource.On {
+					if val == instState {
+						inStates = true
+						break
+					}
+				}
+
+				if inStates {
+					records = append(records, new...)
+				}
+			} else {
+				records = append(records, new...)
+			}
 			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
 	}
