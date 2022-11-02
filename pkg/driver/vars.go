@@ -30,7 +30,7 @@ var (
 	// OpenNebula Super VNet public IP addresses to be reserved from
 	PUBLIC_IP_POOL = "public_ip_pool"
 	// OpenNebula Super VNet private IP addresses to be reserved from
-	PRIVATE_VN_TEMPLATE = "private_vnet_tmpl"
+	PRIVATE_VN_POOL = "private_vnets_pool"
 	// OpenNebula Super VNet private IP addresses to be reserved from
 	PRIVATE_VN_BAN = "private_vnet_ban"
 

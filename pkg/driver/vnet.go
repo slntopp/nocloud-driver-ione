@@ -88,7 +88,7 @@ func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeV
 
 	vnMad = ""
 	freeVlan = -1
-	if privateVNTmplVar, ok := sp.Vars[PRIVATE_VN_TEMPLATE]; ok {
+	if privateVNTmplVar, ok := sp.Vars[PRIVATE_VN_POOL]; ok {
 		tmplId, err := GetVarValue(privateVNTmplVar, "default")
 		if err != nil {
 			c.log.Error("Can't Reserve Private IPs", zap.Error(err))
@@ -181,7 +181,7 @@ func (c *ONeClient) FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeV
 }
 
 func (c *ONeClient) ReservePrivateIP(u int, vnMad string, vlanID int) (pool_id int, err error) {
-	private_tmpl_id, ok := c.vars[PRIVATE_VN_TEMPLATE]
+	private_tmpl_id, ok := c.vars[PRIVATE_VN_POOL]
 	if !ok {
 		return -1, errors.New("VNet Tmpl ID is not set")
 	}

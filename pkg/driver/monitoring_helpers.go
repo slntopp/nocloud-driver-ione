@@ -171,7 +171,10 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 	state["private_vnet"] = func() (state map[string]interface{}) {
 		state = map[string]interface{}{}
 
-		free_vlans := make(map[string]*big.Int)
+		free_vlans := map[string]*big.Int{
+			"vcenter": big.NewInt(0),
+			"802.1Q":  big.NewInt(0),
+		}
 
 		networks_pull, err := c.ctrl.VirtualNetworks().Info(parameters.PoolWhoAll)
 		if err != nil {
@@ -183,7 +186,6 @@ func MonitorNetworks(log *zap.Logger, c *ONeClient) (res *structpb.Value, err er
 			vn_mad := network.VNMad
 			vlanID, err := strconv.Atoi(network.VlanID)
 			if err != nil {
-				log.Debug("Getting VlanID", zap.Error(err))
 				continue
 			}
 
