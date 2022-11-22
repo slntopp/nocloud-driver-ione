@@ -17,6 +17,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/slntopp/nocloud-proto v0.0.0-20221122151021-7e8158586b2e // indirect
 )
 
 require (

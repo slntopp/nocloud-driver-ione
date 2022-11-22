@@ -10,10 +10,10 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
-	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
-	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
+	billingpb "github.com/slntopp/nocloud-proto/billing"
+	ipb "github.com/slntopp/nocloud-proto/instances"
+	stpb "github.com/slntopp/nocloud-proto/states"
 	"github.com/slntopp/nocloud/pkg/nocloud"
-	"github.com/slntopp/nocloud/pkg/states/proto"
 )
 
 type TestClock struct {
@@ -116,7 +116,7 @@ func TestHandleCapacityBilling(t *testing.T) {
 			amount: func() float64 { return 2.0 },
 			ltl:    func() []one.Record { return []one.Record{{Start: 58, End: 131, State: 1}} },
 			res: &billingpb.ResourceConf{
-				On:     []proto.NoCloudState{1},
+				On:     []stpb.NoCloudState{1},
 				Kind:   1,
 				Period: 60,
 				Price:  1.0,
@@ -131,7 +131,7 @@ func TestHandleCapacityBilling(t *testing.T) {
 			amount: func() float64 { return 2.0 },
 			ltl:    func() []one.Record { return []one.Record{{Start: 61, End: 62, State: 1}} },
 			res: &billingpb.ResourceConf{
-				On:     []proto.NoCloudState{1},
+				On:     []stpb.NoCloudState{1},
 				Kind:   1,
 				Period: 60,
 				Price:  1.0,
@@ -211,7 +211,7 @@ func TestHandleIPBilling(t *testing.T) {
 			i:     &ipb.Instance{Uuid: "1"},
 			ltl:   func() []one.Record { return []one.Record{{Start: 58, End: 131, State: 1}} },
 			res: &billingpb.ResourceConf{
-				On:     []proto.NoCloudState{1},
+				On:     []stpb.NoCloudState{1},
 				Kind:   1,
 				Period: 60,
 				Price:  1.0,

@@ -1,7 +1,7 @@
 package datas
 
 import (
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
+	stpb "github.com/slntopp/nocloud-proto/states"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

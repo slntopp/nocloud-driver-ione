@@ -23,7 +23,7 @@ import (
 	"time"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
-	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
+	ipb "github.com/slntopp/nocloud-proto/instances"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

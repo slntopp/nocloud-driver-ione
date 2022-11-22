@@ -20,22 +20,21 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
-	"time"
-
 	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
+	ipb "github.com/slntopp/nocloud-proto/instances"
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
+	stpb "github.com/slntopp/nocloud-proto/states"
 	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
-	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
-	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+	"time"
 )
 
 var (
