@@ -17,12 +17,12 @@ package datas
 
 import (
 	amqp "github.com/rabbitmq/amqp091-go"
+	ipb "github.com/slntopp/nocloud-proto/instances"
+	pdpb "github.com/slntopp/nocloud-proto/services_providers"
+	stpb "github.com/slntopp/nocloud-proto/states"
 	i "github.com/slntopp/nocloud/pkg/instances"
-	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
 	pd "github.com/slntopp/nocloud/pkg/public_data"
-	pdpb "github.com/slntopp/nocloud/pkg/services_providers/proto"
 	s "github.com/slntopp/nocloud/pkg/states"
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )

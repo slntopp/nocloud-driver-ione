@@ -27,10 +27,10 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
-	"github.com/slntopp/nocloud/pkg/hasher"
-	pb "github.com/slntopp/nocloud/pkg/instances/proto"
+	"github.com/slntopp/nocloud-proto/hasher"
+	pb "github.com/slntopp/nocloud-proto/instances"
+	stpb "github.com/slntopp/nocloud-proto/states"
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -664,7 +664,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 						data["public_ips_total"] = ips_total_new
 
 						go igDatasPublisher(ig.Uuid, data)
-						
+
 						break
 					}
 				}

@@ -23,8 +23,8 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	driver_shared "github.com/slntopp/nocloud-driver-ione/pkg/shared"
-	instpb "github.com/slntopp/nocloud/pkg/instances/proto"
-	pb "github.com/slntopp/nocloud/pkg/instances/proto"
+	instpb "github.com/slntopp/nocloud-proto/instances"
+	pb "github.com/slntopp/nocloud-proto/instances"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 )

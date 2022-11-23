@@ -16,8 +16,8 @@ package actions
 import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
-	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
+	ipb "github.com/slntopp/nocloud-proto/instances"
+	stpb "github.com/slntopp/nocloud-proto/states"
 	"strings"
 
 	"go.uber.org/zap"

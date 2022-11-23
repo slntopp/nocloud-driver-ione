@@ -31,8 +31,8 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
-	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
+	billingpb "github.com/slntopp/nocloud-proto/billing"
+	pb "github.com/slntopp/nocloud-proto/drivers/instance/vanilla"
 )
 
 var (

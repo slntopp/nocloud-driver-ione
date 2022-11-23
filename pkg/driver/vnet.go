@@ -23,7 +23,7 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
-	sppb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

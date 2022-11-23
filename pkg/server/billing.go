@@ -11,9 +11,9 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
-	billingpb "github.com/slntopp/nocloud/pkg/billing/proto"
-	ipb "github.com/slntopp/nocloud/pkg/instances/proto"
-	stpb "github.com/slntopp/nocloud/pkg/states/proto"
+	billingpb "github.com/slntopp/nocloud-proto/billing"
+	ipb "github.com/slntopp/nocloud-proto/instances"
+	stpb "github.com/slntopp/nocloud-proto/states"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 

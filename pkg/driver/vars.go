@@ -18,7 +18,7 @@ package one
 import (
 	"fmt"
 
-	"github.com/slntopp/nocloud/pkg/services_providers/proto"
+	"github.com/slntopp/nocloud-proto/services_providers"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -48,7 +48,7 @@ var (
 	MAX_DRIVE_SIZE = "max_drive_size"
 )
 
-func GetVarValue(in *proto.Var, key string) (r *structpb.Value, err error) {
+func GetVarValue(in *services_providers.Var, key string) (r *structpb.Value, err error) {
 	let := in.GetValue()
 	r, ok := let[key]
 	if ok {

@@ -27,7 +27,7 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
-	pb "github.com/slntopp/nocloud/pkg/instances/proto"
+	pb "github.com/slntopp/nocloud-proto/instances"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"

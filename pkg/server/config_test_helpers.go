@@ -5,13 +5,13 @@ import (
 	"strings"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
-	"github.com/slntopp/nocloud/pkg/instances/proto"
+	ipb "github.com/slntopp/nocloud-proto/instances"
 	"go.uber.org/zap"
 
-	pb "github.com/slntopp/nocloud/pkg/services_providers/proto"
+	pb "github.com/slntopp/nocloud-proto/services_providers"
 )
 
-func EnsureSPLimits(log *zap.Logger, instance *proto.Instance, sp *pb.ServicesProvider) error {
+func EnsureSPLimits(log *zap.Logger, instance *ipb.Instance, sp *pb.ServicesProvider) error {
 	log.Debug("Running bounds check")
 	resources := instance.GetResources()
 	size, ok := resources["drive_size"]
