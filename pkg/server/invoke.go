@@ -20,9 +20,9 @@ import (
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	accesspb "github.com/slntopp/nocloud-proto/access"
+	pb "github.com/slntopp/nocloud-proto/drivers/instance/vanilla"
 	ipb "github.com/slntopp/nocloud-proto/instances"
-	accesspb "github.com/slntopp/nocloud/pkg/access"
-	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

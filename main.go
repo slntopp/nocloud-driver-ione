@@ -32,7 +32,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	billingpb "github.com/slntopp/nocloud-proto/billing"
-	pb "github.com/slntopp/nocloud/pkg/drivers/instance/vanilla"
+	pb "github.com/slntopp/nocloud-proto/drivers/instance/vanilla"
 )
 
 var (
