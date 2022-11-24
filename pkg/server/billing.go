@@ -296,8 +296,9 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 						Resource: res.Key,
 						Instance: i.GetUuid(),
 						Start:    rec.Start, End: rec.End,
-						Exec:  rec.End,
-						Total: float64((rec.End-rec.Start)/res.Period) * res.Price * amount(),
+						Priority: billingpb.Priority_NORMAL,
+						Exec:     rec.End,
+						Total:    float64((rec.End-rec.Start)/res.Period) * res.Price * amount(),
 					})
 				}
 			}
@@ -312,8 +313,9 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 				Resource: res.Key,
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
-				Total: res.Price * amount(),
-				Meta:  md,
+				Priority: billingpb.Priority_URGENT,
+				Total:    res.Price * amount(),
+				Meta:     md,
 			})
 			last = end
 		}
@@ -338,7 +340,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billi
 				Product:  *i.Product,
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
-				Total: product.Price,
+				Priority: billingpb.Priority_NORMAL,
+				Total:    product.Price,
 			})
 		}
 	} else {
@@ -349,7 +352,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billi
 				Product:  *i.Product,
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
-				Total: product.Price,
+				Priority: billingpb.Priority_URGENT,
+				Total:    product.Price,
 			})
 			last = end
 		}
