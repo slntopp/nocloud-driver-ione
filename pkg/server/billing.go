@@ -132,13 +132,15 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 
 	if plan.Kind == billingpb.PlanKind_STATIC {
 		var last int64
+		var priority billingpb.Priority
 		if _, ok := i.Data["last_monitoring"]; ok {
 			last = int64(i.Data["last_monitoring"].GetNumberValue())
+			priority = billingpb.Priority_URGENT
 		} else {
 			last = created
+			priority = billingpb.Priority_NORMAL
 		}
-
-		new, last := handleStaticBilling(log, i, last)
+		new, last := handleStaticBilling(log, i, last, priority)
 		if len(new) != 0 {
 			records = append(records, new...)
 			i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
@@ -322,7 +324,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 	return records, last
 }
 
-func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billingpb.Record, int64) {
+func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority billingpb.Priority) ([]*billingpb.Record, int64) {
 	log.Debug("Handling Static Billing", zap.Int64("last", last))
 	product, ok := i.BillingPlan.Products[*i.Product]
 	if !ok {
@@ -338,7 +340,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billi
 				Product:  *i.Product,
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
-				Total: product.Price,
+				Priority: billingpb.Priority_NORMAL,
+				Total:    product.Price,
 			})
 		}
 	} else {
@@ -349,7 +352,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64) ([]*billi
 				Product:  *i.Product,
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
-				Total: product.Price,
+				Priority: priority,
+				Total:    product.Price,
 			})
 			last = end
 		}
