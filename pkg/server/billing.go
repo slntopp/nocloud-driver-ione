@@ -135,10 +135,10 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		var priority billingpb.Priority
 		if _, ok := i.Data["last_monitoring"]; ok {
 			last = int64(i.Data["last_monitoring"].GetNumberValue())
-			priority = billingpb.Priority_URGENT
+			priority = billingpb.Priority_NORMAL
 		} else {
 			last = created
-			priority = billingpb.Priority_NORMAL
+			priority = billingpb.Priority_URGENT
 		}
 		new, last := handleStaticBilling(log, i, last, priority)
 		if len(new) != 0 {
