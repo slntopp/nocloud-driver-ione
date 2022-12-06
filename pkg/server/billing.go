@@ -313,6 +313,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			records = append(records, &billingpb.Record{
 				Resource: res.Key,
 				Instance: i.GetUuid(),
+				Priority: billingpb.Priority_URGENT,
 				Start:    last, End: end, Exec: last,
 				Total: res.Price * amount(),
 				Meta:  md,
