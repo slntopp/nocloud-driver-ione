@@ -401,6 +401,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		s.rdb.HDel(ctx, redisKey, igKeys...)
 	}
 
+	datasPublisher := datas.DataPublisher(datas.POST_SP_PUBLIC_DATA)
+	statePublisher := datas.StatePublisher(datas.POST_SP_STATE)
+
 	st, pd, err := client.MonitorLocation(sp)
 	if err != nil {
 		log.Error("Error Monitoring Location(ServicesProvider)", zap.String("sp", sp.GetUuid()), zap.Error(err))
@@ -408,9 +411,6 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	}
 
 	log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
-
-	datasPublisher := datas.DataPublisher(datas.POST_SP_PUBLIC_DATA)
-	statePublisher := datas.StatePublisher(datas.POST_SP_STATE)
 
 	statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
 	datasPublisher(pd.Uuid, pd.PublicData)
