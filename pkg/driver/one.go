@@ -183,9 +183,11 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (st *LocationStat
 
 	templatesState, err := MonitorTemplates(log.Named("MonitorTemplates"), c)
 	if err != nil {
-		templatesState, _ = structpb.NewValue(map[string]interface{}{
+		st.State = stpb.NoCloudState_UNKNOWN
+		templatesErr, _ := structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
 		})
+		st.Meta["templates"] = templatesErr
 	}
 	pd.PublicData["templates"] = templatesState
 
