@@ -156,6 +156,7 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (st *LocationStat
 
 	hostsState, err := MonitorHostsPool(log.Named("MonitorHostsPool"), c)
 	if err != nil {
+		log.Warn("Error retrieving Hosts", zap.String("warn", err.Error()))
 		st.State = stpb.NoCloudState_FAILURE
 		hostsState, _ = structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
@@ -165,6 +166,7 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (st *LocationStat
 
 	dssState, err := MonitorDatastoresPool(log.Named("MonitorDatastoresPool"), c)
 	if err != nil {
+		log.Warn("Error retrieving Datastores", zap.String("warn", err.Error()))
 		st.State = stpb.NoCloudState_UNKNOWN
 		dssState, _ = structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
@@ -174,6 +176,7 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (st *LocationStat
 
 	netsState, err := MonitorNetworks(log.Named("MonitorNetworks"), c)
 	if err != nil {
+		log.Warn("Error retrieving Networks", zap.String("warn", err.Error()))
 		st.State = stpb.NoCloudState_UNKNOWN
 		netsState, _ = structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
@@ -183,7 +186,7 @@ func (c *ONeClient) MonitorLocation(sp *sppb.ServicesProvider) (st *LocationStat
 
 	templatesState, err := MonitorTemplates(log.Named("MonitorTemplates"), c)
 	if err != nil {
-		log.Error("Error", zap.Error(err))
+		log.Warn("Error retrieving Templates", zap.String("warn", err.Error()))
 		st.State = stpb.NoCloudState_UNKNOWN
 		templatesErr, _ := structpb.NewValue(map[string]interface{}{
 			"error": err.Error(),
