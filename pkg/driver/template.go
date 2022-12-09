@@ -23,7 +23,6 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	driver_shared "github.com/slntopp/nocloud-driver-ione/pkg/shared"
-	instpb "github.com/slntopp/nocloud-proto/instances"
 	pb "github.com/slntopp/nocloud-proto/instances"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -43,7 +42,7 @@ func (c *ONeClient) ListTemplates() ([]tmpl.Template, error) {
 	return p.Templates, nil
 }
 
-func (c *ONeClient) InstantiateTemplateHelper(instance *instpb.Instance, ig *pb.InstancesGroup, token string) (vmid int, err error) {
+func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.InstancesGroup, token string) (vmid int, err error) {
 	group_data := ig.GetData()
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
