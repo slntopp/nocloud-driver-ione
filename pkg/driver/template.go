@@ -37,7 +37,7 @@ func (c *ONeClient) ListTemplates() ([]tmpl.Template, error) {
 	tc := c.ctrl.Templates()
 	p, err := tc.Info()
 	if err != nil {
-		c.log.Debug("Error while listing Templates", zap.Error(err))
+		c.log.Named("Templates").Debug("Error while listing Templates", zap.Error(err))
 		return nil, err
 	}
 	return p.Templates, nil
