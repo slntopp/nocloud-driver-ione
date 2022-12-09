@@ -16,10 +16,12 @@ limitations under the License.
 package one
 
 import (
+	"errors"
 	"fmt"
-	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"math/big"
 	"strconv"
+
+	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/host"
@@ -267,7 +269,7 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		img_id, _ = tmpl.Template.GetDisks()[0].GetInt("IMAGE_ID")
 		img, err = c.GetImage(img_id)
 		if err != nil {
-			state["warning"] = fmt.Errorf("error getting image %d: %s", img_id, err)
+			state["warning"] = fmt.Sprintf("error getting image %d: %s", img_id, err)
 			goto store
 		}
 
