@@ -28,7 +28,6 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
 	vnet "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/virtualnetwork"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
-	instpb "github.com/slntopp/nocloud-proto/instances"
 	pb "github.com/slntopp/nocloud-proto/instances"
 	sppb "github.com/slntopp/nocloud-proto/services_providers"
 	stpb "github.com/slntopp/nocloud-proto/states"
@@ -37,7 +36,7 @@ import (
 )
 
 type IClient interface {
-	CheckInstancesGroup(IG *instpb.InstancesGroup) (*CheckInstancesGroupResponse, error)
+	CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesGroupResponse, error)
 	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int)
 	Chmod(class string, oid int, perm *shared.Permissions) error
 	Chown(class string, oid, uid, gid int) error
@@ -46,21 +45,21 @@ type IClient interface {
 	DeleteUserAndVNets(id int) error
 	DeleteVNet(id int) error
 	FindFreeVlan(sp *sppb.ServicesProvider) (vnMad string, freeVlan int, err error)
-	FindVMByInstance(inst *instpb.Instance) (*vm.VM, error)
+	FindVMByInstance(inst *pb.Instance) (*vm.VM, error)
 	GetGroup(id int) (*group.Group, error)
 	GetImage(id int) (*img.Image, error)
-	GetInstSnapshots(inst *instpb.Instance) (map[string]interface{}, error)
+	GetInstSnapshots(inst *pb.Instance) (map[string]interface{}, error)
 	GetSecrets() map[string]*structpb.Value
 	GetTemplate(id int) (*tmpl.Template, error)
 	GetUser(id int) (*user.User, error)
 	GetUserPrivateVNet(user int) (id int, err error)
 	GetUserPublicVNet(user int) (id int, err error)
-	GetUserVMsInstancesGroup(userId int) (*instpb.InstancesGroup, error)
+	GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, error)
 	GetVM(vmid int) (*vm.VM, error)
 	GetVMByName(name string) (id int, err error)
 	GetVNet(id int) (*vnet.VirtualNetwork, error)
 	InstantiateTemplate(id int, vmname, tmpl string, pending bool) (vmid int, err error)
-	InstantiateTemplateHelper(instance *instpb.Instance, ig *pb.InstancesGroup, token string) (vmid int, err error)
+	InstantiateTemplateHelper(instance *pb.Instance, ig *pb.InstancesGroup, token string) (vmid int, err error)
 	ListImages() ([]img.Image, error)
 	ListTemplates() ([]tmpl.Template, error)
 	Logger(n string) *zap.Logger
@@ -84,7 +83,7 @@ type IClient interface {
 	TerminateVM(id int, hard bool) error
 	UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error
 	UserAddAttribute(id int, data map[string]interface{}) error
-	VMToInstance(id int) (*instpb.Instance, error)
+	VMToInstance(id int) (*pb.Instance, error)
 }
 
 type ONeClient struct {
