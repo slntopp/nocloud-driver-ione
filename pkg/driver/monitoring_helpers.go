@@ -277,5 +277,10 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		templates[strconv.Itoa(tmpl.ID)] = state
 	}
 
-	return structpb.NewValue(templates)
+	result, err := structpb.NewValue(templates)
+	if err != nil {
+		log.Warn("Error Marshaling TemplatesMonitoring", zap.Any("templates", templates), zap.Error(err))
+		return nil, errors.New("JSON generate error")
+	}
+	return result, nil
 }
