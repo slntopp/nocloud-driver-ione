@@ -18,7 +18,7 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -341,7 +341,7 @@ func StartVNC(
 	}
 	defer res.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Warn("Error reading response body", zap.Error(err))
 		return nil, status.Error(codes.Internal, "Cannot read Body")
