@@ -69,6 +69,11 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		return
 	}
 
+	_, state, _, _, err := client.StateVM(vmid)
+	if err != nil {
+		log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
+	}
+
 	vm := GetVM(func() (*onevm.VM, error) { return client.GetVM(vmid) })
 	var created int64
 	if _, ok := i.Data[shared.VM_CREATED]; ok {
@@ -150,7 +155,22 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 	publisher := datas.DataPublisher(datas.POST_INST_DATA)
 
 	log.Debug("Putting new Records", zap.Any("records", records))
-	go publish(records)
+
+	if status == ipb.InstanceStatus_SUS {
+		if len(records) != 0 && state != "SUSPENDED" {
+			if err := client.SuspendVM(vmid); err != nil {
+				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+			}
+		}
+	} else {
+		if state == "SUSPENDED" {
+			if err := client.ResumeVM(vmid); err != nil {
+				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
+			}
+		}
+		go publish(records)
+	}
+
 	go publisher(i.Uuid, i.Data)
 }
 
