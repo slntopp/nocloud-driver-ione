@@ -387,11 +387,6 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 		igStatus := ig.GetStatus()
 
-		for _, inst := range ig.GetInstances() {
-			l.Debug("Suspend/unsuspend instance", zap.String("instance", inst.GetUuid()))
-			suspendMonitoring(log, client, inst, igStatus)
-		}
-
 		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))
 		for _, inst := range ig.GetInstances() {
 			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
@@ -400,7 +395,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
 
-			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst)
+			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst, igStatus)
 		}
 	}
 

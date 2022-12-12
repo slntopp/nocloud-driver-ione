@@ -53,7 +53,7 @@ type LazyTimeline func() []one.Record
 
 type RecordsPublisherFunc func([]*billingpb.Record)
 
-func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client one.IClient, i *ipb.Instance) {
+func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
