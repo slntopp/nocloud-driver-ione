@@ -92,7 +92,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		return one.MakeTimeline(o)
 	})
 
-	var records []*billingpb.Record
+	var productRecords, resourceRecords []*billingpb.Record
 
 	for _, resource := range plan.Resources {
 		var last int64
@@ -126,10 +126,10 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 				}
 
 				if inStates {
-					records = append(records, new...)
+					resourceRecords = append(resourceRecords, new...)
 				}
 			} else {
-				records = append(records, new...)
+				resourceRecords = append(resourceRecords, new...)
 			}
 			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
@@ -147,19 +147,19 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		}
 		new, last := handleStaticBilling(log, i, last, priority)
 		if len(new) != 0 {
-			records = append(records, new...)
+			productRecords = append(productRecords, new...)
 			i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
 	}
 
 	publisher := datas.DataPublisher(datas.POST_INST_DATA)
 
-	log.Debug("Putting new Records", zap.Any("records", records))
+	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
 
 	if status == ipb.InstanceStatus_SUS {
 		now := time.Now().Unix()
 		nowPb := structpb.NewNumberValue(float64(now))
-		if len(records) != 0 && state != "SUSPENDED" {
+		if len(productRecords) != 0 && state != "SUSPENDED" {
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
@@ -177,9 +177,10 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
 		}
-		go publish(records)
 	}
 
+	go publish(productRecords)
+	go publish(resourceRecords)
 	go publisher(i.Uuid, i.Data)
 }
 
