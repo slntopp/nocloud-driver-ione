@@ -157,11 +157,20 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 	log.Debug("Putting new Records", zap.Any("records", records))
 
 	if status == ipb.InstanceStatus_SUS {
+		now := time.Now().Unix()
+		nowPb := structpb.NewNumberValue(float64(now))
 		if len(records) != 0 && state != "SUSPENDED" {
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
 		}
+
+		for key := range i.Data {
+			if strings.HasSuffix(key, "monitoring") {
+				i.Data[key] = nowPb
+			}
+		}
+
 	} else {
 		if state == "SUSPENDED" {
 			if err := client.ResumeVM(vmid); err != nil {
