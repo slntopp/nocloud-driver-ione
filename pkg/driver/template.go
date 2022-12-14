@@ -97,7 +97,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.Inst
 	if resources["cpu"] == nil {
 		return 0, errors.New("amount of CPU is not given")
 	}
-	tmpl.VCPU(int(resources["cpu"].GetNumberValue()))
+	tmpl.CPU(resources["cpu"].GetNumberValue())
 
 	// Set RAM, must be provided by instance resources config
 	if resources["ram"] == nil {
