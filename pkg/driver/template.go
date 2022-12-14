@@ -87,17 +87,18 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.Inst
 	data[DATA_VM_NAME] = structpb.NewStringValue(vmname)
 
 	// Set VCPU, is 1 by default
-	vcpu := 1
+	/*vcpu := 1
 	if resources["vcpu"] != nil {
 		vcpu = int(resources["vcpu"].GetNumberValue())
-	}
-	tmpl.VCPU(vcpu)
+	}*/
+
+	tmpl.CPU(1)
 
 	// Set CPU, must be provided by instance resources config
 	if resources["cpu"] == nil {
 		return 0, errors.New("amount of CPU is not given")
 	}
-	tmpl.CPU(resources["cpu"].GetNumberValue())
+	tmpl.VCPU(int(resources["cpu"].GetNumberValue()))
 
 	// Set RAM, must be provided by instance resources config
 	if resources["ram"] == nil {
