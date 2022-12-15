@@ -53,7 +53,7 @@ type LazyTimeline func() []one.Record
 
 type RecordsPublisherFunc func([]*billingpb.Record)
 
-func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client one.IClient, i *ipb.Instance) {
+func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
@@ -67,6 +67,11 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 	if err != nil {
 		log.Error("Failed to get VM ID", zap.Error(err))
 		return
+	}
+
+	_, state, _, _, err := client.StateVM(vmid)
+	if err != nil {
+		log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
 	}
 
 	vm := GetVM(func() (*onevm.VM, error) { return client.GetVM(vmid) })
@@ -87,7 +92,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		return one.MakeTimeline(o)
 	})
 
-	var records []*billingpb.Record
+	var productRecords, resourceRecords []*billingpb.Record
 
 	for _, resource := range plan.Resources {
 		var last int64
@@ -121,10 +126,10 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 				}
 
 				if inStates {
-					records = append(records, new...)
+					resourceRecords = append(resourceRecords, new...)
 				}
 			} else {
-				records = append(records, new...)
+				resourceRecords = append(resourceRecords, new...)
 			}
 			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
@@ -142,15 +147,43 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		}
 		new, last := handleStaticBilling(log, i, last, priority)
 		if len(new) != 0 {
-			records = append(records, new...)
+			productRecords = append(productRecords, new...)
 			i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
 	}
 
 	publisher := datas.DataPublisher(datas.POST_INST_DATA)
 
-	log.Debug("Putting new Records", zap.Any("records", records))
-	go publish(records)
+	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
+
+	if status == ipb.InstanceStatus_SUS {
+		_, isStatic := i.Data["last_monitoring"]
+		if (len(productRecords) != 0 || (len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
+			if err := client.SuspendVM(vmid); err != nil {
+				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+			}
+		}
+
+		if state == "SUSPENDED" {
+			now := time.Now().Unix()
+			nowPb := structpb.NewNumberValue(float64(now))
+			for key := range i.Data {
+				if strings.HasSuffix(key, "monitoring") {
+					i.Data[key] = nowPb
+				}
+			}
+		}
+
+	} else {
+		if state == "SUSPENDED" {
+			if err := client.ResumeVM(vmid); err != nil {
+				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
+			}
+		}
+	}
+
+	go publish(productRecords)
+	go publish(resourceRecords)
 	go publisher(i.Uuid, i.Data)
 }
 
