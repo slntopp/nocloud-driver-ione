@@ -247,7 +247,7 @@ func handleDriveBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm L
 			driveType, _ := disk.GetStr("DRIVE_TYPE")
 
 			if driveType == driveKind {
-				total += capacity / 1000
+				total += capacity / 1024
 			}
 		}
 		return total
