@@ -244,11 +244,11 @@ func (c *ONeClient) VMToInstance(id int) (*pb.Instance, error) {
 	}
 cpu:
 	{
-		cpu, err := tmpl.GetCPU()
+		cpu, err := tmpl.GetVCPU()
 		if err != nil {
 			return nil, err
 		}
-		inst.Resources["cpu"] = structpb.NewNumberValue(cpu)
+		inst.Resources["cpu"] = structpb.NewNumberValue(float64(cpu))
 	}
 	{
 		ram, err := tmpl.GetMemory()
