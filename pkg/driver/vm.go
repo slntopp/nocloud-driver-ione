@@ -570,7 +570,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		}
 		tmpl := vm.NewTemplate()
 		if vmInst.Resources["cpu"].GetNumberValue() != inst.Resources["cpu"].GetNumberValue() {
-			tmpl.CPU(inst.Resources["cpu"].GetNumberValue())
+			tmpl.VCPU(int(inst.Resources["cpu"].GetNumberValue()))
 			updated = append(updated, "cpu")
 		}
 
