@@ -125,7 +125,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 					}
 				}
 
-				if inStates {
+				if inStates || (!inStates && resource.Except) {
 					resourceRecords = append(resourceRecords, new...)
 				}
 			} else {
