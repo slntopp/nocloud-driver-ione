@@ -292,8 +292,8 @@ func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Lazy
 func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.IClient, last int64, clock utils.IClock) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	cpu := Lazy(func() float64 {
-		cpu, _ := o.Template.GetCPU()
-		return cpu
+		cpu, _ := o.Template.GetVCPU()
+		return float64(cpu)
 	})
 	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, res, last, clock)
 }
@@ -309,22 +309,27 @@ func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 
 func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, res *billingpb.ResourceConf, last int64, time utils.IClock) ([]*billingpb.Record, int64) {
 	now := int64(time.Now().Unix())
+	log.Debug("data", zap.Any("data", i.GetData()))
 	log.Debug("last", zap.Any("last", last))
 	log.Debug("now", zap.Any("now", now))
-	log.Debug("ltl", zap.Any("ltl", ltl()))
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
 
-	log.Debug("Handling Capacity Billing", zap.Any("timeline", ltl()), zap.Any("filtered", timeline))
-
 	if res.Kind == billingpb.Kind_POSTPAID {
+		log.Info("IAm here")
 		on := make(map[stpb.NoCloudState]bool)
 		for _, s := range res.On {
 			on[s] = true
 		}
 
-		for end := last + res.Period; end <= int64(time.Now().Unix()); end += res.Period {
+		log.Info("l + per", zap.Any("t", last+res.Period))
+		log.Info("now", zap.Any("t", time.Now().Unix()))
+		log.Info("after", zap.Any("t", last+res.Period+res.Period))
+
+		for end := last + res.Period; end <= time.Now().Unix(); end += res.Period {
 			tl := one.FilterTimeline(timeline, last, end)
+			log.Info("end", zap.Any("end", end))
+			log.Info("tl", zap.Any("tl", tl))
 			for _, rec := range tl {
 				if _, ok := on[rec.State]; ok != res.Except {
 					records = append(records, &billingpb.Record{
