@@ -165,15 +165,12 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		}
 
 		if state == "SUSPENDED" {
-			now := time.Now().Unix()
-			nowPb := structpb.NewNumberValue(float64(now))
-			for key := range i.Data {
-				if strings.HasSuffix(key, "monitoring") {
-					i.Data[key] = nowPb
-				}
+			if _, ok := i.Data["last_monitoring"]; ok {
+				now := time.Now().Unix()
+				nowPb := structpb.NewNumberValue(float64(now))
+				i.Data["last_monitoring"] = nowPb
 			}
 		}
-
 	} else {
 		if state == "SUSPENDED" {
 			if err := client.ResumeVM(vmid); err != nil {
@@ -308,28 +305,18 @@ func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 }
 
 func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, res *billingpb.ResourceConf, last int64, time utils.IClock) ([]*billingpb.Record, int64) {
-	now := int64(time.Now().Unix())
-	log.Debug("data", zap.Any("data", i.GetData()))
-	log.Debug("last", zap.Any("last", last))
-	log.Debug("now", zap.Any("now", now))
+	now := time.Now().Unix()
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
 
 	if res.Kind == billingpb.Kind_POSTPAID {
-		log.Info("IAm here")
 		on := make(map[stpb.NoCloudState]bool)
 		for _, s := range res.On {
 			on[s] = true
 		}
 
-		log.Info("l + per", zap.Any("t", last+res.Period))
-		log.Info("now", zap.Any("t", time.Now().Unix()))
-		log.Info("after", zap.Any("t", last+res.Period+res.Period))
-
 		for end := last + res.Period; end <= time.Now().Unix(); end += res.Period {
 			tl := one.FilterTimeline(timeline, last, end)
-			log.Info("end", zap.Any("end", end))
-			log.Info("tl", zap.Any("tl", tl))
 			for _, rec := range tl {
 				if _, ok := on[rec.State]; ok != res.Except {
 					records = append(records, &billingpb.Record{
@@ -344,7 +331,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			last = end
 		}
 	} else {
-		for end := last + res.Period; last <= int64(time.Now().Unix()); end += res.Period {
+		for end := last + res.Period; last <= time.Now().Unix(); end += res.Period {
 			md := map[string]*structpb.Value{
 				"instance_title": structpb.NewStringValue(i.GetTitle()),
 			}

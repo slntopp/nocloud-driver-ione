@@ -854,11 +854,11 @@ func MakeTimelineRecords(r vm.HistoryRecord) (res []Record) {
 	res = append(res, MakeRecord(r.RSTime, r.RETime, stpb.NoCloudState_RUNNING))
 	switch r.Action {
 	case 9, 10: // suspended
-		res = append(res, MakeRecord(r.RETime, r.RETime, stpb.NoCloudState_SUSPENDED))
+		res = append(res, MakeRecord(r.RETime, 0, stpb.NoCloudState_SUSPENDED))
 	case 20: // powered off
-		res = append(res, MakeRecord(r.RETime, r.RETime, stpb.NoCloudState_STOPPED))
+		res = append(res, MakeRecord(r.RETime, 0, stpb.NoCloudState_STOPPED))
 	case 27, 28: // terminated (hard)
-		res = append(res, MakeRecord(r.RETime, r.RETime, stpb.NoCloudState_DELETED))
+		res = append(res, MakeRecord(r.RETime, 0, stpb.NoCloudState_DELETED))
 	}
 
 	return res
