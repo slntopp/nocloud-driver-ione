@@ -23,6 +23,7 @@ import (
 	accesspb "github.com/slntopp/nocloud-proto/access"
 	pb "github.com/slntopp/nocloud-proto/drivers/instance/vanilla"
 	ipb "github.com/slntopp/nocloud-proto/instances"
+	"github.com/slntopp/nocloud-proto/services_providers"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,4 +50,23 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
 	}
 	return action(client, instance, req.GetParams())
+}
+
+func (s *DriverServiceServer) SpPrep(ctx context.Context, req *services_providers.PrepSP) (res *services_providers.PrepSP, err error) {
+	log := s.log.Named("ServicesProvider Preparation")
+	log.Debug("ServicesProvider Preparation request received", zap.Any("sp", req.Sp), zap.Any("extra", req.Extra))
+
+	sp := req.GetSp()
+	client, err := one.NewClientFromSP(sp, log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
+
+	state, _, err := client.MonitorLocation(sp)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error gathering Data: %v", err)
+	}
+	req.Extra = state.Meta
+
+	return req, nil
 }
