@@ -17,6 +17,7 @@ package one
 
 import (
 	"errors"
+	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	tmpl "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/template"
@@ -35,7 +36,7 @@ func (c *ONeClient) GetTemplate(id int) (*tmpl.Template, error) {
 
 func (c *ONeClient) ListTemplates() ([]tmpl.Template, error) {
 	tc := c.ctrl.Templates()
-	p, err := tc.Info()
+	p, err := tc.Info(parameters.PoolWhoAll)
 	if err != nil {
 		c.log.Named("Templates").Debug("Error while listing Templates", zap.Error(err))
 		return nil, err
