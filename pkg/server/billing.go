@@ -125,7 +125,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 					}
 				}
 
-				if inStates {
+				if inStates || (!inStates && resource.Except) {
 					resourceRecords = append(resourceRecords, new...)
 				}
 			} else {
@@ -165,15 +165,12 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 		}
 
 		if state == "SUSPENDED" {
-			now := time.Now().Unix()
-			nowPb := structpb.NewNumberValue(float64(now))
-			for key := range i.Data {
-				if strings.HasSuffix(key, "monitoring") {
-					i.Data[key] = nowPb
-				}
+			if _, ok := i.Data["last_monitoring"]; ok {
+				now := time.Now().Unix()
+				nowPb := structpb.NewNumberValue(float64(now))
+				i.Data["last_monitoring"] = nowPb
 			}
 		}
-
 	} else {
 		if state == "SUSPENDED" {
 			if err := client.ResumeVM(vmid); err != nil {
@@ -292,8 +289,8 @@ func handleIPBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Lazy
 func handleCPUBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm LazyVM, res *billingpb.ResourceConf, c one.IClient, last int64, clock utils.IClock) ([]*billingpb.Record, int64) {
 	o, _ := vm()
 	cpu := Lazy(func() float64 {
-		cpu, _ := o.Template.GetCPU()
-		return cpu
+		cpu, _ := o.Template.GetVCPU()
+		return float64(cpu)
 	})
 	return handleCapacityBilling(log.Named("CPU"), cpu, ltl, i, res, last, clock)
 }
@@ -308,14 +305,9 @@ func handleRAMBilling(log *zap.Logger, ltl LazyTimeline, i *ipb.Instance, vm Laz
 }
 
 func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimeline, i *ipb.Instance, res *billingpb.ResourceConf, last int64, time utils.IClock) ([]*billingpb.Record, int64) {
-	now := int64(time.Now().Unix())
-	log.Debug("last", zap.Any("last", last))
-	log.Debug("now", zap.Any("now", now))
-	log.Debug("ltl", zap.Any("ltl", ltl()))
+	now := time.Now().Unix()
 	timeline := one.FilterTimeline(ltl(), last, now)
 	var records []*billingpb.Record
-
-	log.Debug("Handling Capacity Billing", zap.Any("timeline", ltl()), zap.Any("filtered", timeline))
 
 	if res.Kind == billingpb.Kind_POSTPAID {
 		on := make(map[stpb.NoCloudState]bool)
@@ -323,7 +315,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			on[s] = true
 		}
 
-		for end := last + res.Period; end <= int64(time.Now().Unix()); end += res.Period {
+		for end := last + res.Period; end <= time.Now().Unix(); end += res.Period {
 			tl := one.FilterTimeline(timeline, last, end)
 			for _, rec := range tl {
 				if _, ok := on[rec.State]; ok != res.Except {
@@ -339,7 +331,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			last = end
 		}
 	} else {
-		for end := last + res.Period; last <= int64(time.Now().Unix()); end += res.Period {
+		for end := last + res.Period; last <= time.Now().Unix(); end += res.Period {
 			md := map[string]*structpb.Value{
 				"instance_title": structpb.NewStringValue(i.GetTitle()),
 			}
