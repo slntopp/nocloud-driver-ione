@@ -903,5 +903,5 @@ func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
 		})
 	}
 
-	return nil
+	return res
 }
