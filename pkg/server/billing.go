@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"sync"
@@ -324,7 +326,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 						Instance: i.GetUuid(),
 						Start:    rec.Start, End: rec.End,
 						Exec:  rec.End,
-						Total: float64((rec.End-rec.Start)/res.Period) * res.Price * amount(),
+						Total: math.Round(float64((rec.End-rec.Start)/res.Period)*res.Price*amount()*100) / 100.0,
 					})
 				}
 			}
@@ -340,7 +342,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 				Instance: i.GetUuid(),
 				Priority: billingpb.Priority_URGENT,
 				Start:    last, End: end, Exec: last,
-				Total: res.Price * amount(),
+				Total: math.Round(res.Price*amount()*100) / 100.0,
 				Meta:  md,
 			})
 			last = end
@@ -367,7 +369,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
 				Priority: billingpb.Priority_NORMAL,
-				Total:    product.Price,
+				Total:    math.Round(product.Price*100) / 100.0,
 			})
 		}
 	} else {
@@ -379,11 +381,62 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
 				Priority: priority,
-				Total:    product.Price,
+				Total:    math.Round(product.Price*100) / 100.0,
 			})
 			last = end
 		}
 	}
 
 	return records, last
+}
+
+func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONeClient, publish RecordsPublisherFunc) {
+	now := time.Now().Unix()
+
+	var records []*billingpb.Record
+
+	publisher := datas.DataPublisher(datas.POST_INST_DATA)
+
+	for _, inst := range instances {
+		plan := inst.GetBillingPlan()
+		if plan == nil {
+			break
+		}
+		resources := plan.GetResources()
+
+		diffSlice := c.GetVmResourcesDiff(inst)
+
+		for _, diff := range diffSlice {
+			for _, res := range resources {
+				if diff.ResName == res.GetKey() {
+
+					log.Info("Billing res", zap.String("res", diff.ResName), zap.Int("diff", diff.ResDiff))
+
+					lastMonitoring := inst.GetData()[fmt.Sprintf("%s_last_monitoring", diff.ResName)].GetNumberValue()
+
+					timeDiff := now - int64(lastMonitoring)
+
+					if timeDiff < 0 {
+						timeDiff += res.GetPeriod()
+					}
+
+					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.ResDiff)
+					total = math.Round(total*100) / 100.0
+
+					records = append(records, &billingpb.Record{
+						Start: int64(lastMonitoring), End: int64(lastMonitoring) + timeDiff, Exec: now,
+						Priority: 1,
+						Instance: inst.GetUuid(),
+						Resource: diff.ResName,
+						Total:    total,
+					})
+
+					inst.Data[fmt.Sprintf("%s_last_monitoring", diff.ResName)] = structpb.NewNumberValue(lastMonitoring + float64(timeDiff))
+				}
+			}
+		}
+		go publisher(inst.GetUuid(), inst.GetData())
+	}
+
+	go publish(records)
 }

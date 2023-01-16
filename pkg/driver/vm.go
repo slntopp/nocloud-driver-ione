@@ -863,3 +863,45 @@ func MakeTimelineRecords(r vm.HistoryRecord) (res []Record) {
 
 	return res
 }
+
+type VmResourceDiff struct {
+	ResName string
+	ResDiff int
+}
+
+func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
+	var res []*VmResourceDiff
+
+	vmid, err := GetVMIDFromData(c, inst)
+	if err != nil {
+		c.log.Error("Error Getting VMID from Data", zap.Error(err))
+
+	}
+
+	vmInst, err := c.VMToInstance(vmid)
+	if err != nil {
+		c.log.Error("Error Converting VM to Instance", zap.Error(err))
+
+	}
+
+	vmInstIpsPublic := int(vmInst.Resources["ips_public"].GetNumberValue())
+	instIpsPublic := int(inst.Resources["ips_public"].GetNumberValue())
+
+	if vmInstIpsPublic != instIpsPublic {
+		res = append(res, &VmResourceDiff{ResName: "ips_public", ResDiff: instIpsPublic - vmInstIpsPublic})
+	}
+
+	vmInstDriveSize := vmInst.Resources["drive_size"].GetNumberValue()
+	instDriveSize := inst.Resources["drive_size"].GetNumberValue()
+
+	if vmInstDriveSize != instDriveSize {
+		driveType := inst.Resources["drive_type"].GetStringValue()
+
+		res = append(res, &VmResourceDiff{
+			ResName: strings.ToLower(fmt.Sprintf("drive_%s", driveType)),
+			ResDiff: int(instDriveSize - vmInstDriveSize),
+		})
+	}
+
+	return res
+}
