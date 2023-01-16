@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"sync"
@@ -325,7 +326,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 						Instance: i.GetUuid(),
 						Start:    rec.Start, End: rec.End,
 						Exec:  rec.End,
-						Total: float64((rec.End-rec.Start)/res.Period) * res.Price * amount(),
+						Total: math.Round(float64((rec.End-rec.Start)/res.Period)*res.Price*amount()*100) / 100.0,
 					})
 				}
 			}
@@ -341,7 +342,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 				Instance: i.GetUuid(),
 				Priority: billingpb.Priority_URGENT,
 				Start:    last, End: end, Exec: last,
-				Total: res.Price * amount(),
+				Total: math.Round(res.Price*amount()*100) / 100.0,
 				Meta:  md,
 			})
 			last = end
@@ -368,7 +369,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
 				Priority: billingpb.Priority_NORMAL,
-				Total:    product.Price,
+				Total:    math.Round(product.Price*100) / 100.0,
 			})
 		}
 	} else {
@@ -380,7 +381,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
 				Priority: priority,
-				Total:    product.Price,
+				Total:    math.Round(product.Price*100) / 100.0,
 			})
 			last = end
 		}
@@ -420,6 +421,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 					}
 
 					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.ResDiff)
+					total = math.Round(total*100) / 100.0
 
 					records = append(records, &billingpb.Record{
 						Start: int64(lastMonitoring), End: int64(lastMonitoring) + timeDiff, Exec: now,
