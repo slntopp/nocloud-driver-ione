@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -388,8 +389,52 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 	return records, last
 }
 
-func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONeClient, records RecordsPublisherFunc) {
-	for _, _ = range instances {
+func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONeClient, publish RecordsPublisherFunc) {
+	now := time.Now().Unix()
 
+	var records []*billingpb.Record
+
+	publisher := datas.DataPublisher(datas.POST_INST_DATA)
+
+	for _, inst := range instances {
+		plan := inst.GetBillingPlan()
+		if plan == nil {
+			break
+		}
+		resources := plan.GetResources()
+
+		diffSlice := c.GetVmResourcesDiff(inst)
+
+		for _, diff := range diffSlice {
+			for _, res := range resources {
+				if diff.ResName == res.GetKey() {
+
+					log.Info("Billing res", zap.String("res", diff.ResName), zap.Int("diff", diff.ResDiff))
+
+					lastMonitoring := inst.GetData()[fmt.Sprintf("%s_last_monitoring", diff.ResName)].GetNumberValue()
+
+					timeDiff := now - int64(lastMonitoring)
+
+					if timeDiff < 0 {
+						timeDiff += res.GetPeriod()
+					}
+
+					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.ResDiff)
+
+					records = append(records, &billingpb.Record{
+						Start: int64(lastMonitoring), End: int64(lastMonitoring) + timeDiff, Exec: now,
+						Priority: 1,
+						Instance: inst.GetUuid(),
+						Resource: diff.ResName,
+						Total:    total,
+					})
+
+					inst.Data[fmt.Sprintf("%s_last_monitoring", diff.ResName)] = structpb.NewNumberValue(lastMonitoring + float64(timeDiff))
+				}
+			}
+		}
+		go publisher(inst.GetUuid(), inst.GetData())
 	}
+
+	go publish(records)
 }

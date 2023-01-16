@@ -381,7 +381,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			}
 
 			if len(resp.ToBeUpdated) != 0 {
-				handleUpgradeBilling(log, resp.ToBeUpdated, client, s.HandlePublishRecords)
+				handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
 			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))

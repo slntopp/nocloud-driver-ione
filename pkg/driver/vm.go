@@ -899,7 +899,7 @@ func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
 
 		res = append(res, &VmResourceDiff{
 			ResName: strings.ToLower(fmt.Sprintf("drive_%s", driveType)),
-			ResDiff: int((instDriveSize - vmInstDriveSize) * 1024),
+			ResDiff: int(instDriveSize - vmInstDriveSize),
 		})
 	}
 
