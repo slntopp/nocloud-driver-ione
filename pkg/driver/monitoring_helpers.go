@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 
@@ -248,7 +249,7 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 
 		state["is_public"] = true
 		nocloud_enable, e := tmpl.Template.GetStr("NOCLOUD_ENABLED")
-		if e == nil && nocloud_enable == "FALSE" {
+		if e == nil && strings.ToLower(nocloud_enable) == "false" {
 			state["is_public"] = false
 		}
 

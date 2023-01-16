@@ -381,13 +381,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			}
 
 			if len(resp.ToBeUpdated) != 0 {
-				handleUpgradeBilling(resp.ToBeUpdated, s.HandlePublishRecords)
+				handleUpgradeBilling(log, resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
 			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
 		}
-
-		log.Debug("Monitoring suspend/unsuspend")
 
 		igStatus := ig.GetStatus()
 

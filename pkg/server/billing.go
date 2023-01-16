@@ -388,6 +388,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 	return records, last
 }
 
-func handleUpgradeBilling(updated []*ipb.Instance, records RecordsPublisherFunc) {
+func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONeClient, records RecordsPublisherFunc) {
+	for _, _ = range instances {
 
+	}
 }
