@@ -387,3 +387,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 
 	return records, last
 }
+
+func handleUpgradeBilling(updated []*ipb.Instance, records RecordsPublisherFunc) {
+
+}

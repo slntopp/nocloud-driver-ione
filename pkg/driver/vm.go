@@ -18,7 +18,6 @@ package one
 import (
 	"errors"
 	"fmt"
-	"github.com/slntopp/nocloud-driver-ione/pkg/server"
 	"strconv"
 	"strings"
 	"time"
@@ -498,7 +497,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
-func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, publish server.RecordsPublisherFunc, ig *pb.InstancesGroup, group int) {
+func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) {
 	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
 

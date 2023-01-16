@@ -17,7 +17,6 @@ package one
 
 import (
 	"errors"
-	"github.com/slntopp/nocloud-driver-ione/pkg/server"
 	"time"
 
 	goca "github.com/OpenNebula/one/src/oca/go/src/goca"
@@ -38,7 +37,7 @@ import (
 
 type IClient interface {
 	CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesGroupResponse, error)
-	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, publish server.RecordsPublisherFunc, ig *pb.InstancesGroup, group int)
+	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int)
 	Chmod(class string, oid int, perm *shared.Permissions) error
 	Chown(class string, oid, uid, gid int) error
 	CreateUser(name, pass string, groups []int) (id int, err error)

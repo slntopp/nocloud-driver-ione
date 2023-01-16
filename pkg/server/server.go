@@ -380,7 +380,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				datasPublisher(ig.Uuid, ig.Data)
 			}
 
-			client.CheckInstancesGroupResponseProcess(resp, s.HandlePublishRecords, ig, int(group))
+			if len(resp.ToBeUpdated) != 0 {
+				handleUpgradeBilling(resp.ToBeUpdated, s.HandlePublishRecords)
+			}
+
+			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
 		}
 
 		log.Debug("Monitoring suspend/unsuspend")
