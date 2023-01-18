@@ -409,7 +409,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		for _, diff := range diffSlice {
 			for _, res := range resources {
 				if diff.ResName == res.GetKey() {
-					log.Info("Billing res", zap.String("res", diff.ResName), zap.Int("diff", diff.ResDiff))
+					log.Info("Billing res", zap.String("res", diff.ResName), zap.Int("diff", diff.OldResCount))
 					instData := inst.GetData()
 					if instData == nil {
 						log.Info("Data is empty", zap.String("uuid", inst.GetUuid()))
@@ -430,7 +430,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 						timeDiff += res.GetPeriod()
 					}
 
-					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.ResDiff)
+					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.OldResCount)
 					total = math.Round(total*100) / 100.0
 
 					log.Debug("Check diff time", zap.Int64("diff", timeDiff), zap.Float64("total", total))
