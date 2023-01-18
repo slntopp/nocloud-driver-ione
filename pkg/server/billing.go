@@ -430,21 +430,26 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 						timeDiff += res.GetPeriod()
 					}
 
-					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.OldResCount)
-					total = math.Round(total*100) / 100.0
+					if res.Kind == billingpb.Kind_PREPAID {
+						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.OldResCount)
+						total = math.Round(total*100) / 100.0
 
-					log.Debug("Check diff time", zap.Int64("diff", timeDiff), zap.Float64("total", total))
-
-					records = append(records, &billingpb.Record{
-						Start: int64(lastMonitoring.GetNumberValue()), End: int64(lastMonitoring.GetNumberValue()) + timeDiff, Exec: now,
-						Priority: 1,
-						Instance: inst.GetUuid(),
-						Resource: diff.ResName,
-						Total:    total,
-					})
-
-					updateKey := fmt.Sprintf("%s_update_time", diff.ResName)
-					inst.Data[updateKey] = structpb.NewNumberValue(float64(now))
+						records = append(records, &billingpb.Record{
+							Start: int64(lastMonitoring.GetNumberValue()), End: int64(lastMonitoring.GetNumberValue()) + timeDiff, Exec: now,
+							Priority: 1,
+							Instance: inst.GetUuid(),
+							Resource: diff.ResName,
+							Total:    total,
+						})
+					} else {
+						records = append(records, &billingpb.Record{
+							Start: int64(lastMonitoring.GetNumberValue()), End: int64(lastMonitoring.GetNumberValue()) + timeDiff, Exec: now,
+							Priority: 1,
+							Instance: inst.GetUuid(),
+							Resource: diff.ResName,
+							Total:    total,
+						})
+					}
 				}
 			}
 		}
