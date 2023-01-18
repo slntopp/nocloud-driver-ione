@@ -26,14 +26,18 @@ import (
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	pb "github.com/slntopp/nocloud-proto/drivers/instance/vanilla"
+	epb "github.com/slntopp/nocloud-proto/events"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	sppb "github.com/slntopp/nocloud-proto/services_providers"
 	stpb "github.com/slntopp/nocloud-proto/states"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+	"log"
 	"time"
 )
 
@@ -50,6 +54,7 @@ type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
+	busClient            epb.EventsServiceClient
 	rdb                  *redis.Client
 }
 
@@ -62,6 +67,15 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
 }
 
+func (s *DriverServiceServer) RegisterEventsClient(host string) {
+	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	client := epb.NewEventsServiceClient(conn)
+
+	s.busClient = client
+}
 func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *ipb.TestInstancesGroupConfigRequest) (*ipb.TestInstancesGroupConfigResponse, error) {
 	s.log.Debug("TestInstancesGroupConfig request received", zap.Any("request", request))
 	igroup := request.GetGroup()

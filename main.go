@@ -44,6 +44,7 @@ var (
 	RabbitMQConn string
 	SIGNING_KEY  []byte
 	redisHost    string
+	eventsHost   string
 )
 
 func init() {
@@ -67,6 +68,9 @@ func init() {
 
 	viper.SetDefault("REDIS_HOST", "redis:6379")
 	redisHost = viper.GetString("REDIS_HOST")
+
+	viper.SetDefault("EVENTS_HOST", "eventbus:8000")
+	eventsHost = viper.GetString("EVENTS_HOST")
 }
 
 func main() {
@@ -100,6 +104,7 @@ func main() {
 
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
+	srv.RegisterEventsClient(eventsHost)
 
 	pb.RegisterDriverServiceServer(s, srv)
 
