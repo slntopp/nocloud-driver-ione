@@ -170,7 +170,9 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 				Type: "email",
 				Uuid: i.GetUuid(),
 				Data: map[string]*structpb.Value{
-					"data": structpb.NewStringValue("Machine suspended"),
+					"offset": structpb.NewStringValue("event_key"),
+					"data":   structpb.NewStringValue("vm_suspended"),
+					"test":   structpb.NewStringValue("string_value"),
 				},
 			})
 		}
@@ -191,7 +193,9 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 				Type: "email",
 				Uuid: i.GetUuid(),
 				Data: map[string]*structpb.Value{
-					"data": structpb.NewStringValue("Machine unsuspended"),
+					"offset": structpb.NewStringValue("event_key"),
+					"data":   structpb.NewStringValue("vm_unsuspended"),
+					"test":   structpb.NewStringValue("string_value"),
 				},
 			})
 		}
