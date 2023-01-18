@@ -409,12 +409,22 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		for _, diff := range diffSlice {
 			for _, res := range resources {
 				if diff.ResName == res.GetKey() {
-
 					log.Info("Billing res", zap.String("res", diff.ResName), zap.Int("diff", diff.ResDiff))
+					instData := inst.GetData()
+					if instData == nil {
+						log.Info("Data is empty", zap.String("uuid", inst.GetUuid()))
+						continue
+					}
 
-					lastMonitoring := inst.GetData()[fmt.Sprintf("%s_last_monitoring", diff.ResName)].GetNumberValue()
+					key := fmt.Sprintf("%s_last_monitoring", diff.ResName)
 
-					timeDiff := now - int64(lastMonitoring)
+					lastMonitoring, ok := instData[key]
+					if !ok {
+						log.Info("No param ins data", zap.String("uuid", inst.GetUuid()), zap.String("param", key))
+						continue
+					}
+
+					timeDiff := now - int64(lastMonitoring.GetNumberValue())
 
 					if timeDiff < 0 {
 						timeDiff += res.GetPeriod()
@@ -423,15 +433,18 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.ResDiff)
 					total = math.Round(total*100) / 100.0
 
+					log.Debug("Check diff time", zap.Int64("diff", timeDiff), zap.Float64("total", total))
+
 					records = append(records, &billingpb.Record{
-						Start: int64(lastMonitoring), End: int64(lastMonitoring) + timeDiff, Exec: now,
+						Start: int64(lastMonitoring.GetNumberValue()), End: int64(lastMonitoring.GetNumberValue()) + timeDiff, Exec: now,
 						Priority: 1,
 						Instance: inst.GetUuid(),
 						Resource: diff.ResName,
 						Total:    total,
 					})
 
-					inst.Data[fmt.Sprintf("%s_last_monitoring", diff.ResName)] = structpb.NewNumberValue(lastMonitoring + float64(timeDiff))
+					updateKey := fmt.Sprintf("%s_update_time", diff.ResName)
+					inst.Data[updateKey] = structpb.NewNumberValue(float64(now))
 				}
 			}
 		}
