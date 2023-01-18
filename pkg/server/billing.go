@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"fmt"
+	epb "github.com/slntopp/nocloud-proto/events"
 	"math"
 	"regexp"
 	"strings"
@@ -55,7 +57,7 @@ type LazyTimeline func() []one.Record
 
 type RecordsPublisherFunc func([]*billingpb.Record)
 
-func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
+func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, busClient epb.EventsServiceClient, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
@@ -164,6 +166,13 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
+			busClient.Publish(context.Background(), &epb.Event{
+				Type: "email",
+				Uuid: i.GetUuid(),
+				Data: map[string]*structpb.Value{
+					"data": structpb.NewStringValue("Machine suspended"),
+				},
+			})
 		}
 
 		if state == "SUSPENDED" {
@@ -178,6 +187,13 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 			if err := client.ResumeVM(vmid); err != nil {
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
+			busClient.Publish(context.Background(), &epb.Event{
+				Type: "email",
+				Uuid: i.GetUuid(),
+				Data: map[string]*structpb.Value{
+					"data": structpb.NewStringValue("Machine unsuspended"),
+				},
+			})
 		}
 	}
 

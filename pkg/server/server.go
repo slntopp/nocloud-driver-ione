@@ -411,7 +411,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
 
-			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst, igStatus)
+			go handleInstanceBilling(log, s.HandlePublishRecords, s.busClient, client, inst, igStatus)
 		}
 	}
 
