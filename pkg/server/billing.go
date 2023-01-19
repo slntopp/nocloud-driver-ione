@@ -431,7 +431,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 							timeDiff += res.GetPeriod()
 						}
 
-						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.OldResCount)
+						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.NewResCount)
 						total = math.Round(total*100) / 100.0
 
 						records = append(records, &billingpb.Record{
