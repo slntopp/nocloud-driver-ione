@@ -438,7 +438,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 
 						records = append(records, &billingpb.Record{
 							Start: now, End: int64(lastMonitoring.GetNumberValue()), Exec: now,
-							Priority: 1,
+							Priority: billingpb.Priority_ADDITIONAL,
 							Instance: inst.GetUuid(),
 							Resource: diff.ResName,
 							Total:    total,
