@@ -866,8 +866,8 @@ func MakeTimelineRecords(r vm.HistoryRecord) (res []Record) {
 
 type VmResourceDiff struct {
 	ResName     string
-	OldResCount int
-	NewResCount int
+	OldResCount float64
+	NewResCount float64
 }
 
 func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
@@ -891,8 +891,8 @@ func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
 	if vmInstIpsPublic != instIpsPublic {
 		res = append(res, &VmResourceDiff{
 			ResName:     "ips_public",
-			OldResCount: vmInstIpsPublic,
-			NewResCount: instIpsPublic,
+			OldResCount: float64(vmInstIpsPublic),
+			NewResCount: float64(instIpsPublic),
 		})
 	}
 
@@ -904,8 +904,8 @@ func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
 
 		res = append(res, &VmResourceDiff{
 			ResName:     strings.ToLower(fmt.Sprintf("drive_%s", driveType)),
-			OldResCount: int(vmInstDriveSize),
-			NewResCount: int(instDriveSize),
+			OldResCount: vmInstDriveSize / 1024.0,
+			NewResCount: instDriveSize / 1024.0,
 		})
 	}
 
