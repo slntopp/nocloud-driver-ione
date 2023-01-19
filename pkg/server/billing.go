@@ -395,8 +395,6 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 
 	var records []*billingpb.Record
 
-	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-
 	for _, inst := range instances {
 		plan := inst.GetBillingPlan()
 		if plan == nil {
@@ -409,7 +407,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		for _, diff := range diffSlice {
 			for _, res := range resources {
 				if diff.ResName == res.GetKey() {
-					log.Info("Billing res", zap.String("res", diff.ResName), zap.Int("diff", diff.OldResCount))
+					log.Info("Billing res", zap.String("res", diff.ResName), zap.Float64("diff", diff.OldResCount))
 					instData := inst.GetData()
 					if instData == nil {
 						log.Info("Data is empty", zap.String("uuid", inst.GetUuid()))
@@ -427,15 +425,19 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 					if res.Kind == billingpb.Kind_PREPAID {
 						timeDiff := int64(lastMonitoring.GetNumberValue()) - now
 
+						log.Info("timeDiff", zap.Any("diff", timeDiff))
+
 						if timeDiff < 0 {
 							timeDiff += res.GetPeriod()
 						}
 
-						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.NewResCount)
+						log.Info("check", zap.Any("timeDiff", timeDiff), zap.Any("period", res.GetPeriod()), zap.Any("div", float64(timeDiff)/float64(res.GetPeriod())))
+
+						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * (diff.NewResCount - diff.OldResCount)
 						total = math.Round(total*100) / 100.0
 
 						records = append(records, &billingpb.Record{
-							Start: int64(lastMonitoring.GetNumberValue()), End: int64(lastMonitoring.GetNumberValue()) + timeDiff, Exec: now,
+							Start: now, End: int64(lastMonitoring.GetNumberValue()), Exec: now,
 							Priority: 1,
 							Instance: inst.GetUuid(),
 							Resource: diff.ResName,
@@ -460,7 +462,6 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 				}
 			}
 		}
-		go publisher(inst.GetUuid(), inst.GetData())
 	}
 
 	go publish(records)
