@@ -395,8 +395,6 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 
 	var records []*billingpb.Record
 
-	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-
 	for _, inst := range instances {
 		plan := inst.GetBillingPlan()
 		if plan == nil {
@@ -409,33 +407,38 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		for _, diff := range diffSlice {
 			for _, res := range resources {
 				if diff.ResName == res.GetKey() {
-
-					log.Info("Billing res", zap.String("res", diff.ResName), zap.Int("diff", diff.ResDiff))
-
-					lastMonitoring := inst.GetData()[fmt.Sprintf("%s_last_monitoring", diff.ResName)].GetNumberValue()
-
-					timeDiff := now - int64(lastMonitoring)
-
-					if timeDiff < 0 {
-						timeDiff += res.GetPeriod()
+					log.Info("Billing res", zap.String("res", diff.ResName), zap.Float64("diff", diff.OldResCount))
+					instData := inst.GetData()
+					if instData == nil {
+						log.Info("Data is empty", zap.String("uuid", inst.GetUuid()))
+						continue
 					}
 
-					total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.ResDiff)
-					total = math.Round(total*100) / 100.0
+					key := fmt.Sprintf("%s_last_monitoring", diff.ResName)
 
-					records = append(records, &billingpb.Record{
-						Start: int64(lastMonitoring), End: int64(lastMonitoring) + timeDiff, Exec: now,
-						Priority: 1,
-						Instance: inst.GetUuid(),
-						Resource: diff.ResName,
-						Total:    total,
-					})
+					lastMonitoring, ok := instData[key]
+					if !ok {
+						log.Info("No param ins data", zap.String("uuid", inst.GetUuid()), zap.String("param", key))
+						continue
+					}
 
-					inst.Data[fmt.Sprintf("%s_last_monitoring", diff.ResName)] = structpb.NewNumberValue(lastMonitoring + float64(timeDiff))
+					if res.Kind == billingpb.Kind_PREPAID {
+						timeDiff := int64(lastMonitoring.GetNumberValue()) - now
+
+						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * (diff.NewResCount - diff.OldResCount)
+						total = math.Round(total*100) / 100.0
+
+						records = append(records, &billingpb.Record{
+							Start: now, End: int64(lastMonitoring.GetNumberValue()), Exec: now,
+							Priority: billingpb.Priority_ADDITIONAL,
+							Instance: inst.GetUuid(),
+							Resource: diff.ResName,
+							Total:    total,
+						})
+					}
 				}
 			}
 		}
-		go publisher(inst.GetUuid(), inst.GetData())
 	}
 
 	go publish(records)
