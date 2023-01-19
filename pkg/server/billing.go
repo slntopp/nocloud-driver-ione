@@ -424,13 +424,13 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 						continue
 					}
 
-					timeDiff := now - int64(lastMonitoring.GetNumberValue())
-
-					if timeDiff < 0 {
-						timeDiff += res.GetPeriod()
-					}
-
 					if res.Kind == billingpb.Kind_PREPAID {
+						timeDiff := int64(lastMonitoring.GetNumberValue()) - now
+
+						if timeDiff < 0 {
+							timeDiff += res.GetPeriod()
+						}
+
 						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * float64(diff.OldResCount)
 						total = math.Round(total*100) / 100.0
 
@@ -441,7 +441,14 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 							Resource: diff.ResName,
 							Total:    total,
 						})
-					} else {
+					} /*else {
+
+						timeDiff := now - int64(lastMonitoring.GetNumberValue())
+
+						if timeDiff < 0 {
+							timeDiff += res.GetPeriod()
+						}
+
 						records = append(records, &billingpb.Record{
 							Start: int64(lastMonitoring.GetNumberValue()), End: int64(lastMonitoring.GetNumberValue()) + timeDiff, Exec: now,
 							Priority: 1,
@@ -449,7 +456,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 							Resource: diff.ResName,
 							Total:    total,
 						})
-					}
+					}*/
 				}
 			}
 		}
