@@ -167,7 +167,6 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
 			busClient.Publish(context.Background(), &epb.Event{
-				Type: "email",
 				Uuid: i.GetUuid(),
 				Data: map[string]*structpb.Value{
 					"offset": structpb.NewStringValue("event_key"),
@@ -190,7 +189,6 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
 			busClient.Publish(context.Background(), &epb.Event{
-				Type: "email",
 				Uuid: i.GetUuid(),
 				Data: map[string]*structpb.Value{
 					"offset": structpb.NewStringValue("event_key"),
