@@ -168,7 +168,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
-			eventsPublish(context.Background(), &epb.Event{
+			go eventsPublish(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_suspended",
 			})
@@ -186,7 +186,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 			if err := client.ResumeVM(vmid); err != nil {
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
-			eventsPublish(context.Background(), &epb.Event{
+			go eventsPublish(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_unsuspended",
 			})
