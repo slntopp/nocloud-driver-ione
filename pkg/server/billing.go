@@ -168,11 +168,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 			}
 			busClient.Publish(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
-				Data: map[string]*structpb.Value{
-					"offset": structpb.NewStringValue("event_key"),
-					"data":   structpb.NewStringValue("vm_suspended"),
-					"test":   structpb.NewStringValue("string_value"),
-				},
+				Key:  "instance_suspended",
 			})
 		}
 
@@ -190,11 +186,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 			}
 			busClient.Publish(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
-				Data: map[string]*structpb.Value{
-					"offset": structpb.NewStringValue("event_key"),
-					"data":   structpb.NewStringValue("vm_unsuspended"),
-					"test":   structpb.NewStringValue("string_value"),
-				},
+				Key:  "instance_unsuspended",
 			})
 		}
 	}
