@@ -55,11 +55,11 @@ func GetVM(f func() (*onevm.VM, error)) LazyVM {
 
 type LazyTimeline func() []one.Record
 
-type RecordsPublisherFunc func([]*billingpb.Record)
+type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
-type EventsPublisherFunc func(event *epb.Event)
+type EventsPublisherFunc func(context.Context, *epb.Event)
 
-func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, busClient epb.EventsServiceClient, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
+func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eventsPublish EventsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
@@ -168,7 +168,7 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
-			busClient.Publish(context.Background(), &epb.Event{
+			eventsPublish(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_suspended",
 			})
@@ -186,15 +186,15 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, bus
 			if err := client.ResumeVM(vmid); err != nil {
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
-			busClient.Publish(context.Background(), &epb.Event{
+			eventsPublish(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_unsuspended",
 			})
 		}
 	}
 
-	go publish(productRecords)
-	go publish(resourceRecords)
+	go publish(context.Background(), productRecords)
+	go publish(context.Background(), resourceRecords)
 	go publisher(i.Uuid, i.Data)
 }
 
@@ -450,5 +450,5 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		go publisher(inst.GetUuid(), inst.GetData())
 	}
 
-	go publish(records)
+	go publish(context.Background(), records)
 }

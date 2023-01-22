@@ -46,7 +46,6 @@ var (
 	RabbitMQConn string
 	SIGNING_KEY  []byte
 	redisHost    string
-	eventsHost   string
 )
 
 func init() {
@@ -70,9 +69,6 @@ func init() {
 
 	viper.SetDefault("REDIS_HOST", "redis:6379")
 	redisHost = viper.GetString("REDIS_HOST")
-
-	viper.SetDefault("EVENTS_HOST", "eventbus:8000")
-	eventsHost = viper.GetString("EVENTS_HOST")
 }
 
 func main() {
@@ -107,7 +103,6 @@ func main() {
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
 	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
-	srv.RegisterEventsClient(eventsHost)
 
 	pb.RegisterDriverServiceServer(s, srv)
 
@@ -116,7 +111,7 @@ func main() {
 }
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
-	return func(payload []*billingpb.Record) {
+	return func(ctx context.Context, payload []*billingpb.Record) {
 		ch, err := rbmq.Channel()
 		if err != nil {
 			log.Fatal("Failed to open a channel", zap.Error(err))
@@ -134,7 +129,7 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 				log.Error("Error while marshalling record", zap.Error(err))
 				continue
 			}
-			ch.PublishWithContext(context.Background(), "", queue.Name, false, false, amqp.Publishing{
+			ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
 				ContentType: "text/plain", Body: body,
 			})
 		}
@@ -142,7 +137,7 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 }
 
 func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
-	return func(event *epb.Event) {
+	return func(ctx context.Context, event *epb.Event) {
 		ch, err := rbmq.Channel()
 		if err != nil {
 			log.Fatal("Failed to open a channel", zap.Error(err))
@@ -150,7 +145,7 @@ func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
 		defer ch.Close()
 
 		queue, _ := ch.QueueDeclare(
-			"records",
+			"events",
 			true, false, false, true, nil,
 		)
 
@@ -159,7 +154,7 @@ func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
 			log.Error("Error while marshalling record", zap.Error(err))
 			return
 		}
-		ch.PublishWithContext(context.Background(), "", queue.Name, false, false, amqp.Publishing{
+		ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
 			ContentType: "text/plain", Body: body,
 		})
 	}
