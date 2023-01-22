@@ -54,6 +54,7 @@ type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
+	HandlePublishEvents  EventsPublisherFunc
 	busClient            epb.EventsServiceClient
 	rdb                  *redis.Client
 }
