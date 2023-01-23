@@ -30,8 +30,11 @@ import (
 	sppb "github.com/slntopp/nocloud-proto/services_providers"
 	stpb "github.com/slntopp/nocloud-proto/states"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"time"
@@ -40,7 +43,20 @@ import (
 var (
 	DRIVER_TYPE      string
 	MONITORING_REDIS = "MONITORING"
+
+	instClient ipb.InstancesServiceClient
 )
+
+func init() {
+	viper.SetDefault("INST_HOST", "services-registry:8000")
+	instHost := viper.GetString("SETTINGS_HOST")
+
+	instConn, err := grpc.Dial(instHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		panic(err)
+	}
+	instClient = ipb.NewInstancesServiceClient(instConn)
+}
 
 func SetDriverType(_type string) {
 	DRIVER_TYPE = _type

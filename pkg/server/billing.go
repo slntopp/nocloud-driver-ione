@@ -157,21 +157,30 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 			i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
 	}
-
 	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-
 	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
+
+	go publish(context.Background(), productRecords)
+	go publish(context.Background(), resourceRecords)
+	go publisher(i.Uuid, i.Data)
 
 	if status == ipb.InstanceStatus_SUS {
 		_, isStatic := i.Data["last_monitoring"]
 		if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
-			if err := client.SuspendVM(vmid); err != nil {
-				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+			val, ok := i.Data["billing_canceled"]
+			if !ok || !val.GetBoolValue() {
+				if err := client.SuspendVM(vmid); err != nil {
+					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+				}
+				go eventsPublish(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_suspended",
+				})
+			} else {
+				instClient.Delete(context.Background(), &ipb.DeleteRequest{
+					Uuid: i.GetUuid(),
+				})
 			}
-			go eventsPublish(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_suspended",
-			})
 		}
 
 		if state == "SUSPENDED" {
@@ -192,10 +201,6 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 			})
 		}
 	}
-
-	go publish(context.Background(), productRecords)
-	go publish(context.Background(), resourceRecords)
-	go publisher(i.Uuid, i.Data)
 }
 
 type BillingHandlerFunc func(
