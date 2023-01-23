@@ -16,8 +16,10 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
+	epb "github.com/slntopp/nocloud-proto/events"
 	"net"
 
 	"github.com/go-redis/redis/v8"
@@ -100,6 +102,7 @@ func main() {
 
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
+	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
 
 	pb.RegisterDriverServiceServer(s, srv)
 
@@ -108,7 +111,7 @@ func main() {
 }
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
-	return func(payload []*billingpb.Record) {
+	return func(ctx context.Context, payload []*billingpb.Record) {
 		ch, err := rbmq.Channel()
 		if err != nil {
 			log.Fatal("Failed to open a channel", zap.Error(err))
@@ -126,10 +129,33 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 				log.Error("Error while marshalling record", zap.Error(err))
 				continue
 			}
-			ch.Publish("", queue.Name, false, false, amqp.Publishing{
+			ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
 				ContentType: "text/plain", Body: body,
 			})
 		}
+	}
+}
 
+func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
+	return func(ctx context.Context, event *epb.Event) {
+		ch, err := rbmq.Channel()
+		if err != nil {
+			log.Fatal("Failed to open a channel", zap.Error(err))
+		}
+		defer ch.Close()
+
+		queue, _ := ch.QueueDeclare(
+			"events",
+			true, false, false, true, nil,
+		)
+
+		body, err := proto.Marshal(event)
+		if err != nil {
+			log.Error("Error while marshalling record", zap.Error(err))
+			return
+		}
+		ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
+			ContentType: "text/plain", Body: body,
+		})
 	}
 }

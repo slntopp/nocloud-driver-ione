@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"fmt"
+	epb "github.com/slntopp/nocloud-proto/events"
 	"math"
 	"regexp"
 	"strings"
@@ -53,9 +55,11 @@ func GetVM(f func() (*onevm.VM, error)) LazyVM {
 
 type LazyTimeline func() []one.Record
 
-type RecordsPublisherFunc func([]*billingpb.Record)
+type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
-func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
+type EventsPublisherFunc func(context.Context, *epb.Event)
+
+func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eventsPublish EventsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
@@ -164,6 +168,10 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
+			go eventsPublish(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_suspended",
+			})
 		}
 
 		if state == "SUSPENDED" {
@@ -178,11 +186,15 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, cli
 			if err := client.ResumeVM(vmid); err != nil {
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
+			go eventsPublish(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_unsuspended",
+			})
 		}
 	}
 
-	go publish(productRecords)
-	go publish(resourceRecords)
+	go publish(context.Background(), productRecords)
+	go publish(context.Background(), resourceRecords)
 	go publisher(i.Uuid, i.Data)
 }
 
@@ -441,5 +453,5 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		}
 	}
 
-	go publish(records)
+	go publish(context.Background(), records)
 }
