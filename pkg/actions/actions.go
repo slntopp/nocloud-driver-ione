@@ -455,10 +455,10 @@ func CancelBilling(
 		return &ipb.InvokeResponse{Result: false}, status.Errorf(codes.Unknown, "Instance data is nil")
 	}
 
-	inst.Data["billing_canceled"] = structpb.NewBoolValue(true)
+	iData["billing_canceled"] = structpb.NewBoolValue(true)
 
 	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-	go publisher(inst.GetUuid(), inst.GetData())
+	go publisher(inst.GetUuid(), iData)
 
 	return &ipb.InvokeResponse{Result: true}, nil
 }
@@ -475,10 +475,10 @@ func ContinueBilling(
 		return &ipb.InvokeResponse{Result: false}, status.Errorf(codes.Unknown, "Instance data is nil")
 	}
 
-	inst.Data["billing_canceled"] = structpb.NewBoolValue(false)
+	iData["billing_canceled"] = structpb.NewBoolValue(false)
 
 	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-	go publisher(inst.GetUuid(), inst.GetData())
+	go publisher(inst.GetUuid(), iData)
 
 	return &ipb.InvokeResponse{Result: true}, nil
 }
