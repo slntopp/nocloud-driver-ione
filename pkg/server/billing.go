@@ -167,20 +167,13 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 	if status == ipb.InstanceStatus_SUS {
 		_, isStatic := i.Data["last_monitoring"]
 		if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
-			val, ok := i.Data["billing_canceled"]
-			if !ok || !val.GetBoolValue() {
-				if err := client.SuspendVM(vmid); err != nil {
-					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
-				}
-				go eventsPublish(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_suspended",
-				})
-			} else {
-				instClient.Delete(context.Background(), &ipb.DeleteRequest{
-					Uuid: i.GetUuid(),
-				})
+			if err := client.SuspendVM(vmid); err != nil {
+				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
+			go eventsPublish(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_suspended",
+			})
 		}
 
 		if state == "SUSPENDED" {
