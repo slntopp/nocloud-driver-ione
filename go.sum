@@ -204,6 +204,8 @@ github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQD
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/slntopp/nocloud v0.0.17-r10 h1:nE3AJ3lNaQfDFhWi7CDKbZoCVpH4qNZnHVKrO30KBOQ=
 github.com/slntopp/nocloud v0.0.17-r10/go.mod h1:/D0ET5G1bhik2PBdy0nh0vEniBQ26cSOpPJ04PhdIYQ=
+github.com/slntopp/nocloud v0.0.17-r11 h1:ozryl7Kak3Aml8ZaYl3c6ufmHwZ3mzsoSbs4NwM7SJw=
+github.com/slntopp/nocloud v0.0.17-r11/go.mod h1:/D0ET5G1bhik2PBdy0nh0vEniBQ26cSOpPJ04PhdIYQ=
 github.com/slntopp/nocloud-proto v0.0.0-20230125204517-271bcd479347 h1:vc1DpmXw0K8SieVIjiDN6FbzfTkmdca0H7VPGRQvCmk=
 github.com/slntopp/nocloud-proto v0.0.0-20230125204517-271bcd479347/go.mod h1:F22cB+K8C7ym1+Ldg+ji0azXm8GP4En1NUq8Nzvkgxw=
 github.com/spf13/afero v1.9.3 h1:41FoI0fD7OR7mGcKE/aOiLkGreyf8ifIOQmJANWogMk=
