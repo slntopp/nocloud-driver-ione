@@ -84,6 +84,7 @@ func main() {
 		log.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
 	}
 	defer rbmq.Close()
+	log.Info("RabbitMQ connection established")
 
 	datas.Configure(log, rbmq)
 	actions.ConfigureStatusesClient(log)
