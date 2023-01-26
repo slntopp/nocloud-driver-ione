@@ -18,7 +18,6 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"io"
 	"net/http"
 	"time"
@@ -38,19 +37,17 @@ type ServiceAction func(
 ) (*ipb.InvokeResponse, error)
 
 var Actions = map[string]ServiceAction{
-	"poweroff":         Poweroff,
-	"suspend":          Suspend,
-	"reboot":           Reboot,
-	"resume":           Resume,
-	"reinstall":        Reinstall,
-	"monitoring":       Monitoring,
-	"state":            State,
-	"snapcreate":       SnapCreate,
-	"snapdelete":       SnapDelete,
-	"snaprevert":       SnapRevert,
-	"start_vnc":        StartVNC,
-	"cancel_billing":   CancelBilling,
-	"continue_billing": ContinueBilling,
+	"poweroff":   Poweroff,
+	"suspend":    Suspend,
+	"reboot":     Reboot,
+	"resume":     Resume,
+	"reinstall":  Reinstall,
+	"monitoring": Monitoring,
+	"state":      State,
+	"snapcreate": SnapCreate,
+	"snapdelete": SnapDelete,
+	"snaprevert": SnapRevert,
+	"start_vnc":  StartVNC,
 }
 
 var AdminActions = map[string]bool{
@@ -441,44 +438,4 @@ func Monitoring(
 	}
 
 	return resp, nil
-}
-
-func CancelBilling(
-	client one.IClient,
-	inst *ipb.Instance,
-	data map[string]*structpb.Value,
-) (*ipb.InvokeResponse, error) {
-
-	iData := inst.GetData()
-
-	if iData == nil {
-		return &ipb.InvokeResponse{Result: false}, status.Errorf(codes.Unknown, "Instance data is nil")
-	}
-
-	iData["billing_canceled"] = structpb.NewBoolValue(true)
-
-	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-	go publisher(inst.GetUuid(), iData)
-
-	return &ipb.InvokeResponse{Result: true}, nil
-}
-
-func ContinueBilling(
-	client one.IClient,
-	inst *ipb.Instance,
-	data map[string]*structpb.Value,
-) (*ipb.InvokeResponse, error) {
-
-	iData := inst.GetData()
-
-	if iData == nil {
-		return &ipb.InvokeResponse{Result: false}, status.Errorf(codes.Unknown, "Instance data is nil")
-	}
-
-	iData["billing_canceled"] = structpb.NewBoolValue(false)
-
-	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-	go publisher(inst.GetUuid(), iData)
-
-	return &ipb.InvokeResponse{Result: true}, nil
 }

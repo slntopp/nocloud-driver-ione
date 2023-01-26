@@ -157,12 +157,10 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 			i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
 	}
-	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
 
-	go publish(context.Background(), productRecords)
-	go publish(context.Background(), resourceRecords)
-	go publisher(i.Uuid, i.Data)
+	publisher := datas.DataPublisher(datas.POST_INST_DATA)
+
+	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
 
 	if status == ipb.InstanceStatus_SUS {
 		_, isStatic := i.Data["last_monitoring"]
@@ -194,6 +192,10 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 			})
 		}
 	}
+
+	go publish(context.Background(), productRecords)
+	go publish(context.Background(), resourceRecords)
+	go publisher(i.Uuid, i.Data)
 }
 
 type BillingHandlerFunc func(
