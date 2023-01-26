@@ -3,12 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
-	epb "github.com/slntopp/nocloud-proto/events"
 	"math"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	epb "github.com/slntopp/nocloud-proto/events"
 
 	oneshared "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
@@ -55,11 +56,11 @@ func GetVM(f func() (*onevm.VM, error)) LazyVM {
 
 type LazyTimeline func() []one.Record
 
-type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
+type RecordsPublisherFunc func(context.Context, []*billingpb.Record) error
 
 type EventsPublisherFunc func(context.Context, *epb.Event)
 
-func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eventsPublish EventsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
+func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eventsPublish EventsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
@@ -158,8 +159,6 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 		}
 	}
 
-	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-
 	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
 
 	if status == ipb.InstanceStatus_SUS {
@@ -193,9 +192,13 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 		}
 	}
 
-	go publish(context.Background(), productRecords)
-	go publish(context.Background(), resourceRecords)
-	go publisher(i.Uuid, i.Data)
+	err = records(context.Background(), append(resourceRecords, productRecords...))
+	if err != nil {
+		log.Warn("Couldn't post Instance billing records", zap.Error(err))
+		return
+	}
+
+	datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 }
 
 type BillingHandlerFunc func(

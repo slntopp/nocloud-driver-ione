@@ -110,10 +110,11 @@ func main() {
 }
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
-	return func(ctx context.Context, payload []*billingpb.Record) {
+	return func(ctx context.Context, payload []*billingpb.Record) error {
 		ch, err := rbmq.Channel()
 		if err != nil {
-			log.Fatal("Failed to open a channel", zap.Error(err))
+			log.Error("Failed to open a channel", zap.Error(err))
+			return err
 		}
 		defer ch.Close()
 
@@ -132,6 +133,8 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 				ContentType: "text/plain", Body: body,
 			})
 		}
+
+		return nil
 	}
 }
 
