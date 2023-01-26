@@ -18,9 +18,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	epb "github.com/slntopp/nocloud-proto/events"
-	"net"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud/pkg/nocloud"
@@ -42,7 +43,6 @@ var (
 	type_key string
 
 	log          *zap.Logger
-	statesHost   string
 	RabbitMQConn string
 	SIGNING_KEY  []byte
 	redisHost    string
