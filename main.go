@@ -92,6 +92,7 @@ func main() {
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
 
+	log.Info("Connecting redis", zap.String("url", redisHost))
 	rdb := redis.NewClient(&redis.Options{
 		Addr: redisHost,
 		DB:   0, // use default DB
