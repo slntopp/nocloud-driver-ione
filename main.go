@@ -58,9 +58,6 @@ func init() {
 	viper.SetDefault("DRIVER_TYPE_KEY", "ione")
 	type_key = viper.GetString("DRIVER_TYPE_KEY")
 
-	viper.SetDefault("STATES_HOST", "states:8080")
-	statesHost = viper.GetString("STATES_HOST")
-
 	viper.SetDefault("RABBITMQ_CONN", "amqp://nocloud:secret@rabbitmq:5672/")
 	RabbitMQConn = viper.GetString("RABBITMQ_CONN")
 
