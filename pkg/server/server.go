@@ -50,8 +50,8 @@ type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
-	HandlePublishEvents  EventsPublisherFunc
-	rdb                  *redis.Client
+	//HandlePublishEvents  EventsPublisherFunc
+	rdb *redis.Client
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *DriverServiceServer {
@@ -398,7 +398,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
 
-			go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst, igStatus)
 		}
 	}
 

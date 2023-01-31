@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
-	epb "github.com/slntopp/nocloud-proto/events"
-
 	"github.com/go-redis/redis/v8"
+	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud/pkg/nocloud"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -101,7 +99,7 @@ func main() {
 
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
-	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
+	//srv.HandlePublishEvents = SetupEventPublisher(rbmq)
 
 	pb.RegisterDriverServiceServer(s, srv)
 
@@ -138,7 +136,7 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 	}
 }
 
-func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
+/*func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
 	return func(ctx context.Context, event *epb.Event) {
 		ch, err := rbmq.Channel()
 		if err != nil {
@@ -160,4 +158,4 @@ func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
 			ContentType: "text/plain", Body: body,
 		})
 	}
-}
+}*/
