@@ -871,13 +871,13 @@ func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
 	vmid, err := GetVMIDFromData(c, inst)
 	if err != nil {
 		c.log.Error("Error Getting VMID from Data", zap.Error(err))
-
+		return res
 	}
 
 	vmInst, err := c.VMToInstance(vmid)
 	if err != nil {
 		c.log.Error("Error Converting VM to Instance", zap.Error(err))
-
+		return res
 	}
 
 	vmInstIpsPublic := int(vmInst.Resources["ips_public"].GetNumberValue())
