@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -118,7 +119,12 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 		true, false, false, true, nil,
 	)
 
+	var m sync.Mutex
+
 	return func(ctx context.Context, payload []*billingpb.Record) error {
+		m.Lock()
+		defer m.Unlock()
+
 		for _, record := range payload {
 			body, err := proto.Marshal(record)
 			if err != nil {
