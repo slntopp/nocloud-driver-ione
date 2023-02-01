@@ -456,5 +456,5 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		}
 	}
 
-	go publish(context.Background(), records)
+	publish(context.Background(), records)
 }

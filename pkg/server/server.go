@@ -296,7 +296,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 
 		igroup.Instances[i] = instance
 
-		go instDatasPublisher(instance.Uuid, instance.Data)
+		instDatasPublisher(instance.Uuid, instance.Data)
 	}
 
 	data := igroup.GetData()
@@ -311,7 +311,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	}
 
 	igroup.Data = make(map[string]*structpb.Value)
-	go igDatasPublisher(igroup.Uuid, igroup.Data)
+	igDatasPublisher(igroup.Uuid, igroup.Data)
 
 	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
 	return &pb.DownResponse{Group: igroup}, nil
