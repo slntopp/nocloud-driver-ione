@@ -112,21 +112,21 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 
 	var m sync.Mutex
 
+	ch, err := rbmq.Channel()
+	if err != nil {
+		log.Fatal("Failed to open a channel", zap.Error(err))
+	}
+
+	defer ch.Close()
+
+	queue, _ := ch.QueueDeclare(
+		"records",
+		true, false, false, true, nil,
+	)
+
 	return func(ctx context.Context, payload []*billingpb.Record) error {
 		m.Lock()
 		defer m.Unlock()
-
-		ch, err := rbmq.Channel()
-		if err != nil {
-			log.Fatal("Failed to open a channel", zap.Error(err))
-		}
-
-		defer ch.Close()
-
-		queue, _ := ch.QueueDeclare(
-			"records",
-			true, false, false, true, nil,
-		)
 
 		for _, record := range payload {
 			body, err := proto.Marshal(record)
