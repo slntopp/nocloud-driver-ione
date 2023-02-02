@@ -72,9 +72,9 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
-	n, err := datas.StIPub(request)
+	err = datas.StIPub(request)
 	if err != nil {
-		log.Error("Failed to post State", zap.Any("instance_state", request), zap.Int("len", n), zap.Error(err))
+		log.Error("Failed to post State", zap.Any("instance_state", request), zap.Error(err))
 	}
 
 	return &ipb.InvokeResponse{Result: result.Result, Meta: result.Meta}, nil

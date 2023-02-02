@@ -64,8 +64,8 @@ func Configure(logger *zap.Logger, rbmq *amqp.Connection) {
 func postInstData(uuid string, data map[string]*structpb.Value) {
 	if DIPub != nil {
 		msg := &ipb.ObjectData{Uuid: uuid, Data: data}
-		if n, err := DIPub(msg); err != nil {
-			log.Error("Failed to post instance Data", zap.Any("object_data", msg), zap.Int("len", n), zap.Error(err))
+		if err := DIPub(msg); err != nil {
+			log.Error("Failed to post instance Data", zap.Any("object_data", msg), zap.Error(err))
 		}
 	}
 }
@@ -73,8 +73,8 @@ func postInstData(uuid string, data map[string]*structpb.Value) {
 func postIGData(uuid string, data map[string]*structpb.Value) {
 	if DIGPub != nil {
 		msg := &ipb.ObjectData{Uuid: uuid, Data: data}
-		if n, err := DIGPub(msg); err != nil {
-			log.Error("Failed to post ig Data", zap.Any("object_data", msg), zap.Int("len", n), zap.Error(err))
+		if err := DIGPub(msg); err != nil {
+			log.Error("Failed to post ig Data", zap.Any("object_data", msg), zap.Error(err))
 		}
 	}
 }
@@ -82,8 +82,8 @@ func postIGData(uuid string, data map[string]*structpb.Value) {
 func postInstState(uuid string, state *stpb.State) {
 	if StIPub != nil {
 		msg := &stpb.ObjectState{Uuid: uuid, State: state}
-		if n, err := StIPub(msg); err != nil {
-			log.Error("Failed to post instance state", zap.Any("object_state", msg), zap.Int("len", n), zap.Error(err))
+		if err := StIPub(msg); err != nil {
+			log.Error("Failed to post instance state", zap.Any("object_state", msg), zap.Error(err))
 		}
 	}
 }
@@ -91,8 +91,8 @@ func postInstState(uuid string, state *stpb.State) {
 func postSPState(uuid string, state *stpb.State) {
 	if StSpPub != nil {
 		msg := &stpb.ObjectState{Uuid: uuid, State: state}
-		if n, err := StSpPub(&stpb.ObjectState{Uuid: uuid, State: state}); err != nil {
-			log.Error("Failed to post sp state", zap.Any("object_state", msg), zap.Int("len", n), zap.Error(err))
+		if err := StSpPub(&stpb.ObjectState{Uuid: uuid, State: state}); err != nil {
+			log.Error("Failed to post sp state", zap.Any("object_state", msg), zap.Error(err))
 		}
 	}
 }
@@ -100,8 +100,8 @@ func postSPState(uuid string, state *stpb.State) {
 func postSPPublicData(uuid string, data map[string]*structpb.Value) {
 	if PdSpPub != nil {
 		msg := &pdpb.ObjectPublicData{Uuid: uuid, Data: data}
-		if n, err := PdSpPub(msg); err != nil {
-			log.Error("Failed to post sp PublicData", zap.Any("object_public_data", msg), zap.Int("len", n), zap.Error(err))
+		if err := PdSpPub(msg); err != nil {
+			log.Error("Failed to post sp PublicData", zap.Any("object_public_data", msg), zap.Error(err))
 		}
 	}
 }
