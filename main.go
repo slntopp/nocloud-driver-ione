@@ -18,6 +18,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud/pkg/nocloud"
@@ -25,7 +27,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
-	"net"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
@@ -76,6 +77,12 @@ func main() {
 	}
 
 	log.Info("Dialing RabbitMQ", zap.String("url", RabbitMQConn))
+	amqp.DialConfig(RabbitMQConn, amqp.Config{
+		Properties: amqp.Table{
+			"connection_name": "driver." + type_key,
+		},
+	})
+
 	rbmq, err := amqp.Dial(RabbitMQConn)
 	if err != nil {
 		log.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
