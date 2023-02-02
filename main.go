@@ -18,9 +18,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
-	"sync"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud/pkg/nocloud"
@@ -28,6 +25,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	"net"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud-driver-ione/pkg/server"
@@ -109,9 +107,6 @@ func main() {
 }
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
-
-	var m sync.Mutex
-
 	ch, err := rbmq.Channel()
 	if err != nil {
 		log.Fatal("Failed to open a channel", zap.Error(err))
