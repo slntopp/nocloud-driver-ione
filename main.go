@@ -123,9 +123,6 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 	)
 
 	return func(ctx context.Context, payload []*billingpb.Record) error {
-		m.Lock()
-		defer m.Unlock()
-
 		for _, record := range payload {
 			body, err := proto.Marshal(record)
 			if err != nil {
