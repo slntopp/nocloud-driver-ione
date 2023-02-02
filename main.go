@@ -117,8 +117,6 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 		log.Fatal("Failed to open a channel", zap.Error(err))
 	}
 
-	defer ch.Close()
-
 	queue, _ := ch.QueueDeclare(
 		"records",
 		true, false, false, true, nil,
