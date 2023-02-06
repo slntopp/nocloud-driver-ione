@@ -18,6 +18,7 @@ package main
 import (
 	"context"
 	"fmt"
+	epb "github.com/slntopp/nocloud-proto/events"
 	"net"
 
 	"github.com/go-redis/redis/v8"
@@ -105,7 +106,7 @@ func main() {
 
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
-	//srv.HandlePublishEvents = SetupEventPublisher(rbmq)
+	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
 
 	pb.RegisterDriverServiceServer(s, srv)
 
@@ -114,17 +115,17 @@ func main() {
 }
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
-	ch, err := rbmq.Channel()
-	if err != nil {
-		log.Fatal("Failed to open a channel", zap.Error(err))
-	}
+	return func(ctx context.Context, payload []*billingpb.Record) {
+		ch, err := rbmq.Channel()
+		if err != nil {
+			log.Fatal("Failed to open a channel", zap.Error(err))
+		}
 
-	queue, _ := ch.QueueDeclare(
-		"records",
-		true, false, false, true, nil,
-	)
+		queue, _ := ch.QueueDeclare(
+			"records",
+			true, false, false, true, nil,
+		)
 
-	return func(ctx context.Context, payload []*billingpb.Record) error {
 		for _, record := range payload {
 			body, err := proto.Marshal(record)
 			if err != nil {
@@ -135,12 +136,10 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 				ContentType: "text/plain", Body: body,
 			})
 		}
-
-		return nil
 	}
 }
 
-/*func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
+func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
 	return func(ctx context.Context, event *epb.Event) {
 		ch, err := rbmq.Channel()
 		if err != nil {
@@ -162,4 +161,4 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 			ContentType: "text/plain", Body: body,
 		})
 	}
-}*/
+}

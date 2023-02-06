@@ -50,8 +50,8 @@ type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
-	//HandlePublishEvents  EventsPublisherFunc
-	rdb *redis.Client
+	HandlePublishEvents  EventsPublisherFunc
+	rdb                  *redis.Client
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *DriverServiceServer {
@@ -296,7 +296,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 
 		igroup.Instances[i] = instance
 
-		instDatasPublisher(instance.Uuid, instance.Data)
+		go instDatasPublisher(instance.Uuid, instance.Data)
 	}
 
 	data := igroup.GetData()
@@ -311,7 +311,7 @@ func (s *DriverServiceServer) Down(ctx context.Context, input *pb.DownRequest) (
 	}
 
 	igroup.Data = make(map[string]*structpb.Value)
-	igDatasPublisher(igroup.Uuid, igroup.Data)
+	go igDatasPublisher(igroup.Uuid, igroup.Data)
 
 	s.log.Debug("Down request completed", zap.Any("instances_group", igroup))
 	return &pb.DownResponse{Group: igroup}, nil
@@ -378,11 +378,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 
 				ig.Data = data
-				datasPublisher(ig.Uuid, ig.Data)
+				go datasPublisher(ig.Uuid, ig.Data)
 			}
 
 			if len(resp.ToBeUpdated) != 0 {
-				handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
+				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
 			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
@@ -398,7 +398,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
 
-			handleInstanceBilling(log, s.HandlePublishRecords, client, inst, igStatus)
+			go handleInstanceBilling(log, s.HandlePublishRecords, client, inst, igStatus)
 		}
 	}
 
@@ -419,8 +419,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
 
-	statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
-	datasPublisher(pd.Uuid, pd.PublicData)
+	go statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
+	go datasPublisher(pd.Uuid, pd.PublicData)
 
 	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil

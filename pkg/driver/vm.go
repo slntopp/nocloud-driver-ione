@@ -512,7 +512,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		}
 		c.Chown("vm", vmid, userid, group)
 
-		instDatasPublisher(inst.Uuid, inst.Data)
+		go instDatasPublisher(inst.Uuid, inst.Data)
 	}
 
 	for _, inst := range resp.ToBeDeleted {
@@ -534,7 +534,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		data["public_ips_free"] = ips_free_new
 		data["public_ips_total"] = ips_total_new
 
-		igDatasPublisher(ig.Uuid, data)
+		go igDatasPublisher(ig.Uuid, data)
 	}
 
 	for _, inst := range resp.ToBeUpdated {
@@ -622,7 +622,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 				data["public_ips_free"] = ips_free_new
 				data["public_ips_total"] = ips_total_new
 
-				igDatasPublisher(ig.Uuid, data)
+				go igDatasPublisher(ig.Uuid, data)
 
 			} else {
 				nics := VM.Template.GetNICs()
@@ -658,7 +658,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 						data["public_ips_free"] = ips_free_new
 						data["public_ips_total"] = ips_total_new
 
-						igDatasPublisher(ig.Uuid, data)
+						go igDatasPublisher(ig.Uuid, data)
 
 						break
 					}
