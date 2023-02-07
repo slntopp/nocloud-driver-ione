@@ -385,7 +385,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
-			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
 
 		igStatus := ig.GetStatus()

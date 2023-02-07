@@ -37,7 +37,7 @@ import (
 
 type IClient interface {
 	CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesGroupResponse, error)
-	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int)
+	CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) *CheckInstancesGroupResponse
 	Chmod(class string, oid int, perm *shared.Permissions) error
 	Chown(class string, oid, uid, gid int) error
 	CreateUser(name, pass string, groups []int) (id int, err error)

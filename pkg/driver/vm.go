@@ -492,32 +492,40 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
-func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) {
+func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) *CheckInstancesGroupResponse {
 	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
 
 	instDatasPublisher := datas.DataPublisher(datas.POST_INST_DATA)
 	igDatasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
 
-	for _, inst := range resp.ToBeCreated {
-		token, err := auth.MakeTokenInstance(inst.GetUuid())
+	successResp := CheckInstancesGroupResponse{
+		ToBeCreated: make([]*pb.Instance, 0),
+		ToBeDeleted: make([]*pb.Instance, 0),
+	}
+
+	created := resp.ToBeCreated
+	for i := 0; i < len(created); i++ {
+		token, err := auth.MakeTokenInstance(created[i].GetUuid())
 		if err != nil {
-			c.log.Error("Error generating VM token", zap.String("instance", inst.GetUuid()), zap.Error(err))
+			c.log.Error("Error generating VM token", zap.String("instance", created[i].GetUuid()), zap.Error(err))
 			continue
 		}
-		vmid, err := c.InstantiateTemplateHelper(inst, ig, token)
+		vmid, err := c.InstantiateTemplateHelper(created[i], ig, token)
 		if err != nil {
-			c.log.Error("Error deploying VM", zap.String("instance", inst.GetUuid()), zap.Error(err))
+			c.log.Error("Error deploying VM", zap.String("instance", created[i].GetUuid()), zap.Error(err))
 			continue
 		}
 		c.Chown("vm", vmid, userid, group)
 
-		go instDatasPublisher(inst.Uuid, inst.Data)
+		go instDatasPublisher(created[i].Uuid, created[i].Data)
+		successResp.ToBeCreated = append(successResp.ToBeCreated, created[i])
 	}
 
-	for _, inst := range resp.ToBeDeleted {
-		inst_res := inst.GetResources()
-		vmid, err := GetVMIDFromData(c, inst)
+	deleted := resp.ToBeDeleted
+	for i := 0; i < len(deleted); i++ {
+		inst_res := deleted[i].GetResources()
+		vmid, err := GetVMIDFromData(c, deleted[i])
 		if err != nil {
 			c.log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
@@ -535,6 +543,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		data["public_ips_total"] = ips_total_new
 
 		go igDatasPublisher(ig.Uuid, data)
+		successResp.ToBeDeleted = append(successResp.ToBeDeleted, deleted[i])
 	}
 
 	for _, inst := range resp.ToBeUpdated {
@@ -586,7 +595,8 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		publicNetwork := c.ctrl.VirtualNetwork(public_vn)
 		publicNetworkInfo, err := publicNetwork.Info(true)
 		if err != nil {
-			return
+			c.log.Error("Failed to get public networks info", zap.Error(err))
+			continue
 		}
 
 		for _, val := range publicNetworkInfo.ARs {
@@ -776,6 +786,8 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			delete(inst.State.Meta, "updated")
 		}
 	}
+
+	return &successResp
 }
 
 func GetVMIDFromData(client IClient, inst *pb.Instance) (vmid int, err error) {
