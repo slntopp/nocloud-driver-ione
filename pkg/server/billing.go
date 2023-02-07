@@ -27,6 +27,16 @@ import (
 
 var clock utils.IClock = &utils.Clock{}
 
+var notificationsPeriodes = map[int64]int64{
+	0:       0,
+	86400:   1,
+	172800:  2,
+	259200:  3,
+	604800:  7,
+	1296000: 15,
+	2592000: 30,
+}
+
 func Lazy[T any](f func() T) func() T {
 	var o T
 	var once sync.Once
@@ -191,9 +201,72 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			})
 		}
 	}
+	handleBillingEvent(i, events)
 
 	go records(context.Background(), append(resourceRecords, productRecords...))
 	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+}
+
+func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
+	data := i.GetData()
+	now := time.Now().Unix()
+
+	last_monitoring, ok := data["last_monitoring"]
+	if !ok {
+		return
+	}
+
+	last_monitoring_value := int64(last_monitoring.GetNumberValue())
+
+	productName := i.GetProduct()
+
+	products := i.GetBillingPlan().GetProducts()
+	product, ok := products[productName]
+
+	if !ok {
+		return
+	}
+
+	productKind := product.GetKind()
+	period := product.GetPeriod()
+
+	var diff int64
+
+	if productKind == billingpb.Kind_PREPAID {
+		diff = now - (last_monitoring_value - period)
+	} else {
+		diff = now - last_monitoring_value
+	}
+
+	for key, val := range notificationsPeriodes {
+		if diff <= key {
+			notification_period, ok := data["notification_period"]
+			if !ok {
+				data["notification_period"] = structpb.NewNumberValue(float64(val))
+				go events(context.Background(), &epb.Event{
+					Type: "email",
+					Uuid: "expiry_notification",
+					Key:  i.GetUuid(),
+					Data: map[string]*structpb.Value{
+						"period": structpb.NewNumberValue(float64(val)),
+					},
+				})
+			}
+
+			if val != int64(notification_period.GetNumberValue()) {
+				data["notification_period"] = structpb.NewNumberValue(float64(val))
+				go events(context.Background(), &epb.Event{
+					Type: "email",
+					Uuid: "expiry_notification",
+					Key:  i.GetUuid(),
+					Data: map[string]*structpb.Value{
+						"period": structpb.NewNumberValue(float64(val)),
+					},
+				})
+			}
+			break
+		}
+	}
 }
 
 type BillingHandlerFunc func(
