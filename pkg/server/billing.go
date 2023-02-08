@@ -27,14 +27,19 @@ import (
 
 var clock utils.IClock = &utils.Clock{}
 
-var notificationsPeriodes = map[int64]int64{
-	0:       0,
-	86400:   1,
-	172800:  2,
-	259200:  3,
-	604800:  7,
-	1296000: 15,
-	2592000: 30,
+type ExpiryDiff struct {
+	Timestamp int64
+	Days      int64
+}
+
+var notificationsPeriods = []ExpiryDiff{
+	{0, 0},
+	{86400, 1},
+	{172800, 2},
+	{259200, 3},
+	{604800, 7},
+	{1296000, 15},
+	{2592000, 30},
 }
 
 func Lazy[T any](f func() T) func() T {
@@ -238,28 +243,28 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 		diff = last_monitoring_value + period - now
 	}
 
-	for key, val := range notificationsPeriodes {
-		if diff <= key {
+	for _, val := range notificationsPeriods {
+		if diff <= val.Timestamp {
 			notification_period, ok := data["notification_period"]
 			if !ok {
-				data["notification_period"] = structpb.NewNumberValue(float64(val))
+				data["notification_period"] = structpb.NewNumberValue(float64(val.Days))
 				go events(context.Background(), &epb.Event{
 					Uuid: i.GetUuid(),
 					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period":   structpb.NewNumberValue(float64(val)),
+						"period":   structpb.NewNumberValue(float64(val.Days)),
 						"instance": structpb.NewStringValue(i.GetTitle()),
 					},
 				})
 			}
 
-			if val != int64(notification_period.GetNumberValue()) {
-				data["notification_period"] = structpb.NewNumberValue(float64(val))
+			if val.Days != int64(notification_period.GetNumberValue()) {
+				data["notification_period"] = structpb.NewNumberValue(float64(val.Days))
 				go events(context.Background(), &epb.Event{
 					Uuid: i.GetUuid(),
 					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period":   structpb.NewNumberValue(float64(val)),
+						"period":   structpb.NewNumberValue(float64(val.Days)),
 						"instance": structpb.NewStringValue(i.GetTitle()),
 					},
 				})
