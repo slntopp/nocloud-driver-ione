@@ -244,8 +244,8 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 			if !ok {
 				data["notification_period"] = structpb.NewNumberValue(float64(val))
 				go events(context.Background(), &epb.Event{
-					Uuid: "expiry_notification",
-					Key:  i.GetUuid(),
+					Uuid: i.GetUuid(),
+					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
 						"period": structpb.NewNumberValue(float64(val)),
 					},
@@ -255,8 +255,8 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 			if val != int64(notification_period.GetNumberValue()) {
 				data["notification_period"] = structpb.NewNumberValue(float64(val))
 				go events(context.Background(), &epb.Event{
-					Uuid: "expiry_notification",
-					Key:  i.GetUuid(),
+					Uuid: i.GetUuid(),
+					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
 						"period": structpb.NewNumberValue(float64(val)),
 					},
