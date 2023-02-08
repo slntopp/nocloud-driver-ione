@@ -233,9 +233,9 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 	var diff int64
 
 	if productKind == billingpb.Kind_PREPAID {
-		diff = now - (last_monitoring_value - period)
+		diff = last_monitoring_value - now
 	} else {
-		diff = now - last_monitoring_value
+		diff = last_monitoring_value + period - now
 	}
 
 	for key, val := range notificationsPeriodes {
