@@ -247,7 +247,8 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Uuid: i.GetUuid(),
 					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period": structpb.NewNumberValue(float64(val)),
+						"period":   structpb.NewNumberValue(float64(val)),
+						"instance": structpb.NewStringValue(i.GetTitle()),
 					},
 				})
 			}
@@ -258,7 +259,8 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Uuid: i.GetUuid(),
 					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period": structpb.NewNumberValue(float64(val)),
+						"period":   structpb.NewNumberValue(float64(val)),
+						"instance": structpb.NewStringValue(i.GetTitle()),
 					},
 				})
 			}
