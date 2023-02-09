@@ -254,6 +254,7 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Data: map[string]*structpb.Value{
 						"period":   structpb.NewNumberValue(float64(val.Days)),
 						"instance": structpb.NewStringValue(i.GetTitle()),
+						"product":  structpb.NewStringValue(i.GetProduct()),
 					},
 				})
 			}
@@ -266,6 +267,7 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Data: map[string]*structpb.Value{
 						"period":   structpb.NewNumberValue(float64(val.Days)),
 						"instance": structpb.NewStringValue(i.GetTitle()),
+						"product":  structpb.NewStringValue(i.GetProduct()),
 					},
 				})
 			}
