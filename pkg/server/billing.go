@@ -236,13 +236,18 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 	period := product.GetPeriod()
 
 	var diff int64
+	var expirationDate int64
 
 	if productKind == billingpb.Kind_PREPAID {
 		diff = last_monitoring_value - now
+		expirationDate = last_monitoring_value
 	} else {
 		diff = last_monitoring_value + period - now
+		expirationDate = last_monitoring_value + period
 	}
 
+	unix := time.Unix(expirationDate, 0)
+	year, month, day := unix.Date()
 	for _, val := range notificationsPeriods {
 		if diff <= val.Timestamp {
 			notification_period, ok := data["notification_period"]
@@ -255,6 +260,7 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 						"period":   structpb.NewNumberValue(float64(val.Days)),
 						"instance": structpb.NewStringValue(i.GetTitle()),
 						"product":  structpb.NewStringValue(i.GetProduct()),
+						"date":     structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
 					},
 				})
 			}
@@ -268,6 +274,7 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 						"period":   structpb.NewNumberValue(float64(val.Days)),
 						"instance": structpb.NewStringValue(i.GetTitle()),
 						"product":  structpb.NewStringValue(i.GetProduct()),
+						"date":     structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
 					},
 				})
 			}
