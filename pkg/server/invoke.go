@@ -61,7 +61,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	if err != nil {
 		return nil, err
 	} else {
-		go handleManualRenewBilling(s.log, s.HandlePublishRecords, client, instance)
+		go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
 	}
 
 	return response, err

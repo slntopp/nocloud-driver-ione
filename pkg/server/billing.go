@@ -283,8 +283,33 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 	}
 }
 
-func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, client one.IClient, i *ipb.Instance) {
+func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, i *ipb.Instance) {
+	log := logger.Named("InstanceRenewBillingHandler").Named(i.GetUuid())
+	log.Debug("Initializing")
+	productRecords := make([]*billingpb.Record, 1)
 
+	product := i.GetProduct()
+	data := i.GetData()
+	plan := i.GetBillingPlan()
+	p := plan.GetProducts()[product]
+	period := p.GetPeriod()
+
+	lastMonitoring := int64(data["last_monitoring"].GetNumberValue())
+
+	start := lastMonitoring + period
+	end := start + period
+
+	productRecords = append(productRecords, &billingpb.Record{
+		Start:    start,
+		End:      end,
+		Exec:     start,
+		Priority: billingpb.Priority_URGENT,
+		Instance: i.GetUuid(),
+		Product:  product,
+		Total:    p.GetPrice(),
+	})
+
+	go records(context.Background(), productRecords)
 }
 
 type BillingHandlerFunc func(
