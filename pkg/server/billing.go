@@ -283,6 +283,10 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 	}
 }
 
+func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, client one.IClient, i *ipb.Instance) {
+
+}
+
 type BillingHandlerFunc func(
 	*zap.Logger,
 	LazyTimeline,

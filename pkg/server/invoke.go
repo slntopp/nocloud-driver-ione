@@ -17,6 +17,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -45,11 +46,25 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	}
 
 	action, ok := actions.Actions[method]
+	if !ok {
+		s.log.Warn(fmt.Sprintf("Action %s not declared for %s", method, DRIVER_TYPE))
+	} else {
+		return action(client, instance, req.GetParams())
+	}
 
+	action, ok = actions.BillingActions[method]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
 	}
-	return action(client, instance, req.GetParams())
+
+	response, err := action(client, instance, req.GetParams())
+	if err != nil {
+		return nil, err
+	} else {
+		go handleManualRenewBilling(s.log, s.HandlePublishRecords, client, instance)
+	}
+
+	return response, err
 }
 
 func (s *DriverServiceServer) SpPrep(ctx context.Context, req *services_providers.PrepSP) (res *services_providers.PrepSP, err error) {

@@ -18,11 +18,13 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"io"
 	"net/http"
 	"time"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	billingpb "github.com/slntopp/nocloud-proto/billing"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -48,6 +50,10 @@ var Actions = map[string]ServiceAction{
 	"snapdelete": SnapDelete,
 	"snaprevert": SnapRevert,
 	"start_vnc":  StartVNC,
+}
+
+var BillingActions = map[string]ServiceAction{
+	"manual_renew": ManualRenew,
 }
 
 var AdminActions = map[string]bool{
@@ -438,4 +444,33 @@ func Monitoring(
 	}
 
 	return resp, nil
+}
+
+func ManualRenew(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	instData := inst.GetData()
+	instProduct := inst.GetProduct()
+	billingPlan := inst.GetBillingPlan()
+
+	kind := billingPlan.GetKind()
+	if kind != billingpb.PlanKind_STATIC {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "Not implemented for dynamic plan")
+	}
+
+	lastMonitoring, ok := instData["last_monitoring"]
+	if !ok {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "No last_monitoring data")
+	}
+	lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+
+	period := billingPlan.GetProducts()[instProduct].GetPeriod()
+
+	lastMonitoringValue += period
+	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
+
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
+	return &ipb.InvokeResponse{Result: true}, nil
 }
