@@ -440,8 +440,9 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 			zap.Int("vms_found", len(vms_pool.VMs)))
 
 		for _, vm := range vms_pool.VMs {
-			if _, ok := instMapForFastSearch[vm.ID]; !ok {
-				log.Debug("VM not found among initialized Instances", zap.Int("vmid", vm.ID))
+			inst, ok := instMapForFastSearch[vm.ID]
+			if !ok || (ok && inst.GetStatus() == pb.InstanceStatus_DEL) {
+				log.Debug("VM not found among initialized Instances or should be deleted", zap.Int("vmid", vm.ID))
 				vmInst, err := c.VMToInstance(vm.ID)
 				if err != nil {
 					log.Warn("Error Converting VM to Instance", zap.Error(err))
