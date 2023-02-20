@@ -20,6 +20,7 @@ import (
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	pdpb "github.com/slntopp/nocloud-proto/services_providers"
 	stpb "github.com/slntopp/nocloud-proto/states"
+	statuspb "github.com/slntopp/nocloud-proto/statuses"
 	i "github.com/slntopp/nocloud/pkg/instances"
 	pd "github.com/slntopp/nocloud/pkg/public_data"
 	s "github.com/slntopp/nocloud/pkg/states"
@@ -111,6 +112,15 @@ func postSPPublicData(uuid string, data map[string]*structpb.Value) {
 		msg := &pdpb.ObjectPublicData{Uuid: uuid, Data: data}
 		if _, err := PdSpPub(msg); err != nil {
 			log.Error("Failed to post sp PublicData", zap.Any("object_public_data", msg), zap.Error(err))
+		}
+	}
+}
+
+func PostInstanceStatus(uuid string, status *statuspb.Status) {
+	if StatusPub != nil {
+		msg := &statuspb.ObjectStatus{Uuid: uuid, Status: status}
+		if _, err := StatusPub(msg); err != nil {
+			log.Error("Failsed to post instance Status", zap.Any("status", msg), zap.Error(err))
 		}
 	}
 }

@@ -39,17 +39,18 @@ type ServiceAction func(
 ) (*ipb.InvokeResponse, error)
 
 var Actions = map[string]ServiceAction{
-	"poweroff":   Poweroff,
-	"suspend":    Suspend,
-	"reboot":     Reboot,
-	"resume":     Resume,
-	"reinstall":  Reinstall,
-	"monitoring": Monitoring,
-	"state":      State,
-	"snapcreate": SnapCreate,
-	"snapdelete": SnapDelete,
-	"snaprevert": SnapRevert,
-	"start_vnc":  StartVNC,
+	"poweroff":     Poweroff,
+	"suspend":      Suspend,
+	"reboot":       Reboot,
+	"resume":       Resume,
+	"reinstall":    Reinstall,
+	"monitoring":   Monitoring,
+	"state":        State,
+	"snapcreate":   SnapCreate,
+	"snapdelete":   SnapDelete,
+	"snaprevert":   SnapRevert,
+	"start_vnc":    StartVNC,
+	"cancel_renew": CancelRenew,
 }
 
 var BillingActions = map[string]ServiceAction{
@@ -471,6 +472,22 @@ func ManualRenew(
 	lastMonitoringValue += period
 	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
 
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
+	return &ipb.InvokeResponse{Result: true}, nil
+}
+
+func CancelRenew(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	instData := inst.GetData()
+
+	if instData == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Instance data is nil")
+	}
+
+	instData["canceled_remove"] = structpb.NewBoolValue(true)
 	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
 	return &ipb.InvokeResponse{Result: true}, nil
 }
