@@ -72,7 +72,7 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
-	err = datas.StIPub(request)
+	_, err = datas.StIPub(request)
 	if err != nil {
 		log.Error("Failed to post State", zap.Any("instance_state", request), zap.Error(err))
 	}

@@ -30,6 +30,7 @@ import (
 	"github.com/slntopp/nocloud-proto/hasher"
 	pb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
+	statuspb "github.com/slntopp/nocloud-proto/statuses"
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -441,7 +442,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 
 		for _, vm := range vms_pool.VMs {
 			inst, ok := instMapForFastSearch[vm.ID]
-			if !ok || (ok && inst.GetStatus() == pb.InstanceStatus_DEL) {
+			if !ok || (ok && inst.GetStatus() == statuspb.NoCloudStatus_DEL) {
 				log.Debug("VM not found among initialized Instances or should be deleted", zap.Int("vmid", vm.ID))
 				vmInst, err := c.VMToInstance(vm.ID)
 				if err != nil {
@@ -468,7 +469,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 		res.Uuid = ""
 		res.Title = inst.GetTitle()
-		res.Status = pb.InstanceStatus_INIT
+		res.Status = statuspb.NoCloudStatus_INIT
 		res.BillingPlan = inst.BillingPlan
 		res.Data = nil
 		res.State = nil
