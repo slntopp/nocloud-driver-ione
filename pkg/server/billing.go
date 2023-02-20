@@ -176,9 +176,8 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	}
 
 	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
-
+	_, isStatic := i.Data["last_monitoring"]
 	if status == statuspb.NoCloudStatus_SUS {
-		_, isStatic := i.Data["last_monitoring"]
 		if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
@@ -209,8 +208,19 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	}
 	handleBillingEvent(i, events)
 
-	go records(context.Background(), append(resourceRecords, productRecords...))
-	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+	canceled_renew, ok := i.Data["canceled_renew"]
+
+	firstCondition := ok && canceled_renew.GetBoolValue() && isStatic && len(productRecords) != 0
+	secondCondition := ok && canceled_renew.GetBoolValue() && !isStatic
+
+	if firstCondition || secondCondition {
+		datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
+			Status: statuspb.NoCloudStatus_DEL,
+		})
+	} else {
+		go records(context.Background(), append(resourceRecords, productRecords...))
+		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+	}
 }
 
 func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
