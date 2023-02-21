@@ -19,6 +19,7 @@ import (
 	billingpb "github.com/slntopp/nocloud-proto/billing"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
+	statuspb "github.com/slntopp/nocloud-proto/statuses"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -75,7 +76,7 @@ type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
 type EventsPublisherFunc func(context.Context, *epb.Event)
 
-func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
+func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
@@ -175,9 +176,8 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	}
 
 	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
-
-	if status == ipb.InstanceStatus_SUS {
-		_, isStatic := i.Data["last_monitoring"]
+	_, isStatic := i.Data["last_monitoring"]
+	if status == statuspb.NoCloudStatus_SUS {
 		if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
@@ -208,6 +208,17 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	}
 	handleBillingEvent(i, events)
 
+	canceled_renew, ok := i.Data["canceled_renew"]
+
+	firstCondition := ok && canceled_renew.GetBoolValue() && isStatic && len(productRecords) != 0
+	secondCondition := ok && canceled_renew.GetBoolValue() && !isStatic
+	thirdCondition := ok && status == statuspb.NoCloudStatus_SUS
+
+	if firstCondition || secondCondition || thirdCondition {
+		go datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
+			Status: statuspb.NoCloudStatus_DEL,
+		})
+	}
 	go records(context.Background(), append(resourceRecords, productRecords...))
 	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 }
