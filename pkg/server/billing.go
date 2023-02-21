@@ -212,15 +212,15 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	firstCondition := ok && canceled_renew.GetBoolValue() && isStatic && len(productRecords) != 0
 	secondCondition := ok && canceled_renew.GetBoolValue() && !isStatic
+	thirdCondition := ok && status == statuspb.NoCloudStatus_SUS
 
-	if firstCondition || secondCondition {
+	if firstCondition || secondCondition || thirdCondition {
 		datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
 			Status: statuspb.NoCloudStatus_DEL,
 		})
-	} else {
-		go records(context.Background(), append(resourceRecords, productRecords...))
-		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 	}
+	go records(context.Background(), append(resourceRecords, productRecords...))
+	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 }
 
 func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
