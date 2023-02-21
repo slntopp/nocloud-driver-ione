@@ -215,7 +215,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	thirdCondition := ok && status == statuspb.NoCloudStatus_SUS
 
 	if firstCondition || secondCondition || thirdCondition {
-		datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
+		go datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
 			Status: statuspb.NoCloudStatus_DEL,
 		})
 	}
