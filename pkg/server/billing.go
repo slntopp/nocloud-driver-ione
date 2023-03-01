@@ -292,6 +292,7 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 			break
 		}
 	}
+	i.Data = data
 }
 
 func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, i *ipb.Instance) {
