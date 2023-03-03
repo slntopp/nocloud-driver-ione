@@ -456,6 +456,10 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	for _, inst := range IG.GetInstances() {
+		if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
+			continue
+		}
+
 		vm, err := c.FindVMByInstance(inst)
 		if err != nil {
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
