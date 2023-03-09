@@ -13,7 +13,7 @@ func handleInstEvents(ctx context.Context, resp *one.CheckInstancesGroupResponse
 			Uuid: inst.GetUuid(),
 			Key:  "instance_created",
 			Data: map[string]*structpb.Value{
-				"type": structpb.NewStringValue("ione"),
+				"instance": structpb.NewStringValue(inst.GetTitle()),
 			},
 		})
 	}
@@ -23,7 +23,7 @@ func handleInstEvents(ctx context.Context, resp *one.CheckInstancesGroupResponse
 			Uuid: inst.GetUuid(),
 			Key:  "instance_deleted",
 			Data: map[string]*structpb.Value{
-				"type": structpb.NewStringValue("ione"),
+				"instance": structpb.NewStringValue(inst.GetTitle()),
 			},
 		})
 	}

@@ -196,6 +196,9 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_suspended",
+				Data: map[string]*structpb.Value{
+					"instance": structpb.NewStringValue(i.GetTitle()),
+				},
 			})
 		}
 
@@ -217,6 +220,9 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_unsuspended",
+				Data: map[string]*structpb.Value{
+					"instance": structpb.NewStringValue(i.GetTitle()),
+				},
 			})
 		}
 	}
