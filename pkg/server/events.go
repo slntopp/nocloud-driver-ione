@@ -9,7 +9,7 @@ import (
 
 func handleInstEvents(ctx context.Context, resp *one.CheckInstancesGroupResponse, events EventsPublisherFunc) {
 	for _, inst := range resp.ToBeCreated {
-		events(ctx, &epb.Event{
+		go events(ctx, &epb.Event{
 			Uuid: inst.GetUuid(),
 			Key:  "instance_created",
 			Data: map[string]*structpb.Value{
@@ -19,7 +19,7 @@ func handleInstEvents(ctx context.Context, resp *one.CheckInstancesGroupResponse
 	}
 
 	for _, inst := range resp.ToBeDeleted {
-		events(ctx, &epb.Event{
+		go events(ctx, &epb.Event{
 			Uuid: inst.GetUuid(),
 			Key:  "instance_deleted",
 			Data: map[string]*structpb.Value{
