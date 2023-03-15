@@ -450,6 +450,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 					continue
 				}
 
+				uuid := vmInst.GetData()["vm_name"].GetStringValue()
+				vmInst.Uuid = uuid
 				resp.ToBeDeleted = append(resp.ToBeDeleted, vmInst)
 			}
 		}
