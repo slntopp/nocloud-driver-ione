@@ -364,6 +364,7 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 						"date":     structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
 					},
 				})
+				continue
 			}
 
 			if val.Days != int64(notification_period.GetNumberValue()) {
