@@ -18,6 +18,8 @@ package server
 import (
 	"context"
 	"fmt"
+	epb "github.com/slntopp/nocloud-proto/events"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -49,6 +51,15 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	if !ok {
 		s.log.Warn(fmt.Sprintf("Action %s not declared for %s", method, DRIVER_TYPE))
 	} else {
+
+		if method == "suspend" {
+			go s.HandlePublishEvents(ctx, &epb.Event{
+				Uuid: instance.GetUuid(),
+				Key:  "instance_suspended",
+				Data: map[string]*structpb.Value{},
+			})
+		}
+
 		return action(client, instance, req.GetParams())
 	}
 
