@@ -12,9 +12,7 @@ func handleInstEvents(ctx context.Context, resp *one.CheckInstancesGroupResponse
 		go events(ctx, &epb.Event{
 			Uuid: inst.GetUuid(),
 			Key:  "instance_created",
-			Data: map[string]*structpb.Value{
-				"instance": structpb.NewStringValue(inst.GetTitle()),
-			},
+			Data: map[string]*structpb.Value{},
 		})
 	}
 
@@ -22,9 +20,7 @@ func handleInstEvents(ctx context.Context, resp *one.CheckInstancesGroupResponse
 		go events(ctx, &epb.Event{
 			Uuid: inst.GetUuid(),
 			Key:  "instance_deleted",
-			Data: map[string]*structpb.Value{
-				"instance": structpb.NewStringValue(inst.GetTitle()),
-			},
+			Data: map[string]*structpb.Value{},
 		})
 	}
 }

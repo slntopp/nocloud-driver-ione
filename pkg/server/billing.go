@@ -196,9 +196,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_suspended",
-				Data: map[string]*structpb.Value{
-					"instance": structpb.NewStringValue(i.GetTitle()),
-				},
+				Data: map[string]*structpb.Value{},
 			})
 		}
 
@@ -220,9 +218,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_unsuspended",
-				Data: map[string]*structpb.Value{
-					"instance": structpb.NewStringValue(i.GetTitle()),
-				},
+				Data: map[string]*structpb.Value{},
 			})
 		}
 	}
@@ -275,8 +271,7 @@ func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Uuid: i.GetUuid(),
 					Key:  "suspend_expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period":   structpb.NewNumberValue(float64(val.Days)),
-						"instance": structpb.NewStringValue(i.GetTitle()),
+						"period": structpb.NewNumberValue(float64(val.Days)),
 					},
 				})
 			}
@@ -287,8 +282,7 @@ func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Uuid: i.GetUuid(),
 					Key:  "suspend_expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period":   structpb.NewNumberValue(float64(val.Days)),
-						"instance": structpb.NewStringValue(i.GetTitle()),
+						"period": structpb.NewNumberValue(float64(val.Days)),
 					},
 				})
 			}
@@ -304,9 +298,7 @@ func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
 		go events(context.Background(), &epb.Event{
 			Uuid: i.GetUuid(),
 			Key:  "suspend_delete_instance",
-			Data: map[string]*structpb.Value{
-				"instance": structpb.NewStringValue(i.GetTitle()),
-			},
+			Data: map[string]*structpb.Value{},
 		})
 	}
 
@@ -358,10 +350,9 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Uuid: i.GetUuid(),
 					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period":   structpb.NewNumberValue(float64(val.Days)),
-						"instance": structpb.NewStringValue(i.GetTitle()),
-						"product":  structpb.NewStringValue(i.GetProduct()),
-						"date":     structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
+						"period":  structpb.NewNumberValue(float64(val.Days)),
+						"product": structpb.NewStringValue(i.GetProduct()),
+						"date":    structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
 					},
 				})
 				continue
@@ -373,10 +364,9 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 					Uuid: i.GetUuid(),
 					Key:  "expiry_notification",
 					Data: map[string]*structpb.Value{
-						"period":   structpb.NewNumberValue(float64(val.Days)),
-						"instance": structpb.NewStringValue(i.GetTitle()),
-						"product":  structpb.NewStringValue(i.GetProduct()),
-						"date":     structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
+						"period":  structpb.NewNumberValue(float64(val.Days)),
+						"product": structpb.NewStringValue(i.GetProduct()),
+						"date":    structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
 					},
 				})
 			}
