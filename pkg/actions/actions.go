@@ -204,6 +204,10 @@ func Suspend(
 	}
 
 	// return &ipb.InvokeResponse{Result: true}, nil
+
+	inst.Data["suspended_manually"] = structpb.NewBoolValue(true)
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
@@ -250,6 +254,9 @@ func Resume(
 		return nil, status.Errorf(codes.Internal, "Can't Resume VM, error: %v", err)
 	}
 
+	delete(inst.Data, "suspended_manually")
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	// return &ipb.InvokeResponse{Result: true}, nil
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }

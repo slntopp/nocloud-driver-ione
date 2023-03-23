@@ -208,7 +208,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			}
 		}
 	} else {
-		if state == "SUSPENDED" {
+		if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
 			if err := client.ResumeVM(vmid); err != nil {
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
@@ -223,7 +223,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		}
 	}
 
-	if state == "SUSPENDED" {
+	if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
 		handleSuspendEvent(i, events)
 	} else {
 		handleBillingEvent(i, events)
