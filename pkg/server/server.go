@@ -386,6 +386,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			}
 
 			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			log.Debug("Events instances", zap.Any("resp", successResp))
 			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
 
