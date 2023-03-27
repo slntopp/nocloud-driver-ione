@@ -343,6 +343,11 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 	year, month, day := unix.Date()
 	for _, val := range notificationsPeriods {
 		if diff <= val.Timestamp {
+
+			if val.Timestamp == period {
+				break
+			}
+
 			notification_period, ok := data["notification_period"]
 			if !ok {
 				data["notification_period"] = structpb.NewNumberValue(float64(val.Days))
