@@ -464,6 +464,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 
 		vm, err := c.FindVMByInstance(inst)
 		if err != nil {
+			log.Warn("VM is still not created", zap.Error(err), zap.Any("inst", inst))
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
 			continue
 		}
