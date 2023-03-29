@@ -184,7 +184,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
 	_, isStatic := i.Data["last_monitoring"]
-	if status == statuspb.NoCloudStatus_SUS {
+	if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL {
 		if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
