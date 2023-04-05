@@ -7,7 +7,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.8.0
 	github.com/slntopp/nocloud v0.0.18-0.20230220161430-c44b89bcff8a
 	github.com/slntopp/nocloud-proto v0.0.0-20230220122211-5b97a1851a4d
-	github.com/spf13/cobra v1.6.1
+	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	go.uber.org/zap v1.24.0
 	google.golang.org/grpc v1.54.0
