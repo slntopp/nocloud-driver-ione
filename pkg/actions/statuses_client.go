@@ -78,15 +78,16 @@ func StatusesClient(
 	networking, ok := inst.GetState().GetMeta()["networking"]
 	if ok {
 		networkingValue := networking.GetStructValue().AsMap()
-		publicIps := networkingValue["public"].([]interface{})
-
-		for _, val := range publicIps {
-			interfaces = append(interfaces, &stpb.Interface{
-				Kind: stpb.InterfaceKind_SSH,
-				Data: map[string]string{
-					"public_ip": val.(string),
-				},
-			})
+		publicIps, ok := networkingValue["public"].([]interface{})
+		if ok {
+			for _, val := range publicIps {
+				interfaces = append(interfaces, &stpb.Interface{
+					Kind: stpb.InterfaceKind_SSH,
+					Data: map[string]string{
+						"public_ip": val.(string),
+					},
+				})
+			}
 		}
 	}
 
