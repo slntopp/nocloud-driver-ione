@@ -72,6 +72,26 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
+
+	var interfaces []*stpb.Interface
+
+	networking, ok := inst.GetState().GetMeta()["networking"]
+	if ok {
+		networkingValue := networking.GetStructValue().AsMap()
+		publicIps := networkingValue["public"].([]interface{})
+
+		for _, val := range publicIps {
+			interfaces = append(interfaces, &stpb.Interface{
+				Kind: stpb.InterfaceKind_SSH,
+				Data: map[string]string{
+					"public_ip": val.(string),
+				},
+			})
+		}
+	}
+
+	request.State.Interfaces = interfaces
+
 	_, err = datas.StIPub(request)
 	if err != nil {
 		log.Error("Failed to post State", zap.Any("instance_state", request), zap.Error(err))
