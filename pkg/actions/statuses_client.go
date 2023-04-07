@@ -84,7 +84,7 @@ func StatusesClient(
 				interfaces = append(interfaces, &stpb.Interface{
 					Kind: stpb.InterfaceKind_SSH,
 					Data: map[string]string{
-						"public_ip": val.(string),
+						"host": val.(string),
 					},
 				})
 			}
