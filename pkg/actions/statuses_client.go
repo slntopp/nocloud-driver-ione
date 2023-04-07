@@ -85,6 +85,7 @@ func StatusesClient(
 					Kind: stpb.InterfaceKind_SSH,
 					Data: map[string]string{
 						"host": val.(string),
+						"port": "52222",
 					},
 				})
 			}
