@@ -306,6 +306,10 @@ func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
 }
 
 func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
+	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
+		return
+	}
+
 	data := i.GetData()
 	now := time.Now().Unix()
 
