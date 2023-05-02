@@ -254,7 +254,7 @@ func Resume(
 		return nil, status.Errorf(codes.Internal, "Can't Resume VM, error: %v", err)
 	}
 
-	delete(inst.Data, "suspended_manually")
+	inst.Data["suspended_manually"] = structpb.NewBoolValue(false)
 
 	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	// return &ipb.InvokeResponse{Result: true}, nil
