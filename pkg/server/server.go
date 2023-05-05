@@ -378,14 +378,16 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 
 				ig.Data = data
-				datasPublisher(ig.Uuid, ig.Data)
+				go datasPublisher(ig.Uuid, ig.Data)
 			}
 
 			if len(resp.ToBeUpdated) != 0 {
-				handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
+				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
-			client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			log.Debug("Events instances", zap.Any("resp", successResp))
+			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
 
 		igStatus := ig.GetStatus()
@@ -419,8 +421,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
 
-	statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
-	datasPublisher(pd.Uuid, pd.PublicData)
+	go statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
+	go datasPublisher(pd.Uuid, pd.PublicData)
 
 	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil

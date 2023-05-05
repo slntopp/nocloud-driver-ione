@@ -3,12 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
-	epb "github.com/slntopp/nocloud-proto/events"
 	"math"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	epb "github.com/slntopp/nocloud-proto/events"
 
 	oneshared "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
@@ -18,6 +19,7 @@ import (
 	billingpb "github.com/slntopp/nocloud-proto/billing"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
+	statuspb "github.com/slntopp/nocloud-proto/statuses"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -25,6 +27,28 @@ import (
 )
 
 var clock utils.IClock = &utils.Clock{}
+
+type ExpiryDiff struct {
+	Timestamp int64
+	Days      int64
+}
+
+var notificationsPeriods = []ExpiryDiff{
+	{0, 0},
+	{86400, 1},
+	{172800, 2},
+	{259200, 3},
+	{604800, 7},
+	{1296000, 15},
+	{2592000, 30},
+}
+
+var suspendNotificationsPeriods = []ExpiryDiff{
+	{604800, 7},
+	{259200, 3},
+	{172800, 2},
+	{86400, 1},
+}
 
 func Lazy[T any](f func() T) func() T {
 	var o T
@@ -59,7 +83,7 @@ type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
 type EventsPublisherFunc func(context.Context, *epb.Event)
 
-func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eventsPublish EventsPublisherFunc, client one.IClient, i *ipb.Instance, status ipb.InstanceStatus) {
+func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
 
@@ -158,19 +182,21 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 		}
 	}
 
-	publisher := datas.DataPublisher(datas.POST_INST_DATA)
-
 	log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
-
-	if status == ipb.InstanceStatus_SUS {
-		_, isStatic := i.Data["last_monitoring"]
+	_, isStatic := i.Data["last_monitoring"]
+	if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL {
 		if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 			}
-			go eventsPublish(context.Background(), &epb.Event{
+
+			suspendTime := structpb.NewNumberValue(float64(time.Now().Unix()))
+			i.Data["suspend_time"] = suspendTime
+
+			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_suspended",
+				Data: map[string]*structpb.Value{},
 			})
 		}
 
@@ -182,20 +208,210 @@ func handleInstanceBilling(logger *zap.Logger, publish RecordsPublisherFunc, eve
 			}
 		}
 	} else {
-		if state == "SUSPENDED" {
+		if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
 			if err := client.ResumeVM(vmid); err != nil {
 				log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 			}
-			go eventsPublish(context.Background(), &epb.Event{
+
+			delete(i.Data, "suspend_time")
+
+			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_unsuspended",
+				Data: map[string]*structpb.Value{},
 			})
 		}
 	}
 
-	go publish(context.Background(), productRecords)
-	go publish(context.Background(), resourceRecords)
-	go publisher(i.Uuid, i.Data)
+	if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
+		handleSuspendEvent(i, events)
+	} else {
+		handleBillingEvent(i, events)
+	}
+
+	canceled_renew, ok := i.Data["canceled_renew"]
+
+	firstCondition := ok && canceled_renew.GetBoolValue() && isStatic && len(productRecords) != 0
+	secondCondition := ok && canceled_renew.GetBoolValue() && !isStatic
+	thirdCondition := ok && status == statuspb.NoCloudStatus_SUS
+
+	if firstCondition || secondCondition || thirdCondition {
+		go datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
+			Status: statuspb.NoCloudStatus_DEL,
+		})
+	}
+	go records(context.Background(), append(resourceRecords, productRecords...))
+	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+}
+
+func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
+	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
+		return
+	}
+
+	data := i.GetData()
+	now := time.Now().Unix()
+
+	suspend_time, ok := data["suspend_time"]
+	if !ok {
+		return
+	}
+
+	suspend_time_value := int64(suspend_time.GetNumberValue())
+
+	diff := now - suspend_time_value
+
+	for _, val := range suspendNotificationsPeriods {
+		if diff >= val.Timestamp {
+			suspend_notification_period, ok := data["suspend_notification_period"]
+
+			if !ok {
+				data["suspend_notification_period"] = structpb.NewNumberValue(float64(val.Days))
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "suspend_expiry_notification",
+					Data: map[string]*structpb.Value{
+						"period": structpb.NewNumberValue(float64(val.Days)),
+					},
+				})
+			}
+
+			if val.Days != int64(suspend_notification_period.GetNumberValue()) {
+				data["suspend_notification_period"] = structpb.NewNumberValue(float64(val.Days))
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "suspend_expiry_notification",
+					Data: map[string]*structpb.Value{
+						"period": structpb.NewNumberValue(float64(val.Days)),
+					},
+				})
+			}
+			break
+		}
+	}
+
+	if int64(data["suspend_notification_period"].GetNumberValue()) == 7 {
+		go datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
+			Status: statuspb.NoCloudStatus_DEL,
+		})
+
+		go events(context.Background(), &epb.Event{
+			Uuid: i.GetUuid(),
+			Key:  "suspend_delete_instance",
+			Data: map[string]*structpb.Value{},
+		})
+	}
+
+	i.Data = data
+}
+
+func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
+	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
+		return
+	}
+
+	data := i.GetData()
+	now := time.Now().Unix()
+
+	last_monitoring, ok := data["last_monitoring"]
+	if !ok {
+		return
+	}
+
+	last_monitoring_value := int64(last_monitoring.GetNumberValue())
+
+	productName := i.GetProduct()
+
+	products := i.GetBillingPlan().GetProducts()
+	product, ok := products[productName]
+
+	if !ok {
+		return
+	}
+
+	productKind := product.GetKind()
+	period := product.GetPeriod()
+
+	var diff int64
+	var expirationDate int64
+
+	if productKind == billingpb.Kind_PREPAID {
+		diff = last_monitoring_value - now
+		expirationDate = last_monitoring_value
+	} else {
+		diff = last_monitoring_value + period - now
+		expirationDate = last_monitoring_value + period
+	}
+
+	unix := time.Unix(expirationDate, 0)
+	year, month, day := unix.Date()
+	for _, val := range notificationsPeriods {
+		if diff <= val.Timestamp {
+
+			if val.Timestamp == period {
+				break
+			}
+
+			notification_period, ok := data["notification_period"]
+			if !ok {
+				data["notification_period"] = structpb.NewNumberValue(float64(val.Days))
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "expiry_notification",
+					Data: map[string]*structpb.Value{
+						"period":  structpb.NewNumberValue(float64(val.Days)),
+						"product": structpb.NewStringValue(i.GetProduct()),
+						"date":    structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
+					},
+				})
+				continue
+			}
+
+			if val.Days != int64(notification_period.GetNumberValue()) {
+				data["notification_period"] = structpb.NewNumberValue(float64(val.Days))
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "expiry_notification",
+					Data: map[string]*structpb.Value{
+						"period":  structpb.NewNumberValue(float64(val.Days)),
+						"product": structpb.NewStringValue(i.GetProduct()),
+						"date":    structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
+					},
+				})
+			}
+			break
+		}
+	}
+	i.Data = data
+}
+
+func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, i *ipb.Instance) {
+	log := logger.Named("InstanceRenewBillingHandler").Named(i.GetUuid())
+	log.Debug("Initializing")
+	productRecords := make([]*billingpb.Record, 1)
+
+	product := i.GetProduct()
+	data := i.GetData()
+	plan := i.GetBillingPlan()
+	p := plan.GetProducts()[product]
+	period := p.GetPeriod()
+
+	lastMonitoring := int64(data["last_monitoring"].GetNumberValue())
+
+	start := lastMonitoring + period
+	end := start + period
+
+	productRecords = append(productRecords, &billingpb.Record{
+		Start:    start,
+		End:      end,
+		Exec:     start,
+		Priority: billingpb.Priority_URGENT,
+		Instance: i.GetUuid(),
+		Product:  product,
+		Total:    p.GetPrice(),
+	})
+
+	go records(context.Background(), productRecords)
 }
 
 type BillingHandlerFunc func(
@@ -453,5 +669,5 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		}
 	}
 
-	go publish(context.Background(), records)
+	publish(context.Background(), records)
 }

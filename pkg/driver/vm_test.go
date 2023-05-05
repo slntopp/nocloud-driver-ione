@@ -11,7 +11,7 @@ func TestFilterTimeline(t *testing.T) {
 	c := goca.NewClient(conf, nil)
 	ctrl := goca.NewController(c)
 
-	machine, err := ctrl.VM(6165).Info(true)
+	machine, err := ctrl.VM(6166).Info(true)
 
 	if err != nil {
 		t.Errorf("Cannot get vm")

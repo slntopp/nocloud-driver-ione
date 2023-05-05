@@ -17,6 +17,9 @@ package server
 
 import (
 	"context"
+	"fmt"
+	epb "github.com/slntopp/nocloud-proto/events"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -45,11 +48,34 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	}
 
 	action, ok := actions.Actions[method]
+	if !ok {
+		s.log.Warn(fmt.Sprintf("Action %s not declared for %s", method, DRIVER_TYPE))
+	} else {
 
+		if method == "suspend" {
+			go s.HandlePublishEvents(ctx, &epb.Event{
+				Uuid: instance.GetUuid(),
+				Key:  "instance_suspended",
+				Data: map[string]*structpb.Value{},
+			})
+		}
+
+		return action(client, instance, req.GetParams())
+	}
+
+	action, ok = actions.BillingActions[method]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
 	}
-	return action(client, instance, req.GetParams())
+
+	response, err := action(client, instance, req.GetParams())
+	if err != nil {
+		return nil, err
+	} else {
+		go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+	}
+
+	return response, err
 }
 
 func (s *DriverServiceServer) SpPrep(ctx context.Context, req *services_providers.PrepSP) (res *services_providers.PrepSP, err error) {

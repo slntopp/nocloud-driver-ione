@@ -18,11 +18,13 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"io"
 	"net/http"
 	"time"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	billingpb "github.com/slntopp/nocloud-proto/billing"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -37,17 +39,22 @@ type ServiceAction func(
 ) (*ipb.InvokeResponse, error)
 
 var Actions = map[string]ServiceAction{
-	"poweroff":   Poweroff,
-	"suspend":    Suspend,
-	"reboot":     Reboot,
-	"resume":     Resume,
-	"reinstall":  Reinstall,
-	"monitoring": Monitoring,
-	"state":      State,
-	"snapcreate": SnapCreate,
-	"snapdelete": SnapDelete,
-	"snaprevert": SnapRevert,
-	"start_vnc":  StartVNC,
+	"poweroff":     Poweroff,
+	"suspend":      Suspend,
+	"reboot":       Reboot,
+	"resume":       Resume,
+	"reinstall":    Reinstall,
+	"monitoring":   Monitoring,
+	"state":        State,
+	"snapcreate":   SnapCreate,
+	"snapdelete":   SnapDelete,
+	"snaprevert":   SnapRevert,
+	"start_vnc":    StartVNC,
+	"cancel_renew": CancelRenew,
+}
+
+var BillingActions = map[string]ServiceAction{
+	"manual_renew": ManualRenew,
 }
 
 var AdminActions = map[string]bool{
@@ -197,6 +204,10 @@ func Suspend(
 	}
 
 	// return &ipb.InvokeResponse{Result: true}, nil
+
+	inst.Data["suspended_manually"] = structpb.NewBoolValue(true)
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
@@ -243,6 +254,9 @@ func Resume(
 		return nil, status.Errorf(codes.Internal, "Can't Resume VM, error: %v", err)
 	}
 
+	inst.Data["suspended_manually"] = structpb.NewBoolValue(false)
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	// return &ipb.InvokeResponse{Result: true}, nil
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
@@ -438,4 +452,49 @@ func Monitoring(
 	}
 
 	return resp, nil
+}
+
+func ManualRenew(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	instData := inst.GetData()
+	instProduct := inst.GetProduct()
+	billingPlan := inst.GetBillingPlan()
+
+	kind := billingPlan.GetKind()
+	if kind != billingpb.PlanKind_STATIC {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "Not implemented for dynamic plan")
+	}
+
+	lastMonitoring, ok := instData["last_monitoring"]
+	if !ok {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "No last_monitoring data")
+	}
+	lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+
+	period := billingPlan.GetProducts()[instProduct].GetPeriod()
+
+	lastMonitoringValue += period
+	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
+
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
+	return &ipb.InvokeResponse{Result: true}, nil
+}
+
+func CancelRenew(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	instData := inst.GetData()
+
+	if instData == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Instance data is nil")
+	}
+
+	instData["canceled_remove"] = structpb.NewBoolValue(true)
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
+	return &ipb.InvokeResponse{Result: true}, nil
 }

@@ -14,11 +14,12 @@ limitations under the License.
 package actions
 
 import (
+	"strings"
+
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
-	"strings"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -71,9 +72,31 @@ func StatusesClient(
 	result.Meta = par.Meta
 
 	request := MakePostStateRequest(inst.GetUuid(), par.Meta)
-	err = datas.StIPub(request)
+
+	var interfaces []*stpb.Interface
+
+	networking, ok := inst.GetState().GetMeta()["networking"]
+	if ok {
+		networkingValue := networking.GetStructValue().AsMap()
+		publicIps, ok := networkingValue["public"].([]interface{})
+		if ok {
+			for _, val := range publicIps {
+				interfaces = append(interfaces, &stpb.Interface{
+					Kind: stpb.InterfaceKind_SSH,
+					Data: map[string]string{
+						"host": val.(string),
+						"port": "52222",
+					},
+				})
+			}
+		}
+	}
+
+	request.State.Interfaces = interfaces
+
+	_, err = datas.StIPub(request)
 	if err != nil {
-		log.Error("Failed to post State", zap.Error(err))
+		log.Error("Failed to post State", zap.Any("instance_state", request), zap.Error(err))
 	}
 
 	return &ipb.InvokeResponse{Result: result.Result, Meta: result.Meta}, nil

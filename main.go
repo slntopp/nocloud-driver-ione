@@ -18,11 +18,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	epb "github.com/slntopp/nocloud-proto/events"
 	"net"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud/pkg/nocloud"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -42,7 +42,6 @@ var (
 	type_key string
 
 	log          *zap.Logger
-	statesHost   string
 	RabbitMQConn string
 	SIGNING_KEY  []byte
 	redisHost    string
@@ -57,9 +56,6 @@ func init() {
 
 	viper.SetDefault("DRIVER_TYPE_KEY", "ione")
 	type_key = viper.GetString("DRIVER_TYPE_KEY")
-
-	viper.SetDefault("STATES_HOST", "states:8080")
-	statesHost = viper.GetString("STATES_HOST")
 
 	viper.SetDefault("RABBITMQ_CONN", "amqp://nocloud:secret@rabbitmq:5672/")
 	RabbitMQConn = viper.GetString("RABBITMQ_CONN")
@@ -82,11 +78,18 @@ func main() {
 	}
 
 	log.Info("Dialing RabbitMQ", zap.String("url", RabbitMQConn))
+	amqp.DialConfig(RabbitMQConn, amqp.Config{
+		Properties: amqp.Table{
+			"connection_name": "driver." + type_key,
+		},
+	})
+
 	rbmq, err := amqp.Dial(RabbitMQConn)
 	if err != nil {
 		log.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
 	}
 	defer rbmq.Close()
+	log.Info("RabbitMQ connection established")
 
 	datas.Configure(log, rbmq)
 	actions.ConfigureStatusesClient(log)
@@ -94,6 +97,7 @@ func main() {
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
 
+	log.Info("Connecting redis", zap.String("url", redisHost))
 	rdb := redis.NewClient(&redis.Options{
 		Addr: redisHost,
 		DB:   0, // use default DB

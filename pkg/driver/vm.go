@@ -30,6 +30,7 @@ import (
 	"github.com/slntopp/nocloud-proto/hasher"
 	pb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
+	statuspb "github.com/slntopp/nocloud-proto/statuses"
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -440,22 +441,30 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 			zap.Int("vms_found", len(vms_pool.VMs)))
 
 		for _, vm := range vms_pool.VMs {
-			if _, ok := instMapForFastSearch[vm.ID]; !ok {
-				log.Debug("VM not found among initialized Instances", zap.Int("vmid", vm.ID))
+			inst, ok := instMapForFastSearch[vm.ID]
+			if !ok || (ok && inst.GetStatus() == statuspb.NoCloudStatus_DEL) {
+				log.Debug("VM not found among initialized Instances or should be deleted", zap.Int("vmid", vm.ID))
 				vmInst, err := c.VMToInstance(vm.ID)
 				if err != nil {
 					log.Warn("Error Converting VM to Instance", zap.Error(err))
 					continue
 				}
 
+				uuid := vmInst.GetData()["vm_name"].GetStringValue()
+				vmInst.Uuid = uuid
 				resp.ToBeDeleted = append(resp.ToBeDeleted, vmInst)
 			}
 		}
 	}
 
 	for _, inst := range IG.GetInstances() {
+		if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
+			continue
+		}
+
 		vm, err := c.FindVMByInstance(inst)
 		if err != nil {
+			log.Warn("VM is still not created", zap.Error(err), zap.Any("inst", inst))
 			resp.ToBeCreated = append(resp.ToBeCreated, inst)
 			continue
 		}
@@ -467,7 +476,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 		res.Uuid = ""
 		res.Title = inst.GetTitle()
-		res.Status = pb.InstanceStatus_INIT
+		res.Status = statuspb.NoCloudStatus_INIT
 		res.BillingPlan = inst.BillingPlan
 		res.Data = nil
 		res.State = nil
@@ -492,32 +501,40 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
-func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) {
+func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) *CheckInstancesGroupResponse {
 	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
 
 	instDatasPublisher := datas.DataPublisher(datas.POST_INST_DATA)
 	igDatasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
 
-	for _, inst := range resp.ToBeCreated {
-		token, err := auth.MakeTokenInstance(inst.GetUuid())
+	successResp := CheckInstancesGroupResponse{
+		ToBeCreated: make([]*pb.Instance, 0),
+		ToBeDeleted: make([]*pb.Instance, 0),
+	}
+
+	created := resp.ToBeCreated
+	for i := 0; i < len(created); i++ {
+		token, err := auth.MakeTokenInstance(created[i].GetUuid())
 		if err != nil {
-			c.log.Error("Error generating VM token", zap.String("instance", inst.GetUuid()), zap.Error(err))
+			c.log.Error("Error generating VM token", zap.String("instance", created[i].GetUuid()), zap.Error(err))
 			continue
 		}
-		vmid, err := c.InstantiateTemplateHelper(inst, ig, token)
+		vmid, err := c.InstantiateTemplateHelper(created[i], ig, token)
 		if err != nil {
-			c.log.Error("Error deploying VM", zap.String("instance", inst.GetUuid()), zap.Error(err))
+			c.log.Error("Error deploying VM", zap.String("instance", created[i].GetUuid()), zap.Error(err))
 			continue
 		}
 		c.Chown("vm", vmid, userid, group)
 
-		go instDatasPublisher(inst.Uuid, inst.Data)
+		go instDatasPublisher(created[i].Uuid, created[i].Data)
+		successResp.ToBeCreated = append(successResp.ToBeCreated, created[i])
 	}
 
-	for _, inst := range resp.ToBeDeleted {
-		inst_res := inst.GetResources()
-		vmid, err := GetVMIDFromData(c, inst)
+	deleted := resp.ToBeDeleted
+	for i := 0; i < len(deleted); i++ {
+		inst_res := deleted[i].GetResources()
+		vmid, err := GetVMIDFromData(c, deleted[i])
 		if err != nil {
 			c.log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
@@ -535,6 +552,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		data["public_ips_total"] = ips_total_new
 
 		go igDatasPublisher(ig.Uuid, data)
+		successResp.ToBeDeleted = append(successResp.ToBeDeleted, deleted[i])
 	}
 
 	for _, inst := range resp.ToBeUpdated {
@@ -586,7 +604,8 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		publicNetwork := c.ctrl.VirtualNetwork(public_vn)
 		publicNetworkInfo, err := publicNetwork.Info(true)
 		if err != nil {
-			return
+			c.log.Error("Failed to get public networks info", zap.Error(err))
+			continue
 		}
 
 		for _, val := range publicNetworkInfo.ARs {
@@ -776,6 +795,8 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			delete(inst.State.Meta, "updated")
 		}
 	}
+
+	return &successResp
 }
 
 func GetVMIDFromData(client IClient, inst *pb.Instance) (vmid int, err error) {
@@ -871,13 +892,13 @@ func (c *ONeClient) GetVmResourcesDiff(inst *pb.Instance) []*VmResourceDiff {
 	vmid, err := GetVMIDFromData(c, inst)
 	if err != nil {
 		c.log.Error("Error Getting VMID from Data", zap.Error(err))
-
+		return res
 	}
 
 	vmInst, err := c.VMToInstance(vmid)
 	if err != nil {
 		c.log.Error("Error Converting VM to Instance", zap.Error(err))
-
+		return res
 	}
 
 	vmInstIpsPublic := int(vmInst.Resources["ips_public"].GetNumberValue())
