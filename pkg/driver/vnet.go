@@ -263,6 +263,10 @@ func (c *ONeClient) GetUserPrivateVNet(user int) (id int, err error) {
 	return vnsc.ByName(fmt.Sprintf(USER_PRIVATE_VNET_NAME_PATTERN, user), user)
 }
 
+func (c *ONeClient) GetUserVNets(user int) (*vnet.Pool, error) {
+	return c.ctrl.VirtualNetworks().Info(user)
+}
+
 func (c *ONeClient) UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error {
 	vnc := c.ctrl.VirtualNetwork(id)
 	return vnc.Update(tmpl, uType)

@@ -38,6 +38,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func (c *ONeClient) GetUserVMS(userId int) (*vm.Pool, error) {
+	return c.ctrl.VMs().InfoExtended(userId)
+}
+
 func (c *ONeClient) GetInstSnapshots(inst *pb.Instance) (map[string]interface{}, error) {
 	vm, err := c.FindVMByInstance(inst)
 	if err != nil {

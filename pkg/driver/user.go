@@ -38,6 +38,10 @@ func (c *ONeClient) GetUser(id int) (*user.User, error) {
 	return uc.Info(true)
 }
 
+func (c *ONeClient) GetUsers() (*user.Pool, error) {
+	return c.ctrl.Users().Info()
+}
+
 func (c *ONeClient) CreateUser(name, pass string, groups []int) (id int, err error) {
 	uc := c.ctrl.Users()
 	return uc.Create(name, pass, "core", groups)

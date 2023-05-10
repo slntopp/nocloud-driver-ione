@@ -27,6 +27,7 @@ import (
 	pb "github.com/slntopp/nocloud-proto/drivers/instance/vanilla"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	"github.com/slntopp/nocloud-proto/services_providers"
+	spb "github.com/slntopp/nocloud-proto/services_providers"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -73,6 +74,26 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, err
 	} else {
 		go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+	}
+
+	return response, err
+}
+
+func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequest) (res *spb.InvokeResponse, err error) {
+	s.log.Debug("Invoke request received", zap.Any("action", req.Method))
+	sp := req.GetServicesProvider()
+	client, err := one.NewClientFromSP(sp, s.log)
+
+	method := req.GetMethod()
+
+	action, ok := actions.SpActions[method]
+	if !ok {
+		return nil, fmt.Errorf("action '%s' not declared for %s", req.GetMethod(), DRIVER_TYPE)
+	}
+
+	response, err := action(client, req.GetParams())
+	if err != nil {
+		return nil, err
 	}
 
 	return response, err
