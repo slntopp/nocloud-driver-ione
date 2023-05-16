@@ -14,6 +14,7 @@ RUN apk add -U --no-cache ca-certificates
 
 FROM scratch
 WORKDIR /
+
 COPY --from=builder  /go/src/github.com/slntopp/nocloud-driver-ione/nocloud-driver-ione /nocloud-driver-ione
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
