@@ -26,7 +26,6 @@ func GetUsers(client one.IClient, data map[string]*structpb.Value) (*sppb.Invoke
 	for _, val := range usersPool.Users {
 		var userInfo = make(map[string]interface{})
 		var userVmsInfo []interface{}
-		userInfo["userid"] = val.ID
 		userVms, _ := client.GetUserVMS(val.ID)
 		userNetworks, _ := client.GetUserVNets(val.ID)
 		groupPublicIps, groupPrivateIps := 0, 0
@@ -65,16 +64,29 @@ func GetUsers(client one.IClient, data map[string]*structpb.Value) (*sppb.Invoke
 
 			userVmsInfo = append(userVmsInfo, vmInfo)
 		}
+		var igResources = make(map[string]interface{})
+		var igData = make(map[string]interface{})
+
 		userInfo["vms"] = userVmsInfo
-		userInfo["ips_public"] = groupPublicIps
-		userInfo["ips_private"] = groupPrivateIps
+		igResources["ips_public"] = groupPublicIps
+		igResources["ips_private"] = groupPrivateIps
 		for _, network := range userNetworks.VirtualNetworks {
 			if strings.HasSuffix(network.Name, "pub-vnet") {
-				userInfo["public_vn"] = network.ID
+				igData["public_vn"] = network.ID
 			} else {
-				userInfo["public_vn"] = network.ID
+				igData["private_vn"] = network.ID
 			}
 		}
+		igData["userid"] = val.ID
+
+		igData["public_ips_total"] = groupPublicIps
+		igData["public_ips_free"] = 0
+		igData["private_ips_total"] = groupPrivateIps
+		igData["private_ips_free"] = 0
+
+		userInfo["resources"] = igResources
+		userInfo["data"] = igData
+
 		usersInfo = append(usersInfo, userInfo)
 	}
 
