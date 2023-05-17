@@ -31,15 +31,18 @@ func GetUsers(client one.IClient, data map[string]*structpb.Value) (*sppb.Invoke
 		userNetworks, _ := client.GetUserVNets(val.ID)
 		for _, vm := range userVms.VMs {
 			var vmInfo = make(map[string]interface{})
-			vmInfo["vmid"] = vm.ID
-			vmInfo["vm_name"] = vm.Name
-			vmInfo["cpu"], _ = vm.Template.GetVCPU()
-			vmInfo["ram"], _ = vm.Template.GetMemory()
-			vmInfo["drive_type"], _ = vm.Template.GetStrFromVec("DISK", "DRIVE_TYPE")
+			var config = make(map[string]interface{})
+			var data = make(map[string]interface{})
+			var resources = make(map[string]interface{})
+			data["vmid"] = vm.ID
+			data["vm_name"] = vm.Name
+			resources["cpu"], _ = vm.Template.GetVCPU()
+			resources["ram"], _ = vm.Template.GetMemory()
+			resources["drive_type"], _ = vm.Template.GetStrFromVec("DISK", "DRIVE_TYPE")
 			driveSize, _ := vm.Template.GetStrFromVec("DISK", "SIZE")
-			vmInfo["drive_size"], _ = strconv.Atoi(driveSize)
-			vmInfo["template_id"], _ = vm.Template.GetInt("TEMPLATE_ID")
-			vmInfo["password"], _ = vm.UserTemplate.GetStr("PASSWORD")
+			resources["drive_size"], _ = strconv.Atoi(driveSize)
+			config["template_id"], _ = vm.Template.GetInt("TEMPLATE_ID")
+			config["password"], _ = vm.UserTemplate.GetStr("PASSWORD")
 			publicIps, privateIps := 0, 0
 			nics := vm.Template.GetVectors("NIC")
 			for _, nic := range nics {
@@ -50,8 +53,13 @@ func GetUsers(client one.IClient, data map[string]*structpb.Value) (*sppb.Invoke
 					privateIps += 1
 				}
 			}
-			vmInfo["ips_public"] = publicIps
-			vmInfo["ips_private"] = privateIps
+			resources["ips_public"] = publicIps
+			resources["ips_private"] = privateIps
+
+			vmInfo["config"] = config
+			vmInfo["data"] = data
+			vmInfo["resources"] = resources
+
 			userVmsInfo = append(userVmsInfo, vmInfo)
 		}
 		userInfo["vms"] = userVmsInfo
