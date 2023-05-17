@@ -787,6 +787,11 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			c.log.Error("Error Converting Updated To Structpb.List", zap.Error(err))
 			continue
 		}
+		if inst.GetState() == nil {
+			inst.State = &stpb.State{
+				Meta: map[string]*structpb.Value{},
+			}
+		}
 		inst.State.Meta["updated"] = updlist
 	}
 
