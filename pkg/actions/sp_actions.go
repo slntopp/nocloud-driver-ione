@@ -29,6 +29,7 @@ func GetUsers(client one.IClient, data map[string]*structpb.Value) (*sppb.Invoke
 		userInfo["userid"] = val.ID
 		userVms, _ := client.GetUserVMS(val.ID)
 		userNetworks, _ := client.GetUserVNets(val.ID)
+		groupPublicIps, groupPrivateIps := 0, 0
 		for _, vm := range userVms.VMs {
 			var vmInfo = make(map[string]interface{})
 			var config = make(map[string]interface{})
@@ -54,7 +55,9 @@ func GetUsers(client one.IClient, data map[string]*structpb.Value) (*sppb.Invoke
 				}
 			}
 			resources["ips_public"] = publicIps
+			groupPublicIps += publicIps
 			resources["ips_private"] = privateIps
+			groupPrivateIps += privateIps
 
 			vmInfo["config"] = config
 			vmInfo["data"] = data
@@ -63,6 +66,8 @@ func GetUsers(client one.IClient, data map[string]*structpb.Value) (*sppb.Invoke
 			userVmsInfo = append(userVmsInfo, vmInfo)
 		}
 		userInfo["vms"] = userVmsInfo
+		userInfo["ips_public"] = groupPublicIps
+		userInfo["ips_private"] = groupPrivateIps
 		for _, network := range userNetworks.VirtualNetworks {
 			if strings.HasSuffix(network.Name, "pub-vnet") {
 				userInfo["public_vn"] = network.ID
