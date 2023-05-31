@@ -76,6 +76,7 @@ func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, requ
 
 	for _, inst := range igroup.GetInstances() {
 		if err := EnsureSPLimits(s.log.Named("EnsureSPLimits"), inst, request.Sp); err != nil {
+			s.log.Error("Error", zap.Error(err))
 			return &ipb.TestInstancesGroupConfigResponse{
 				Result: false,
 				Errors: []*ipb.TestInstancesGroupConfigError{
