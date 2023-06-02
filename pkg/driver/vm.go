@@ -38,6 +38,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func (c *ONeClient) GetUserVMS(userId int) (*vm.Pool, error) {
+	return c.ctrl.VMs().InfoExtended(userId)
+}
+
 func (c *ONeClient) GetInstSnapshots(inst *pb.Instance) (map[string]interface{}, error) {
 	vm, err := c.FindVMByInstance(inst)
 	if err != nil {
@@ -782,6 +786,11 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		if err != nil {
 			c.log.Error("Error Converting Updated To Structpb.List", zap.Error(err))
 			continue
+		}
+		if inst.GetState() == nil {
+			inst.State = &stpb.State{
+				Meta: map[string]*structpb.Value{},
+			}
 		}
 		inst.State.Meta["updated"] = updlist
 	}

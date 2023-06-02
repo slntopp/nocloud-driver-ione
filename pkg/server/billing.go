@@ -290,7 +290,7 @@ func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
 		}
 	}
 
-	if int64(data["suspend_notification_period"].GetNumberValue()) == 7 {
+	/*if int64(data["suspend_notification_period"].GetNumberValue()) == 7 {
 		go datas.PostInstanceStatus(i.GetUuid(), &statuspb.Status{
 			Status: statuspb.NoCloudStatus_DEL,
 		})
@@ -300,7 +300,7 @@ func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
 			Key:  "suspend_delete_instance",
 			Data: map[string]*structpb.Value{},
 		})
-	}
+	}*/
 
 	i.Data = data
 }

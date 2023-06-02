@@ -52,6 +52,9 @@ type IClient interface {
 	GetSecrets() map[string]*structpb.Value
 	GetTemplate(id int) (*tmpl.Template, error)
 	GetUser(id int) (*user.User, error)
+	GetUsers() (*user.Pool, error)
+	GetUserVMS(userId int) (*vm.Pool, error)
+	GetUserVNets(user int) (*vnet.Pool, error)
 	GetUserPrivateVNet(user int) (id int, err error)
 	GetUserPublicVNet(user int) (id int, err error)
 	GetUserVMsInstancesGroup(userId int) (*pb.InstancesGroup, error)

@@ -34,6 +34,7 @@ import (
 var VMMsRecordHelpers = map[string]func(state map[string]interface{}, rec dynamic.Template, host host.Host){
 	"vcenter": vCenterRecordHelper,
 	"kvm":     kvmRecordHelper,
+	"isp":     ispRecordHelper,
 }
 
 func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template, host host.Host) {
@@ -52,7 +53,25 @@ func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template, hos
 		state["ts"] = ts
 	}
 }
+
 func kvmRecordHelper(state map[string]interface{}, rec dynamic.Template, host host.Host) {
+	share := host.Share
+
+	state["total_cpu"] = share.TotalCPU
+	state["used_cpu"] = share.CPUUsage
+	state["free_cpu"] = share.TotalCPU - share.CPUUsage
+
+	state["total_ram"] = share.TotalMem
+	state["used_ram"] = share.MemUsage
+	state["free_ram"] = share.TotalMem - share.MemUsage
+
+	ts, err := rec.GetInt("TIMESTAMP")
+	if err == nil {
+		state["ts"] = ts
+	}
+}
+
+func ispRecordHelper(state map[string]interface{}, rec dynamic.Template, host host.Host) {
 	share := host.Share
 
 	state["total_cpu"] = share.TotalCPU
