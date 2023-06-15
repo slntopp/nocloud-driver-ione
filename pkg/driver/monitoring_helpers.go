@@ -39,14 +39,23 @@ var VMMsRecordHelpers = map[string]func(state map[string]interface{}, rec dynami
 
 func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template, host host.Host) {
 	share := host.Share
+	template := host.Template
 
-	state["total_cpu"] = share.TotalCPU
-	state["used_cpu"] = share.CPUUsage
-	state["free_cpu"] = share.TotalCPU - share.CPUUsage
+	strUsedCpu, _ := template.GetStrFromVec("HOST", "USED_CPU")
+	strUsedMem, _ := template.GetStrFromVec("HOST", "USED_MEM")
 
+	usedCpu, _ := strconv.Atoi(strUsedCpu)
+	usedMem, _ := strconv.Atoi(strUsedMem)
+
+	state["ram_usage"] = share.MemUsage
+	state["max_ram"] = share.MaxMem
+	state["used_ram"] = usedMem
 	state["total_ram"] = share.TotalMem
-	state["used_ram"] = share.MemUsage
-	state["free_ram"] = share.TotalMem - share.MemUsage
+
+	state["cpu_usage"] = share.CPUUsage
+	state["max_cpu"] = share.MaxCPU
+	state["used_cpu"] = usedCpu
+	state["total_cpu"] = share.TotalCPU
 
 	ts, err := rec.GetInt("TIMESTAMP")
 	if err == nil {
