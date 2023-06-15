@@ -44,7 +44,7 @@ func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template, hos
 	strUsedCpu, _ := template.GetStrFromVec("HOST", "USED_CPU")
 	strUsedMem, _ := template.GetStrFromVec("HOST", "USED_MEM")
 
-	usedCpu, _ := strconv.Atoi(strUsedCpu)
+	usedCpu, _ := strconv.ParseFloat(strUsedCpu, 64)
 	usedMem, _ := strconv.Atoi(strUsedMem)
 
 	state["ram_usage"] = share.MemUsage
