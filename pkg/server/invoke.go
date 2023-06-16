@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"fmt"
+
 	epb "github.com/slntopp/nocloud-proto/events"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -34,7 +35,7 @@ import (
 )
 
 func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest) (res *ipb.InvokeResponse, err error) {
-	s.log.Debug("Invoke request received", zap.Any("instance", req.Instance.Uuid), zap.Any("action", req.Method))
+	s.log.Debug("Invoke request received", zap.Any("instance", req.Instance.Uuid), zap.Any("action", req.Method), zap.Any("data", req.Params))
 	sp := req.GetServicesProvider()
 	client, err := one.NewClientFromSP(sp, s.log)
 	instance := req.GetInstance()
@@ -80,7 +81,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 }
 
 func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequest) (res *spb.InvokeResponse, err error) {
-	s.log.Debug("Invoke request received", zap.Any("action", req.Method))
+	s.log.Debug("Invoke request received", zap.Any("action", req.Method), zap.Any("data", req.Params))
 	sp := req.GetServicesProvider()
 	client, err := one.NewClientFromSP(sp, s.log)
 
