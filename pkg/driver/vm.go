@@ -531,6 +531,8 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		}
 		c.Chown("vm", vmid, userid, group)
 
+		created[i].Data["creation"] = structpb.NewStringValue(time.Now().Format(`2006-01-02`))
+
 		go instDatasPublisher(created[i].Uuid, created[i].Data)
 		successResp.ToBeCreated = append(successResp.ToBeCreated, created[i])
 	}
