@@ -281,6 +281,15 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 			state["is_public"] = false
 		}
 
+		userInputs, _ := tmpl.Template.GetVector("USER_INPUTS")
+		var inputs []interface{}
+
+		for _, input := range userInputs.Pairs {
+			inputs = append(inputs, input.Key())
+		}
+
+		state["inputs"] = inputs
+
 		var img *image.Image
 		var img_id int
 		var err error
@@ -303,7 +312,6 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		}
 
 		state["min_size"] = img.Size
-
 	store:
 		templates[strconv.Itoa(tmpl.ID)] = state
 	}
