@@ -56,6 +56,10 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.Inst
 	tmpl.Add(driver_shared.NOCLOUD_INST_TITLE, instance.GetTitle())
 	tmpl.Add(driver_shared.NOCLOUD_IG_TITLE, instance.GetTitle())
 
+	if username, ok := conf["username"]; ok && username.GetStringValue() != "" {
+		tmpl.Add(keys.Template("USERNAME"), username.GetStringValue())
+		tmpl.AddCtx("USERNAME", username.GetStringValue())
+	}
 	if pass := conf["password"].GetStringValue(); pass != "" {
 		tmpl.Add(keys.Template("PASSWORD"), pass)
 		tmpl.AddCtx("PASSWORD", pass)
