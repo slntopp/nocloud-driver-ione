@@ -345,6 +345,8 @@ func StartVNC(
 
 	url := fmt.Sprintf("%s/vnc?kind=%s&vmid=%d", host, kind, vmid)
 
+	log.Debug("Url", zap.String("Url", url))
+
 	hc := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
