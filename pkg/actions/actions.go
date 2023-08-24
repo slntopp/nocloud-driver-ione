@@ -366,6 +366,8 @@ func StartVNC(
 		return nil, status.Error(codes.Internal, "Cannot read Body")
 	}
 
+	log.Debug("Body", zap.String("string", string(body)))
+
 	var token_data map[string]interface{}
 	err = json.Unmarshal(body, &token_data)
 	if err != nil {
