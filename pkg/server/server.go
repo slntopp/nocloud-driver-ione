@@ -56,7 +56,7 @@ type DriverServiceServer struct {
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *DriverServiceServer {
-	auth.SetContext(log, key)
+	auth.SetContext(log, rdb, key)
 	return &DriverServiceServer{log: log, rdb: rdb}
 }
 

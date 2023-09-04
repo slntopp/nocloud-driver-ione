@@ -200,10 +200,10 @@ github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFR
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
-github.com/slntopp/nocloud v0.0.18-0.20230904193757-6093c491d45c h1:sZM3AsqcCNMcuf/7d0umvi+TwzKWE3iWipYgtD9i0/I=
-github.com/slntopp/nocloud v0.0.18-0.20230904193757-6093c491d45c/go.mod h1:UlAcGiBZIJB1oDYt4+MILPJzC5UAdKniCqn3p1I2eeM=
-github.com/slntopp/nocloud-proto v0.0.0-20230904193418-d69d29f48636 h1:4lNbtcm5FqaMUAd/zmh2lUYSTZ/qUZ/uoMOPaltyvMM=
-github.com/slntopp/nocloud-proto v0.0.0-20230904193418-d69d29f48636/go.mod h1:7A1kZNGXKKLhEnt2ELeb1e1XgeyAUkCpgxjyg/Vn5vg=
+github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb h1:2cMt7JROFmM5i4/L6W3bWL7/7zLToSfD3gszMS79kzI=
+github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb/go.mod h1:zRLD6OaWq0vlPTA+qo3ssEBFPjoHH6crpUpeRPgl9sw=
+github.com/slntopp/nocloud-proto v0.0.0-20230904195054-4f2d1760c6b8 h1:hnN8y4Vn0RRFIder50dIBjsQCebgszrZPrOVTNNpMaM=
+github.com/slntopp/nocloud-proto v0.0.0-20230904195054-4f2d1760c6b8/go.mod h1:7A1kZNGXKKLhEnt2ELeb1e1XgeyAUkCpgxjyg/Vn5vg=
 github.com/spf13/afero v1.9.5 h1:stMpOSZFs//0Lv29HduCmli3GUfpFoF3Y1Q/aXj/wVM=
 github.com/spf13/afero v1.9.5/go.mod h1:UBogFpq8E9Hx+xc5CNTTEpTnuHVmXDwZcZcE1eb/UhQ=
 github.com/spf13/cast v1.5.1 h1:R+kOtfhWQE6TVQzY+4D7wJLBgkdVasCEFxSUBYBYIlA=
