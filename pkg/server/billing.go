@@ -163,7 +163,15 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			}
 			i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 		}
+
+		if resource.GetKind() == billingpb.Kind_POSTPAID {
+			i.Data[resource.Key+"_next_payment_date"] = structpb.NewNumberValue(float64(last + resource.GetPeriod()))
+		} else {
+			i.Data[resource.Key+"_next_payment_date"] = structpb.NewNumberValue(float64(last))
+		}
 	}
+
+	nextPaymentDate := i.Data["next_payment_date"]
 
 	if plan.Kind == billingpb.PlanKind_STATIC {
 		var last int64
@@ -212,6 +220,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 				now := time.Now().Unix()
 				nowPb := structpb.NewNumberValue(float64(now))
 				i.Data["last_monitoring"] = nowPb
+				i.Data["next_payment_date"] = nextPaymentDate
 			}
 		}
 	} else {
