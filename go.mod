@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20230517101801-6d09265b614f
-	github.com/rabbitmq/amqp091-go v1.8.1
+	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb
 	github.com/slntopp/nocloud-proto v0.0.0-20230904195054-4f2d1760c6b8
 	github.com/spf13/cobra v1.7.0
