@@ -239,6 +239,12 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		}
 	}
 
+	if status == statuspb.NoCloudStatus_DETACHED {
+		now := time.Now().Unix()
+		nowPb := structpb.NewNumberValue(float64(now))
+		i.Data["last_monitoring"] = nowPb
+	}
+
 	if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
 		handleSuspendEvent(i, events)
 	} else {
