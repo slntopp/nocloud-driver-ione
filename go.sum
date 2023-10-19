@@ -203,8 +203,8 @@ github.com/sagikazarmark/locafero v0.3.0/go.mod h1:w+v7UsPNFwzF1cHuOajOOzoq4U7v/
 github.com/sagikazarmark/slog-shim v0.1.0 h1:diDBnUNK9N/354PgrxMywXnAwEr1QZcOr6gto+ugjYE=
 github.com/sagikazarmark/slog-shim v0.1.0/go.mod h1:SrcSrq8aKtyuqEI1uvTDTK1arOWRIczQRv+GVI1AkeQ=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
-github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb h1:2cMt7JROFmM5i4/L6W3bWL7/7zLToSfD3gszMS79kzI=
-github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb/go.mod h1:zRLD6OaWq0vlPTA+qo3ssEBFPjoHH6crpUpeRPgl9sw=
+github.com/slntopp/nocloud v0.0.18 h1:401sPe67/RpWE4y05+swj/KgUgc6JoVx6zSyqhUV9nY=
+github.com/slntopp/nocloud v0.0.18/go.mod h1:ZdxpCzrLn4aNKg1jITAR1m2qU//MwXBSHhCEJdp7c80=
 github.com/slntopp/nocloud-proto v0.0.0-20231018203755-65e6664c3118 h1:r9Yt/ug7VGNLkq52gGgoOKkb+WRaEKpT2r+aTlPnLe0=
 github.com/slntopp/nocloud-proto v0.0.0-20231018203755-65e6664c3118/go.mod h1:4Hsf0e2WQQOWaZj6sC1vVq4oCdu30asV+JzWk/xAlIg=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
@@ -343,7 +343,7 @@ golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43/go.mod h1:KelEdhl1UZF7XfJ
 golang.org/x/oauth2 v0.0.0-20201109201403-9fd604954f58/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20210218202405-ba52d332ba99/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
-golang.org/x/oauth2 v0.12.0 h1:smVPGxink+n1ZI5pkQa8y6fZT0RW0MgCO5bFpepy4B4=
+golang.org/x/oauth2 v0.13.0 h1:jDDenyj+WgFtmV3zYVoi8aE2BwtXFLWOA67ZfNWftiY=
 golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20181108010431-42b317875d0f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
