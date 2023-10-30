@@ -154,8 +154,6 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 	hasher.Write([]byte(username + time.Now().String()))
 	userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
-	is_vdc := config["is_vdc"].GetBoolValue()
-
 	if data["userid"] == nil {
 		oneID, err := client.CreateUser(username, userPass, []int{int(group)})
 		if err != nil {
@@ -173,7 +171,8 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
-	if is_vdc {
+
+	if is_vdc, ok := config["is_vdc"]; ok && is_vdc.GetBoolValue() {
 		data["password"] = structpb.NewStringValue(userPass)
 		client.SetQuotaFromConfig(oneID, igroup, sp)
 	}
