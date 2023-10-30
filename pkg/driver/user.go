@@ -18,8 +18,11 @@ package one
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/xml"
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
@@ -28,6 +31,8 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/user"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	pb "github.com/slntopp/nocloud-proto/instances"
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -195,6 +200,149 @@ func (c *ONeClient) CheckOrphanInstanceGroup(instanceGroup *pb.InstancesGroup, u
 
 	// Should only happen if everything is ok
 	instanceGroup.Data["userid"] = structpb.NewNumberValue(float64(newUserID))
+
+	return nil
+}
+
+type VMQuota struct {
+	XMLName xml.Name `xml:"VM_QUOTA"`
+	CPU     float64  `xml:"VM>CPU"`
+	Memory  int      `xml:"VM>MEMORY"`
+}
+
+type DataStoreQuota struct {
+	XMLName xml.Name `xml:"DATASTORE"`
+	ID      int      `xml:"ID"`
+	Size    int      `xml:"SIZE"`
+}
+type DataStoreQuotaList struct {
+	XMLName xml.Name `xml:"DATASTORE_QUOTA"`
+	DS      []DataStoreQuota
+}
+
+type NetworkQuota struct {
+	XMLName xml.Name `xml:"NETWORK_QUOTA"`
+	ID      int      `xml:"NETWORK>ID"`
+	Leases  int      `xml:"NETWORK>LEASES"`
+}
+
+// Generates Quotas Templates from InstancesGroup resources and SP configuration
+// Quota consists of 3 parts:
+// 1. VM_QUOTA - VM -> { CPU, MEMORY }
+// 2. NETWORK_QUOTA - NETWORK -> { ID, LEASES }
+// 3. DATASTORE_QUOTA - DATASTORE -> { ID, SIZE }
+func GenerateQuotaFromIGroup(_log *zap.Logger, igroup *pb.InstancesGroup, sp *sppb.ServicesProvider) (quotas []string) {
+	log := _log.Named("GenerateQuotaFromIGroup")
+	resources := igroup.GetResources()
+
+	var bytes []byte
+	var err error
+
+	vm_quota := VMQuota{}
+	if cpus := resources["cpu"]; cpus != nil && cpus.GetNumberValue() > 0 {
+		vm_quota.CPU = cpus.GetNumberValue()
+	}
+	if memory := resources["ram"]; memory != nil && memory.GetNumberValue() > 0 {
+		vm_quota.Memory = int(memory.GetNumberValue())
+	}
+
+	bytes, err = xml.Marshal(vm_quota)
+	if err != nil {
+		log.Error("Can't marshal VM quota", zap.Error(err))
+		return
+	}
+
+	quotas = append(quotas, string(bytes))
+
+	vn_quota := NetworkQuota{}
+	if resources["ips_public"] != nil { // Private IPs don't need quota as the separate network is created for each User
+		public_pool_id, ok := sp.GetVars()[PUBLIC_IP_POOL]
+		if ok {
+			id, err := GetVarValue(public_pool_id, "default") // Seeking for super vnet id
+			if err == nil {
+				vn_quota.ID = int(id.GetNumberValue())
+				vn_quota.Leases = int(resources["ips_public"].GetNumberValue())
+
+				bytes, err := xml.Marshal(vn_quota)
+				if err != nil {
+					log.Error("Can't marshal Netowrks quota", zap.Error(err))
+					return
+				}
+
+				quotas = append(quotas, string(bytes))
+			} else {
+				log.Warn("PUBLIC_IP_POOL is not set or malformed", zap.Error(err))
+			}
+		} else {
+			log.Warn("PUBLIC_IP_POOL is not set")
+		}
+	}
+
+	ds_quotas := []DataStoreQuota{}
+
+	sched_ds, ok := sp.GetVars()[SCHED_DS]
+	if !ok || sched_ds == nil {
+		log.Warn("SCHED_DS is not set")
+		return quotas
+	}
+
+	dss := map[string]int{}
+
+	// Seeking for Datastores IDs in SCHED_DS
+	// TODO: refactor this and extend to use several datastores if rule is set so
+	re := regexp.MustCompile("[0-9]+")
+	for key, ds := range sched_ds.GetValue() {
+		ids := re.FindAllString(ds.GetStringValue(), 1)
+		if len(ids) == 0 {
+			log.Warn("Can't parse datastore id from SCHED_DS", zap.String("key", key), zap.String("value", ds.GetStringValue()))
+			continue
+		}
+		dss[strings.ToLower(key)], err = strconv.Atoi(ids[0])
+		if err != nil {
+			log.Warn("Can't parse datastore id from SCHED_DS (not an integer)", zap.String("key", key), zap.String("value", ds.GetStringValue()))
+			continue
+		}
+	}
+
+	for resource, val := range resources {
+		if !strings.HasPrefix(resource, "drive_") {
+			continue
+		}
+
+		key := strings.TrimPrefix(resource, "drive_")
+		if err != nil {
+			log.Error("Can't parse drive type key", zap.Error(err))
+			continue
+		}
+
+		ds_quota := DataStoreQuota{
+			ID:   dss[key],
+			Size: int(val.GetNumberValue()),
+		}
+
+		ds_quotas = append(ds_quotas, ds_quota)
+	}
+
+	bytes, err = xml.Marshal(DataStoreQuotaList{DS: ds_quotas})
+	if err != nil {
+		log.Error("Can't marshal VM quota", zap.Error(err))
+		return
+	}
+
+	quotas = append(quotas, string(bytes))
+
+	return quotas
+}
+
+func (c *ONeClient) SetQuotaFromConfig(one_id int, igroup *pb.InstancesGroup, sp *sppb.ServicesProvider) error {
+	tpl := GenerateQuotaFromIGroup(c.log, igroup, sp)
+	c.log.Debug("SetQuotaFromConfig", zap.Strings("quotas", tpl))
+
+	for _, quota := range tpl {
+		if err := c.ctrl.User(one_id).Quota(quota); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
