@@ -20,6 +20,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"time"
+
 	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
@@ -35,7 +37,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
-	"time"
 )
 
 var (
@@ -147,10 +148,13 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.ServicesProvider, igroup *ipb.InstancesGroup, client one.IClient, group float64) (map[string]*structpb.Value, error) {
 	data := igroup.GetData()
 	username := igroup.GetUuid()
+	config := igroup.GetConfig()
 
 	hasher := sha256.New()
 	hasher.Write([]byte(username + time.Now().String()))
 	userPass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+
+	is_vdc := config["is_vdc"].GetBoolValue()
 
 	if data["userid"] == nil {
 		oneID, err := client.CreateUser(username, userPass, []int{int(group)})
@@ -169,6 +173,10 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
+	if is_vdc {
+		data["password"] = structpb.NewStringValue(userPass)
+		client.SetQuotaFromConfig(oneID, igroup, sp)
+	}
 
 	resources := igroup.GetResources()
 	var public_ips_amount int = 0
@@ -259,6 +267,23 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
 	client.SetVars(sp.GetVars())
+
+	if is_vdc, ok := igroup.GetConfig()["is_vdc"]; ok && is_vdc.GetBoolValue() {
+		group := sp.GetSecrets()["group"].GetNumberValue()
+
+		if igroup.Data == nil {
+			igroup.Data = make(map[string]*structpb.Value)
+		}
+
+		data, err := s.PrepareService(ctx, sp, igroup, client, group)
+		if err != nil {
+			log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
+			return nil, err
+		}
+
+		igroup.Data = data
+		go datas.DataPublisher(datas.POST_IG_DATA)(igroup.Uuid, igroup.Data)
+	}
 
 	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp, Scheduled: false})
 
