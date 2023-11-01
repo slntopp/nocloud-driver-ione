@@ -84,6 +84,9 @@ func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequ
 	s.log.Debug("Invoke request received", zap.Any("action", req.Method), zap.Any("data", req.Params))
 	sp := req.GetServicesProvider()
 	client, err := one.NewClientFromSP(sp, s.log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
 
 	method := req.GetMethod()
 
