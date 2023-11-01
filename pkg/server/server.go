@@ -216,6 +216,10 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		private_ips_amount = int(resources["ips_private"].GetNumberValue())
 	}
 
+	if private_ips_amount <= 0 {
+		return data, nil
+	}
+
 	private_vn_ban, ok := sp.Vars[one.PRIVATE_VN_BAN]
 	if !ok {
 		return data, nil
