@@ -283,13 +283,12 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		}
 
 		data, err := s.PrepareService(ctx, sp, igroup, client, group)
+		igroup.Data = data
+		go datas.DataPublisher(datas.POST_IG_DATA)(igroup.Uuid, igroup.Data)
 		if err != nil {
 			log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
 			return nil, err
 		}
-
-		igroup.Data = data
-		go datas.DataPublisher(datas.POST_IG_DATA)(igroup.Uuid, igroup.Data)
 	}
 
 	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp, Scheduled: false})
