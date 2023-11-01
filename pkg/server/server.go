@@ -146,6 +146,9 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 }
 
 func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.ServicesProvider, igroup *ipb.InstancesGroup, client one.IClient, group float64) (map[string]*structpb.Value, error) {
+
+	s.log.Info("Preparing Service", zap.String("group", igroup.GetUuid()))
+
 	data := igroup.GetData()
 	username := igroup.GetUuid()
 	config := igroup.GetConfig()
@@ -268,6 +271,7 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	client.SetVars(sp.GetVars())
 
 	if is_vdc, ok := igroup.GetConfig()["is_vdc"]; ok && is_vdc.GetBoolValue() {
+		log.Info("VDC mode enabled", zap.String("group", igroup.GetUuid()))
 		group := sp.GetSecrets()["group"].GetNumberValue()
 
 		if igroup.Data == nil {
