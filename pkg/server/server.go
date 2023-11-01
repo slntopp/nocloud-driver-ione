@@ -270,11 +270,7 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 	}
 	client.SetVars(sp.GetVars())
 
-	log.Debug("Checking config", zap.Any("config", igroup.GetConfig()))
-	is_vdc, ok := igroup.GetConfig()["is_vdc"]
-	log.Debug("Checking if VDC mode enabled", zap.Bool("present", ok), zap.Bool("is_vdc", is_vdc.GetBoolValue()))
-
-	if ok && is_vdc.GetBoolValue() {
+	if is_vdc, ok := igroup.GetConfig()["is_vdc"]; ok && is_vdc.GetBoolValue() {
 		log.Info("VDC mode enabled", zap.String("group", igroup.GetUuid()))
 		group := sp.GetSecrets()["group"].GetNumberValue()
 
