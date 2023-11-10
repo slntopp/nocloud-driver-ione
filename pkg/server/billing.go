@@ -263,6 +263,13 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		})
 	}
 	go records(context.Background(), append(resourceRecords, productRecords...))
+	if len(productRecords) != 0 {
+		go events(context.Background(), &epb.Event{
+			Uuid: i.GetUuid(),
+			Key:  "instance_renew",
+			Data: map[string]*structpb.Value{},
+		})
+	}
 	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 }
 
