@@ -85,6 +85,12 @@ type EventsPublisherFunc func(context.Context, *epb.Event)
 
 func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
+
+	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
+		log.Debug("Instance was deleted. No billing")
+		return
+	}
+
 	log.Debug("Initializing")
 
 	plan := i.BillingPlan
