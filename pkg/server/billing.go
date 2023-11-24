@@ -433,13 +433,13 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 	lastMonitoring := int64(data["last_monitoring"].GetNumberValue())
 
-	start := lastMonitoring + period
+	start := lastMonitoring
 	end := start + period
 
 	productRecords = append(productRecords, &billingpb.Record{
 		Start:    start,
 		End:      end,
-		Exec:     start,
+		Exec:     time.Now().Unix(),
 		Priority: billingpb.Priority_URGENT,
 		Instance: i.GetUuid(),
 		Product:  product,
