@@ -447,6 +447,11 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 	})
 
 	go records(context.Background(), productRecords)
+
+	lastMonitoring += period
+	data["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoring))
+
+	datas.DataPublisher(datas.POST_INST_DATA)(i.GetUuid(), data)
 }
 
 type BillingHandlerFunc func(
