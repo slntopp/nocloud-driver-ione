@@ -31,7 +31,6 @@ import (
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	sppb "github.com/slntopp/nocloud-proto/services_providers"
 	stpb "github.com/slntopp/nocloud-proto/states"
-	statuspb "github.com/slntopp/nocloud-proto/statuses"
 	auth "github.com/slntopp/nocloud/pkg/nocloud/auth"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -428,11 +427,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))
 		for _, inst := range ig.GetInstances() {
 			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
-			if inst.GetStatus() != statuspb.NoCloudStatus_DEL {
-				_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
-				if err != nil {
-					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
-				}
+			_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
+			if err != nil {
+				log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 			}
 
 			go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
