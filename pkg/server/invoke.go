@@ -70,14 +70,9 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
 	}
 
-	response, err := action(client, instance, req.GetParams())
-	if err != nil {
-		return nil, err
-	} else {
-		go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
-	}
+	go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
 
-	return response, err
+	return &ipb.InvokeResponse{Result: true}, err
 }
 
 func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequest) (res *spb.InvokeResponse, err error) {
