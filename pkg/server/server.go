@@ -438,7 +438,18 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
 			}
 
-			go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+			instConfig := inst.GetConfig()
+			regularPayment := true
+
+			if instConfig != nil {
+				regularPayment = instConfig["regular_payment"].GetBoolValue()
+			}
+
+			if regularPayment {
+				go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+			} else {
+				go handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+			}
 		}
 	}
 

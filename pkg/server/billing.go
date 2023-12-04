@@ -83,6 +83,165 @@ type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
 type EventsPublisherFunc func(context.Context, *epb.Event)
 
+func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client *one.ONeClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
+	log := logger.Named("NonRegularInstanceBillingHandler").Named(i.GetUuid())
+	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
+		log.Debug("Instance was deleted. No billing")
+		return
+	}
+	log.Debug("Initializing")
+
+	data := i.GetData()
+	if data == nil {
+		log.Debug("Instance has no data")
+		return
+	}
+
+	if lastMonitoring, ok := data["last_monitoring"]; ok {
+		now := time.Now().Unix()
+		lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+
+		vmid, err := one.GetVMIDFromData(client, i)
+		if err != nil {
+			log.Error("Failed to get VM ID", zap.Error(err))
+			return
+		}
+
+		_, state, _, _, err := client.StateVM(vmid)
+		if err != nil {
+			log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
+		}
+
+		suspendedManually := data["suspended_manually"].GetBoolValue()
+
+		if now > lastMonitoringValue && state != "SUSPENDED" {
+			err := client.SuspendVM(vmid)
+			if err != nil {
+				log.Error("Failed to suspend vm", zap.Error(err))
+				return
+			}
+		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !suspendedManually {
+			err := client.ResumeVM(vmid)
+			if err != nil {
+				log.Error("Failed to resume vm", zap.Error(err))
+				return
+			}
+		}
+
+	} else {
+		plan := i.BillingPlan
+		if plan == nil {
+			log.Warn("Instance has no Billing Plan", zap.Any("instance", i))
+			return
+		}
+
+		vmid, err := one.GetVMIDFromData(client, i)
+		if err != nil {
+			log.Error("Failed to get VM ID", zap.Error(err))
+			return
+		}
+
+		vm := GetVM(func() (*onevm.VM, error) { return client.GetVM(vmid) })
+		var created int64
+		if _, ok := i.Data[shared.VM_CREATED]; ok {
+			created = int64(i.Data[shared.VM_CREATED].GetNumberValue())
+		} else {
+			obj, err := vm()
+			if err != nil {
+				log.Error("Error getting VM", zap.Error(err))
+				return
+			}
+			created = int64(obj.STime)
+		}
+
+		timeline := Lazy(func() []one.Record {
+			o, _ := vm()
+			return one.MakeTimeline(o)
+		})
+
+		var productRecords, resourceRecords []*billingpb.Record
+
+		for _, resource := range plan.Resources {
+			var last int64
+			if _, ok := i.Data[resource.Key+"_last_monitoring"]; ok {
+				last = int64(i.Data[resource.Key+"_last_monitoring"].GetNumberValue())
+			} else {
+				last = created
+			}
+
+			handler, ok := handlers.Get(resource.Key)
+			if !ok {
+				log.Warn("Handler not found", zap.String("resource", resource.Key))
+				continue
+			}
+			log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
+			new, last := handler(log, timeline, i, vm, resource, client, last, clock)
+
+			if len(new) != 0 {
+				if plan.Kind == billingpb.PlanKind_DYNAMIC {
+					instState := stpb.NoCloudState_INIT
+					if i.State != nil {
+						instState = i.State.State
+					}
+					inStates := false
+
+					for _, val := range resource.On {
+						if val == instState {
+							inStates = true
+							break
+						}
+					}
+
+					if inStates || (!inStates && resource.Except) {
+						resourceRecords = append(resourceRecords, new...)
+					}
+				} else {
+					resourceRecords = append(resourceRecords, new...)
+				}
+				i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
+			}
+
+			if resource.GetKind() == billingpb.Kind_POSTPAID {
+				i.Data[resource.Key+"_next_payment_date"] = structpb.NewNumberValue(float64(last + resource.GetPeriod()))
+			} else {
+				i.Data[resource.Key+"_next_payment_date"] = structpb.NewNumberValue(float64(last))
+			}
+		}
+
+		if plan.Kind == billingpb.PlanKind_STATIC {
+			var last int64
+			var priority billingpb.Priority
+			if _, ok := i.Data["last_monitoring"]; ok {
+				last = int64(i.Data["last_monitoring"].GetNumberValue())
+				priority = billingpb.Priority_NORMAL
+			} else {
+				last = created
+				priority = billingpb.Priority_URGENT
+			}
+			new, last := handleStaticBilling(log, i, last, priority)
+			if len(new) != 0 {
+				productRecords = append(productRecords, new...)
+				i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
+			}
+
+			product := i.GetBillingPlan().GetProducts()[i.GetProduct()]
+			if product.GetKind() == billingpb.Kind_POSTPAID {
+				i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last + product.GetPeriod()))
+			} else {
+				i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
+			}
+
+			go records(context.Background(), append(resourceRecords, productRecords...))
+			go events(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_renew",
+				Data: map[string]*structpb.Value{},
+			})
+			go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+		}
+	}
+}
+
 func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 
