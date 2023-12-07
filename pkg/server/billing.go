@@ -628,34 +628,81 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, i *ipb.Instance) {
 	log := logger.Named("InstanceRenewBillingHandler").Named(i.GetUuid())
 	log.Debug("Initializing")
-	productRecords := make([]*billingpb.Record, 1)
+	var recs []*billingpb.Record
 
 	product := i.GetProduct()
 	data := i.GetData()
 	plan := i.GetBillingPlan()
 	p := plan.GetProducts()[product]
 	period := p.GetPeriod()
+	resources := i.GetResources()
 
-	lastMonitoring := int64(data["last_monitoring"].GetNumberValue())
+	//math.Round(float64((rec.End-rec.Start)/res.Period)*res.Price*amount()*100) / 100.0
 
-	start := lastMonitoring
-	end := start + period
+	if period != 0 {
+		lastMonitoring := int64(data["last_monitoring"].GetNumberValue())
 
-	productRecords = append(productRecords, &billingpb.Record{
-		Start:    start,
-		End:      end,
-		Exec:     time.Now().Unix(),
-		Priority: billingpb.Priority_URGENT,
-		Instance: i.GetUuid(),
-		Product:  product,
-		Total:    p.GetPrice(),
-	})
+		start := lastMonitoring
+		end := start + period
 
-	go records(context.Background(), productRecords)
+		recs = append(recs, &billingpb.Record{
+			Start:    start,
+			End:      end,
+			Exec:     time.Now().Unix(),
+			Priority: billingpb.Priority_URGENT,
+			Instance: i.GetUuid(),
+			Product:  product,
+			Total:    p.GetPrice(),
+		})
 
-	lastMonitoring += period
-	data["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoring))
+		lastMonitoring += period
+		data["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoring))
+	}
 
+	for _, resource := range plan.GetResources() {
+		if resource.GetPeriod() == 0 {
+			continue
+		}
+		lm := int64(data[resource.GetKey()+"last_monitoring"].GetNumberValue())
+		if strings.Contains(resource.GetKey(), "drive") {
+			driveType := resources["drive_type"].GetStringValue()
+
+			if resource.GetKey() != "drive_"+strings.ToLower(driveType) {
+				continue
+			}
+
+			value := resources[resource.GetKey()].GetNumberValue() / 1024
+
+			recs = append(recs, &billingpb.Record{
+				Start:    lm,
+				End:      lm + resource.GetPeriod(),
+				Exec:     time.Now().Unix(),
+				Priority: billingpb.Priority_URGENT,
+				Instance: i.GetUuid(),
+				Product:  resource.GetKey(),
+				Total:    math.Round(resource.GetPrice()*value*100) / 100.0,
+			})
+		} else {
+			value := resources[resource.GetKey()].GetNumberValue()
+
+			if resource.GetKey() == "ram" {
+				value /= 1024
+			}
+
+			recs = append(recs, &billingpb.Record{
+				Start:    lm,
+				End:      lm + resource.GetPeriod(),
+				Exec:     time.Now().Unix(),
+				Priority: billingpb.Priority_URGENT,
+				Instance: i.GetUuid(),
+				Product:  resource.GetKey(),
+				Total:    math.Round(resource.GetPrice()*value*100) / 100.0,
+			})
+		}
+		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(lm + resource.GetPeriod()))
+	}
+
+	go records(context.Background(), recs)
 	datas.DataPublisher(datas.POST_INST_DATA)(i.GetUuid(), data)
 }
 
