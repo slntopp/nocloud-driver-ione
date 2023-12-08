@@ -39,14 +39,23 @@ var VMMsRecordHelpers = map[string]func(state map[string]interface{}, rec dynami
 
 func vCenterRecordHelper(state map[string]interface{}, rec dynamic.Template, host host.Host) {
 	share := host.Share
+	template := host.Template
 
-	state["total_cpu"] = share.TotalCPU
-	state["used_cpu"] = share.CPUUsage
-	state["free_cpu"] = share.TotalCPU - share.CPUUsage
+	strUsedCpu, _ := template.GetStrFromVec("HOST", "USED_CPU")
+	strUsedMem, _ := template.GetStrFromVec("HOST", "USED_MEM")
 
+	usedCpu, _ := strconv.ParseFloat(strUsedCpu, 64)
+	usedMem, _ := strconv.Atoi(strUsedMem)
+
+	state["ram_usage"] = share.MemUsage
+	state["max_ram"] = share.MaxMem
+	state["used_ram"] = usedMem
 	state["total_ram"] = share.TotalMem
-	state["used_ram"] = share.MemUsage
-	state["free_ram"] = share.TotalMem - share.MemUsage
+
+	state["cpu_usage"] = share.CPUUsage
+	state["max_cpu"] = share.MaxCPU
+	state["used_cpu"] = usedCpu
+	state["total_cpu"] = share.TotalCPU
 
 	ts, err := rec.GetInt("TIMESTAMP")
 	if err == nil {
@@ -272,6 +281,15 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 			state["is_public"] = false
 		}
 
+		userInputs, _ := tmpl.Template.GetVector("USER_INPUTS")
+		var inputs []interface{}
+
+		for _, input := range userInputs.Pairs {
+			inputs = append(inputs, input.Key())
+		}
+
+		state["inputs"] = inputs
+
 		var img *image.Image
 		var img_id int
 		var err error
@@ -294,7 +312,6 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 		}
 
 		state["min_size"] = img.Size
-
 	store:
 		templates[strconv.Itoa(tmpl.ID)] = state
 	}

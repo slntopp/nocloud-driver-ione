@@ -87,6 +87,8 @@ type IClient interface {
 	UpdateVNet(id int, tmpl string, uType parameters.UpdateType) error
 	UserAddAttribute(id int, data map[string]interface{}) error
 	VMToInstance(id int) (*pb.Instance, error)
+
+	SetQuotaFromConfig(one_id int, ig *pb.InstancesGroup, sp *sppb.ServicesProvider) error
 }
 
 type ONeClient struct {

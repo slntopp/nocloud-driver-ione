@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"fmt"
+
 	epb "github.com/slntopp/nocloud-proto/events"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -34,7 +35,7 @@ import (
 )
 
 func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest) (res *ipb.InvokeResponse, err error) {
-	s.log.Debug("Invoke request received", zap.Any("instance", req.Instance.Uuid), zap.Any("action", req.Method))
+	s.log.Debug("Invoke request received", zap.Any("instance", req.Instance.Uuid), zap.Any("action", req.Method), zap.Any("data", req.Params))
 	sp := req.GetServicesProvider()
 	client, err := one.NewClientFromSP(sp, s.log)
 	instance := req.GetInstance()
@@ -69,20 +70,18 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
 	}
 
-	response, err := action(client, instance, req.GetParams())
-	if err != nil {
-		return nil, err
-	} else {
-		go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
-	}
+	go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
 
-	return response, err
+	return &ipb.InvokeResponse{Result: true}, err
 }
 
 func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequest) (res *spb.InvokeResponse, err error) {
-	s.log.Debug("Invoke request received", zap.Any("action", req.Method))
+	s.log.Debug("Invoke request received", zap.Any("action", req.Method), zap.Any("data", req.Params))
 	sp := req.GetServicesProvider()
 	client, err := one.NewClientFromSP(sp, s.log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
 
 	method := req.GetMethod()
 

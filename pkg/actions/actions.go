@@ -18,10 +18,11 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	billingpb "github.com/slntopp/nocloud-proto/billing"
@@ -327,10 +328,14 @@ func StartVNC(
 	user := secrets["user"].GetStringValue()
 	pass := secrets["pass"].GetStringValue()
 
+	log.Debug("Creds", zap.Any("host", host), zap.Any("user", user), zap.Any("pass", pass))
+
 	kind := "vnc"
 	if _, ok := data["kind"]; ok {
 		kind = data["kind"].GetStringValue()
 	}
+
+	log.Debug("Console", zap.Any("type", kind))
 
 	vmid, err := one.GetVMIDFromData(client, inst)
 	if err != nil {
@@ -339,6 +344,8 @@ func StartVNC(
 	}
 
 	url := fmt.Sprintf("%s/vnc?kind=%s&vmid=%d", host, kind, vmid)
+
+	log.Debug("Url", zap.String("Url", url))
 
 	hc := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
@@ -360,6 +367,8 @@ func StartVNC(
 		log.Warn("Error reading response body", zap.Error(err))
 		return nil, status.Error(codes.Internal, "Cannot read Body")
 	}
+
+	log.Debug("Body", zap.String("string", string(body)))
 
 	var token_data map[string]interface{}
 	err = json.Unmarshal(body, &token_data)

@@ -20,6 +20,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"time"
+
 	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
@@ -35,7 +37,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
-	"time"
 )
 
 var (
@@ -56,7 +57,7 @@ type DriverServiceServer struct {
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *DriverServiceServer {
-	auth.SetContext(log, key)
+	auth.SetContext(log, rdb, key)
 	return &DriverServiceServer{log: log, rdb: rdb}
 }
 
@@ -145,8 +146,12 @@ func (s *DriverServiceServer) TestServiceProviderConfig(ctx context.Context, req
 }
 
 func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.ServicesProvider, igroup *ipb.InstancesGroup, client one.IClient, group float64) (map[string]*structpb.Value, error) {
+
+	s.log.Info("Preparing Service", zap.String("group", igroup.GetUuid()))
+
 	data := igroup.GetData()
 	username := igroup.GetUuid()
+	config := igroup.GetConfig()
 
 	hasher := sha256.New()
 	hasher.Write([]byte(username + time.Now().String()))
@@ -169,6 +174,11 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		})
 	}
 	oneID := int(data["userid"].GetNumberValue())
+
+	if is_vdc, ok := config["is_vdc"]; ok && is_vdc.GetBoolValue() {
+		data["password"] = structpb.NewStringValue(userPass)
+		client.SetQuotaFromConfig(oneID, igroup, sp)
+	}
 
 	resources := igroup.GetResources()
 	var public_ips_amount int = 0
@@ -204,6 +214,10 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 	var private_ips_amount int = 0
 	if resources["ips_private"] != nil {
 		private_ips_amount = int(resources["ips_private"].GetNumberValue())
+	}
+
+	if private_ips_amount <= 0 {
+		return data, nil
 	}
 
 	private_vn_ban, ok := sp.Vars[one.PRIVATE_VN_BAN]
@@ -259,6 +273,23 @@ func (s *DriverServiceServer) Up(ctx context.Context, input *pb.UpRequest) (*pb.
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
 	client.SetVars(sp.GetVars())
+
+	if is_vdc, ok := igroup.GetConfig()["is_vdc"]; ok && is_vdc.GetBoolValue() {
+		log.Info("VDC mode enabled", zap.String("group", igroup.GetUuid()))
+		group := sp.GetSecrets()["group"].GetNumberValue()
+
+		if igroup.Data == nil {
+			igroup.Data = make(map[string]*structpb.Value)
+		}
+
+		data, err := s.PrepareService(ctx, sp, igroup, client, group)
+		igroup.Data = data
+		go datas.DataPublisher(datas.POST_IG_DATA)(igroup.Uuid, igroup.Data)
+		if err != nil {
+			log.Error("Error Preparing Service", zap.Any("group", igroup), zap.Error(err))
+			return nil, err
+		}
+	}
 
 	s.Monitoring(ctx, &pb.MonitoringRequest{Groups: []*ipb.InstancesGroup{igroup}, ServicesProvider: sp, Scheduled: false})
 
@@ -402,9 +433,25 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				if err != nil {
 					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 				}
+			} else {
+				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
+				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
 			}
 
-			go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+			instConfig := inst.GetConfig()
+			autoRenew := true
+
+			if instConfig != nil {
+				if autoRenewVal, ok := instConfig["auto_renew"]; ok {
+					autoRenew = autoRenewVal.GetBoolValue()
+				}
+			}
+
+			if autoRenew {
+				go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+			} else {
+				go handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+			}
 		}
 	}
 
