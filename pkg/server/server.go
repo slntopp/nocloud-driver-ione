@@ -442,7 +442,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			regularPayment := true
 
 			if instConfig != nil {
-				regularPayment = instConfig["regular_payment"].GetBoolValue()
+				if regularPaymentVal, ok := instConfig["regular_payment"]; ok {
+					regularPayment = regularPaymentVal.GetBoolValue()
+				}
+
 			}
 
 			if regularPayment {
