@@ -683,14 +683,17 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			log.Debug("Temp", zap.Any("price", resource.GetPrice()), zap.Any("val", value))
 
+			total := math.Round(resource.GetPrice()*value*100) / 100.0
+			log.Debug("Total", zap.Any("t", total))
+
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
 				End:      lm + resource.GetPeriod(),
 				Exec:     time.Now().Unix(),
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
-				Product:  resource.GetKey(),
-				Total:    math.Round(resource.GetPrice()*value*100) / 100.0,
+				Resource: resource.GetKey(),
+				Total:    total,
 			})
 		} else {
 			value := resources[resource.GetKey()].GetNumberValue()
@@ -701,14 +704,17 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			log.Debug("Temp", zap.Any("price", resource.GetPrice()), zap.Any("val", value))
 
+			total := math.Round(resource.GetPrice()*value*100) / 100.0
+			log.Debug("Total", zap.Any("t", total))
+
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
 				End:      lm + resource.GetPeriod(),
 				Exec:     time.Now().Unix(),
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
-				Product:  resource.GetKey(),
-				Total:    math.Round(resource.GetPrice()*value*100) / 100.0,
+				Resource: resource.GetKey(),
+				Total:    total,
 			})
 		}
 		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(lm + resource.GetPeriod()))
@@ -716,6 +722,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 	log.Debug("Data", zap.Any("d", i.GetData()))
 
+	log.Debug("records", zap.Any("r", recs))
 	go records(context.Background(), recs)
 	datas.DataPublisher(datas.POST_INST_DATA)(i.GetUuid(), i.GetData())
 }
