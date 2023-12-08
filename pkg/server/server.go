@@ -439,16 +439,15 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			}
 
 			instConfig := inst.GetConfig()
-			regularPayment := true
+			autoRenew := true
 
 			if instConfig != nil {
-				if regularPaymentVal, ok := instConfig["regular_payment"]; ok {
-					regularPayment = regularPaymentVal.GetBoolValue()
+				if autoRenewVal, ok := instConfig["auto_renew"]; ok {
+					autoRenew = autoRenewVal.GetBoolValue()
 				}
-
 			}
 
-			if regularPayment {
+			if autoRenew {
 				go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
 			} else {
 				go handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
