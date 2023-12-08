@@ -640,6 +640,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 	period := p.GetPeriod()
 	resources := i.GetResources()
 
+	log.Debug("resources", zap.Any("res", resources))
+
 	//math.Round(float64((rec.End-rec.Start)/res.Period)*res.Price*amount()*100) / 100.0
 
 	if period != 0 {
@@ -679,6 +681,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			value := resources[resource.GetKey()].GetNumberValue() / 1024
 
+			log.Debug("Value", zap.Any("v", value))
+
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
 				End:      lm + resource.GetPeriod(),
@@ -694,6 +698,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			if resource.GetKey() == "ram" {
 				value /= 1024
 			}
+
+			log.Debug("Value", zap.Any("v", value))
 
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
