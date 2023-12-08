@@ -679,9 +679,9 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				continue
 			}
 
-			value := resources[resource.GetKey()].GetNumberValue() / 1024
+			value := resources["drive_size"].GetNumberValue() / 1024
 
-			log.Debug("Value", zap.Any("v", value))
+			log.Debug("Temp", zap.Any("price", resource.GetPrice()), zap.Any("val", value))
 
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
@@ -699,7 +699,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				value /= 1024
 			}
 
-			log.Debug("Value", zap.Any("v", value))
+			log.Debug("Temp", zap.Any("price", resource.GetPrice()), zap.Any("val", value))
 
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
