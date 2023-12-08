@@ -668,7 +668,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		if resource.GetPeriod() == 0 {
 			continue
 		}
-		lm := int64(i.GetData()[resource.GetKey()+"last_monitoring"].GetNumberValue())
+		lm := int64(i.GetData()[resource.GetKey()+"_last_monitoring"].GetNumberValue())
+		log.Debug("lm", zap.Int64("lm", lm))
 		if strings.Contains(resource.GetKey(), "drive") {
 			driveType := resources["drive_type"].GetStringValue()
 
@@ -678,7 +679,6 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			value := resources[resource.GetKey()].GetNumberValue() / 1024
 
-			log.Debug("Res", zap.String("key", resource.GetKey()))
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
 				End:      lm + resource.GetPeriod(),
@@ -695,7 +695,6 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				value /= 1024
 			}
 
-			log.Debug("Res", zap.String("key", resource.GetKey()))
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
 				End:      lm + resource.GetPeriod(),
