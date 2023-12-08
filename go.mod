@@ -5,8 +5,8 @@ go 1.19
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20230517101801-6d09265b614f
 	github.com/rabbitmq/amqp091-go v1.9.0
-	github.com/slntopp/nocloud v0.0.18
-	github.com/slntopp/nocloud-proto v0.0.0-20231018203755-65e6664c3118
+	github.com/slntopp/nocloud v0.0.19-0.20231208094742-46214369f460
+	github.com/slntopp/nocloud-proto v0.0.0-20231127154920-0be0b2849c94
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.0
 	go.uber.org/zap v1.26.0
@@ -28,14 +28,14 @@ require (
 )
 
 require (
-	github.com/arangodb/go-driver v1.6.0 // indirect
+	github.com/arangodb/go-driver v1.6.1 // indirect
 	github.com/arangodb/go-velocypack v0.0.0-20200318135517-5af53c29c67e // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.1 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
