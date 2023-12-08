@@ -367,6 +367,8 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	nextPaymentDate := i.Data["next_payment_date"]
 	isOnePayment := false
 
+	log.Debug("Next payment", zap.Any("p", nextPaymentDate))
+
 	if plan.Kind == billingpb.PlanKind_STATIC {
 		var last int64
 		var priority billingpb.Priority
@@ -453,6 +455,8 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			nowPb := structpb.NewNumberValue(float64(now))
 			i.Data["last_monitoring"] = nowPb
 		}
+
+		log.Debug("Next payment", zap.Any("p", i.Data["next_payment_date"]))
 
 		if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
 			handleSuspendEvent(i, events)
