@@ -635,7 +635,6 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 	var recs []*billingpb.Record
 
 	product := i.GetProduct()
-	data := i.GetData()
 	plan := i.GetBillingPlan()
 	p := plan.GetProducts()[product]
 	period := p.GetPeriod()
@@ -644,7 +643,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 	//math.Round(float64((rec.End-rec.Start)/res.Period)*res.Price*amount()*100) / 100.0
 
 	if period != 0 {
-		lastMonitoring := int64(data["last_monitoring"].GetNumberValue())
+		log.Debug("Product")
+		lastMonitoring := int64(i.GetData()["last_monitoring"].GetNumberValue())
 
 		start := lastMonitoring
 		end := start + period
@@ -660,14 +660,15 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		})
 
 		lastMonitoring += period
-		data["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoring))
+		i.Data["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoring))
 	}
 
 	for _, resource := range plan.GetResources() {
+		log.Debug("Res", zap.String("key", resource.GetKey()))
 		if resource.GetPeriod() == 0 {
 			continue
 		}
-		lm := int64(data[resource.GetKey()+"last_monitoring"].GetNumberValue())
+		lm := int64(i.GetData()[resource.GetKey()+"last_monitoring"].GetNumberValue())
 		if strings.Contains(resource.GetKey(), "drive") {
 			driveType := resources["drive_type"].GetStringValue()
 
@@ -677,6 +678,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			value := resources[resource.GetKey()].GetNumberValue() / 1024
 
+			log.Debug("Res", zap.String("key", resource.GetKey()))
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
 				End:      lm + resource.GetPeriod(),
@@ -693,6 +695,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				value /= 1024
 			}
 
+			log.Debug("Res", zap.String("key", resource.GetKey()))
 			recs = append(recs, &billingpb.Record{
 				Start:    lm,
 				End:      lm + resource.GetPeriod(),
@@ -706,8 +709,10 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(lm + resource.GetPeriod()))
 	}
 
+	log.Debug("Data", zap.Any("d", i.GetData()))
+
 	go records(context.Background(), recs)
-	datas.DataPublisher(datas.POST_INST_DATA)(i.GetUuid(), data)
+	datas.DataPublisher(datas.POST_INST_DATA)(i.GetUuid(), i.GetData())
 }
 
 type BillingHandlerFunc func(
