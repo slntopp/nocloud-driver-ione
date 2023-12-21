@@ -112,8 +112,8 @@ github.com/sagikazarmark/slog-shim v0.1.0/go.mod h1:SrcSrq8aKtyuqEI1uvTDTK1arOWR
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/slntopp/nocloud v0.0.19-0.20231208094742-46214369f460 h1:Y40Iwn7N6iz3hVBgXpXGPLR2lJ7dOnn+Ecd2I5wcVBM=
 github.com/slntopp/nocloud v0.0.19-0.20231208094742-46214369f460/go.mod h1:m+4Xg+imXt/KcsAkelCXPa0I/M757TJk4qPgfSvRE1M=
-github.com/slntopp/nocloud-proto v0.0.0-20231127154920-0be0b2849c94 h1:whg4mEAyQqHLEIYQj10ncFReBTbrK/QQ/KTUoZ1ODEs=
-github.com/slntopp/nocloud-proto v0.0.0-20231127154920-0be0b2849c94/go.mod h1:CwJXNOt1iMCIskt/QA0Toyu2kdCmzYqEJ47e/G7Rg7E=
+github.com/slntopp/nocloud-proto v0.0.0-20231219155745-63f57ae5ee27 h1:AdPLIpP/JhNkckCLAFHe8agdNdc/JJlScPoDfjSoA6s=
+github.com/slntopp/nocloud-proto v0.0.0-20231219155745-63f57ae5ee27/go.mod h1:cyg8eHT4hAKqcitR3TD3v9zGkq/Ywt28cJH9lGF7Guk=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
 github.com/sourcegraph/conc v0.3.0/go.mod h1:Sdozi7LEKbFPqYX2/J+iBAM6HpqSLTASQIKqDmF7Mt0=
 github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=
