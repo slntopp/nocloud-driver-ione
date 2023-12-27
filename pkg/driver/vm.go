@@ -808,6 +808,9 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 				Meta: map[string]*structpb.Value{},
 			}
 		}
+		if inst.GetState().GetMeta() == nil {
+			inst.State.Meta = make(map[string]*structpb.Value)
+		}
 		inst.State.Meta["updated"] = updlist
 	}
 
