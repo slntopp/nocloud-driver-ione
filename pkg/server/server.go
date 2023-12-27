@@ -439,7 +439,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			}
 
 			instConfig := inst.GetConfig()
-			autoRenew := true
+			autoRenew := false
 
 			if instConfig != nil {
 				if autoRenewVal, ok := instConfig["auto_renew"]; ok {
