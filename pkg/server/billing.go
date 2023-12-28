@@ -138,6 +138,31 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			})
 		}
 
+		plan := i.GetBillingPlan()
+		product := plan.GetProducts()[i.GetProduct()]
+
+		for _, resource := range plan.Resources {
+			last := int64(i.Data[resource.Key+"_last_monitoring"].GetNumberValue())
+
+			if resource.GetKind() == billingpb.Kind_POSTPAID {
+				i.Data[resource.Key+"_next_payment_date"] = structpb.NewNumberValue(float64(last + resource.GetPeriod()))
+			} else {
+				i.Data[resource.Key+"_next_payment_date"] = structpb.NewNumberValue(float64(last))
+			}
+
+		}
+
+		if plan.Kind == billingpb.PlanKind_STATIC {
+			last := int64(i.Data["last_monitoring"].GetNumberValue())
+
+			if product.GetKind() == billingpb.Kind_POSTPAID {
+				i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last + product.GetPeriod()))
+			} else {
+				i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
+			}
+		}
+		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+
 	} else {
 		plan := i.BillingPlan
 		if plan == nil {
@@ -260,15 +285,15 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 					i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
 				}
 			}
-
-			go records(context.Background(), append(resourceRecords, productRecords...))
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_renew",
-				Data: map[string]*structpb.Value{},
-			})
-			go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 		}
+
+		go records(context.Background(), append(resourceRecords, productRecords...))
+		go events(context.Background(), &epb.Event{
+			Uuid: i.GetUuid(),
+			Key:  "instance_renew",
+			Data: map[string]*structpb.Value{},
+		})
+		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 	}
 }
 
