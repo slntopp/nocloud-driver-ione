@@ -120,12 +120,22 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 				log.Error("Failed to suspend vm", zap.Error(err))
 				return
 			}
+			go events(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_suspended",
+				Data: map[string]*structpb.Value{},
+			})
 		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !suspendedManually {
 			err := client.ResumeVM(vmid)
 			if err != nil {
 				log.Error("Failed to resume vm", zap.Error(err))
 				return
 			}
+			go events(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_unsuspended",
+				Data: map[string]*structpb.Value{},
+			})
 		}
 
 	} else {
