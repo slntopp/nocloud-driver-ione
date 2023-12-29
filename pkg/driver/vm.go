@@ -469,7 +469,21 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		vm, err := c.FindVMByInstance(inst)
 		if err != nil {
 			log.Warn("VM is still not created", zap.Error(err), zap.Any("inst", inst))
-			resp.ToBeCreated = append(resp.ToBeCreated, inst)
+			meta := inst.GetBillingPlan().GetMeta()
+			if meta == nil {
+				meta = make(map[string]*structpb.Value)
+			}
+			cfg := inst.GetConfig()
+			if cfg == nil {
+				cfg = make(map[string]*structpb.Value)
+			}
+
+			cfgAutoStart := cfg["auto_start"].GetBoolValue()
+			metaAutoStart := meta["auto_start"].GetBoolValue()
+
+			if metaAutoStart || cfgAutoStart {
+				resp.ToBeCreated = append(resp.ToBeCreated, inst)
+			}
 			continue
 		}
 
@@ -793,6 +807,9 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 			inst.State = &stpb.State{
 				Meta: map[string]*structpb.Value{},
 			}
+		}
+		if inst.GetState().GetMeta() == nil {
+			inst.State.Meta = make(map[string]*structpb.Value)
 		}
 		inst.State.Meta["updated"] = updlist
 	}

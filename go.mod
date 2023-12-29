@@ -1,17 +1,17 @@
 module github.com/slntopp/nocloud-driver-ione
 
-go 1.19
+go 1.21
 
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20230517101801-6d09265b614f
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/slntopp/nocloud v0.0.19-0.20231208094742-46214369f460
-	github.com/slntopp/nocloud-proto v0.0.0-20231127154920-0be0b2849c94
+	github.com/slntopp/nocloud-proto v0.0.0-20231219155745-63f57ae5ee27
 	github.com/spf13/cobra v1.8.0
-	github.com/spf13/viper v1.18.0
+	github.com/spf13/viper v1.18.2
 	go.uber.org/zap v1.26.0
-	google.golang.org/grpc v1.59.0
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/grpc v1.60.1
+	google.golang.org/protobuf v1.32.0
 )
 
 require (
