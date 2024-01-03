@@ -513,7 +513,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	}
 
 	go records(context.Background(), append(resourceRecords, productRecords...))
-	if len(productRecords) != 0 {
+	if len(productRecords) != 0 && state != "SUSPENDED" {
 		go events(context.Background(), &epb.Event{
 			Uuid: i.GetUuid(),
 			Key:  "instance_renew",
