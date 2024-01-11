@@ -928,12 +928,11 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			last = end
 		}
 	} else {
-		for end := last + res.Period; last <= time.Now().Unix(); {
+		for end := last + res.Period; last <= time.Now().Unix(); end += res.Period {
 			md := map[string]*structpb.Value{
 				"instance_title": structpb.NewStringValue(i.GetTitle()),
 			}
 
-			end += res.Period
 			if res.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
 
 				if last-end == 86400 {
@@ -973,9 +972,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 	var records []*billingpb.Record
 	if product.Kind == billingpb.Kind_POSTPAID {
 		log.Debug("Handling Postpaid Billing", zap.Any("product", product))
-		for end := last + product.Period; end <= time.Now().Unix(); {
+		for end := last + product.Period; end <= time.Now().Unix(); end += product.Period {
 
-			end += product.Period
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
 
 				if last-end == 86400 {
@@ -1011,8 +1009,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 			}
 		}
 		log.Debug("Handling Prepaid Billing", zap.Any("product", product), zap.Int64("end", end), zap.Int64("now", time.Now().Unix()))
-		for last <= time.Now().Unix() {
-			end += product.Period
+		for ; last <= time.Now().Unix(); end += product.Period {
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
 				if last-end == 86400 {
 					end += 86400
