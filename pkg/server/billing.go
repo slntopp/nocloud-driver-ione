@@ -1038,13 +1038,16 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 		log.Debug("Handling Prepaid Billing", zap.Any("product", product), zap.Int64("end", end), zap.Int64("now", time.Now().Unix()))
 		for ; last <= time.Now().Unix(); end += product.Period {
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				if last-end == 86400 {
+				lastDay := time.Unix(last, 0).Day()
+				endDay := time.Unix(end, 0).Day()
+
+				if lastDay-endDay == 1 {
 					end += 86400
-				} else if last-end == -29*86400 {
+				} else if lastDay-endDay == -29 {
 					end += 2 * 86400
-				} else if last-end == -1*86400 {
+				} else if lastDay-endDay == -1 {
 					end -= 86400
-				} else if last-end == -2*86400 {
+				} else if lastDay-endDay == -2 {
 					end -= 2 * 86400
 				}
 			}
