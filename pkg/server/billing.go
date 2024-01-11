@@ -686,6 +686,22 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		start := lastMonitoring
 		end := start + period
 
+		if p.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+
+			lastDay := time.Unix(start, 0).Day()
+			endDay := time.Unix(end, 0).Day()
+
+			if lastDay-endDay == 1 {
+				end += 86400
+			} else if lastDay-endDay == -29 {
+				end += 2 * 86400
+			} else if lastDay-endDay == -1 {
+				end -= 86400
+			} else if lastDay-endDay == -2 {
+				end -= 2 * 86400
+			}
+		}
+
 		recs = append(recs, &billingpb.Record{
 			Start:    start,
 			End:      end,
@@ -721,9 +737,28 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			total := math.Round(resource.GetPrice()*value*100) / 100.0
 			log.Debug("Total", zap.Any("t", total))
 
+			start := lm
+			end := start + resource.GetPeriod()
+
+			if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+
+				lastDay := time.Unix(start, 0).Day()
+				endDay := time.Unix(end, 0).Day()
+
+				if lastDay-endDay == 1 {
+					end += 86400
+				} else if lastDay-endDay == -29 {
+					end += 2 * 86400
+				} else if lastDay-endDay == -1 {
+					end -= 86400
+				} else if lastDay-endDay == -2 {
+					end -= 2 * 86400
+				}
+			}
+
 			recs = append(recs, &billingpb.Record{
-				Start:    lm,
-				End:      lm + resource.GetPeriod(),
+				Start:    start,
+				End:      end,
 				Exec:     time.Now().Unix(),
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
@@ -742,9 +777,28 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			total := math.Round(resource.GetPrice()*value*100) / 100.0
 			log.Debug("Total", zap.Any("t", total))
 
+			start := lm
+			end := start + resource.GetPeriod()
+
+			if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+
+				lastDay := time.Unix(start, 0).Day()
+				endDay := time.Unix(end, 0).Day()
+
+				if lastDay-endDay == 1 {
+					end += 86400
+				} else if lastDay-endDay == -29 {
+					end += 2 * 86400
+				} else if lastDay-endDay == -1 {
+					end -= 86400
+				} else if lastDay-endDay == -2 {
+					end -= 2 * 86400
+				}
+			}
+
 			recs = append(recs, &billingpb.Record{
-				Start:    lm,
-				End:      lm + resource.GetPeriod(),
+				Start:    start,
+				End:      end,
 				Exec:     time.Now().Unix(),
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
