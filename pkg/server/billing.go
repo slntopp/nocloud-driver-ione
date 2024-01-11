@@ -712,8 +712,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			Total:    p.GetPrice(),
 		})
 
-		lastMonitoring += period
-		i.Data["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoring))
+		i.Data["last_monitoring"] = structpb.NewNumberValue(float64(end))
 	}
 
 	for _, resource := range plan.GetResources() {
@@ -723,6 +722,26 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		}
 		lm := int64(i.GetData()[resource.GetKey()+"_last_monitoring"].GetNumberValue())
 		log.Debug("lm", zap.Int64("lm", lm))
+
+		start := lm
+		end := start + resource.GetPeriod()
+
+		if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+
+			lastDay := time.Unix(start, 0).Day()
+			endDay := time.Unix(end, 0).Day()
+
+			if lastDay-endDay == 1 {
+				end += 86400
+			} else if lastDay-endDay == -29 {
+				end += 2 * 86400
+			} else if lastDay-endDay == -1 {
+				end -= 86400
+			} else if lastDay-endDay == -2 {
+				end -= 2 * 86400
+			}
+		}
+
 		if strings.Contains(resource.GetKey(), "drive") {
 			driveType := resources["drive_type"].GetStringValue()
 
@@ -736,25 +755,6 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			total := math.Round(resource.GetPrice()*value*100) / 100.0
 			log.Debug("Total", zap.Any("t", total))
-
-			start := lm
-			end := start + resource.GetPeriod()
-
-			if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-
-				lastDay := time.Unix(start, 0).Day()
-				endDay := time.Unix(end, 0).Day()
-
-				if lastDay-endDay == 1 {
-					end += 86400
-				} else if lastDay-endDay == -29 {
-					end += 2 * 86400
-				} else if lastDay-endDay == -1 {
-					end -= 86400
-				} else if lastDay-endDay == -2 {
-					end -= 2 * 86400
-				}
-			}
 
 			recs = append(recs, &billingpb.Record{
 				Start:    start,
@@ -777,25 +777,6 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			total := math.Round(resource.GetPrice()*value*100) / 100.0
 			log.Debug("Total", zap.Any("t", total))
 
-			start := lm
-			end := start + resource.GetPeriod()
-
-			if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-
-				lastDay := time.Unix(start, 0).Day()
-				endDay := time.Unix(end, 0).Day()
-
-				if lastDay-endDay == 1 {
-					end += 86400
-				} else if lastDay-endDay == -29 {
-					end += 2 * 86400
-				} else if lastDay-endDay == -1 {
-					end -= 86400
-				} else if lastDay-endDay == -2 {
-					end -= 2 * 86400
-				}
-			}
-
 			recs = append(recs, &billingpb.Record{
 				Start:    start,
 				End:      end,
@@ -806,7 +787,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				Total:    total,
 			})
 		}
-		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(lm + resource.GetPeriod()))
+		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(end))
 	}
 
 	log.Debug("Data", zap.Any("d", i.GetData()))
