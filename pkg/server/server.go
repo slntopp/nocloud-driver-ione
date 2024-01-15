@@ -441,19 +441,18 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			cfgAutoStart := cfg["auto_start"].GetBoolValue()
 			metaAutoStart := meta["auto_start"].GetBoolValue()
 
-			if !(metaAutoStart || cfgAutoStart) {
+			if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
+				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
+				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
+			} else if !(metaAutoStart || cfgAutoStart) {
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
-			} else if inst.GetStatus() != statuspb.NoCloudStatus_DEL {
+			} else {
 				_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 				if err != nil {
 					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 				}
-			} else {
-				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
-				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
 			}
-
 			instConfig := inst.GetConfig()
 			autoRenew := false
 

@@ -513,7 +513,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	}
 
 	go records(context.Background(), append(resourceRecords, productRecords...))
-	if len(productRecords) != 0 {
+	if len(productRecords) != 0 && state != "SUSPENDED" {
 		go events(context.Background(), &epb.Event{
 			Uuid: i.GetUuid(),
 			Key:  "instance_renew",
@@ -686,6 +686,22 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		start := lastMonitoring
 		end := start + period
 
+		if p.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+
+			lastDay := time.Unix(start, 0).Day()
+			endDay := time.Unix(end, 0).Day()
+
+			if lastDay-endDay == 1 {
+				end += 86400
+			} else if lastDay-endDay == -29 {
+				end += 2 * 86400
+			} else if lastDay-endDay == -1 {
+				end -= 86400
+			} else if lastDay-endDay == -2 {
+				end -= 2 * 86400
+			}
+		}
+
 		recs = append(recs, &billingpb.Record{
 			Start:    start,
 			End:      end,
@@ -696,8 +712,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			Total:    p.GetPrice(),
 		})
 
-		lastMonitoring += period
-		i.Data["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoring))
+		i.Data["last_monitoring"] = structpb.NewNumberValue(float64(end))
 	}
 
 	for _, resource := range plan.GetResources() {
@@ -707,6 +722,26 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		}
 		lm := int64(i.GetData()[resource.GetKey()+"_last_monitoring"].GetNumberValue())
 		log.Debug("lm", zap.Int64("lm", lm))
+
+		start := lm
+		end := start + resource.GetPeriod()
+
+		if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+
+			lastDay := time.Unix(start, 0).Day()
+			endDay := time.Unix(end, 0).Day()
+
+			if lastDay-endDay == 1 {
+				end += 86400
+			} else if lastDay-endDay == -29 {
+				end += 2 * 86400
+			} else if lastDay-endDay == -1 {
+				end -= 86400
+			} else if lastDay-endDay == -2 {
+				end -= 2 * 86400
+			}
+		}
+
 		if strings.Contains(resource.GetKey(), "drive") {
 			driveType := resources["drive_type"].GetStringValue()
 
@@ -722,8 +757,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			log.Debug("Total", zap.Any("t", total))
 
 			recs = append(recs, &billingpb.Record{
-				Start:    lm,
-				End:      lm + resource.GetPeriod(),
+				Start:    start,
+				End:      end,
 				Exec:     time.Now().Unix(),
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
@@ -743,8 +778,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			log.Debug("Total", zap.Any("t", total))
 
 			recs = append(recs, &billingpb.Record{
-				Start:    lm,
-				End:      lm + resource.GetPeriod(),
+				Start:    start,
+				End:      end,
 				Exec:     time.Now().Unix(),
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
@@ -752,7 +787,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				Total:    total,
 			})
 		}
-		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(lm + resource.GetPeriod()))
+		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(end))
 	}
 
 	log.Debug("Data", zap.Any("d", i.GetData()))
@@ -928,12 +963,11 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			last = end
 		}
 	} else {
-		for end := last + res.Period; last <= time.Now().Unix(); {
+		for end := last + res.Period; last <= time.Now().Unix(); end += res.Period {
 			md := map[string]*structpb.Value{
 				"instance_title": structpb.NewStringValue(i.GetTitle()),
 			}
 
-			end += res.Period
 			if res.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
 
 				if last-end == 86400 {
@@ -973,18 +1007,20 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 	var records []*billingpb.Record
 	if product.Kind == billingpb.Kind_POSTPAID {
 		log.Debug("Handling Postpaid Billing", zap.Any("product", product))
-		for end := last + product.Period; end <= time.Now().Unix(); {
+		for end := last + product.Period; end <= time.Now().Unix(); end += product.Period {
 
-			end += product.Period
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
 
-				if last-end == 86400 {
+				lastDay := time.Unix(last, 0).Day()
+				endDay := time.Unix(end, 0).Day()
+
+				if lastDay-endDay == 1 {
 					end += 86400
-				} else if last-end == -29*86400 {
+				} else if lastDay-endDay == -29 {
 					end += 2 * 86400
-				} else if last-end == -1*86400 {
+				} else if lastDay-endDay == -1 {
 					end -= 86400
-				} else if last-end == -2*86400 {
+				} else if lastDay-endDay == -2 {
 					end -= 2 * 86400
 				}
 			}
@@ -999,28 +1035,19 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 		}
 	} else {
 		end := last + product.Period
-		if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-			if last-end == 86400 {
-				end += 86400
-			} else if last-end == -29*86400 {
-				end += 2 * 86400
-			} else if last-end == -1*86400 {
-				end -= 86400
-			} else if last-end == -2*86400 {
-				end -= 2 * 86400
-			}
-		}
 		log.Debug("Handling Prepaid Billing", zap.Any("product", product), zap.Int64("end", end), zap.Int64("now", time.Now().Unix()))
-		for last <= time.Now().Unix() {
-			end += product.Period
+		for ; last <= time.Now().Unix(); end += product.Period {
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				if last-end == 86400 {
+				lastDay := time.Unix(last, 0).Day()
+				endDay := time.Unix(end, 0).Day()
+
+				if lastDay-endDay == 1 {
 					end += 86400
-				} else if last-end == -29*86400 {
+				} else if lastDay-endDay == -29 {
 					end += 2 * 86400
-				} else if last-end == -1*86400 {
+				} else if lastDay-endDay == -1 {
 					end -= 86400
-				} else if last-end == -2*86400 {
+				} else if lastDay-endDay == -2 {
 					end -= 2 * 86400
 				}
 			}
