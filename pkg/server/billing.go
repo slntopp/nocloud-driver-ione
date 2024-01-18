@@ -1139,6 +1139,10 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * (diff.NewResCount - diff.OldResCount)
 						total = math.Round(total*100) / 100.0
 
+						if diff.ResName == "ips_public" {
+							total /= diff.NewResCount - diff.OldResCount
+						}
+
 						records = append(records, &billingpb.Record{
 							Start: now, End: int64(lastMonitoring.GetNumberValue()), Exec: now,
 							Priority: billingpb.Priority_ADDITIONAL,
