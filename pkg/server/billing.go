@@ -1141,6 +1141,9 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 
 						if diff.ResName == "ips_public" {
 							total /= diff.NewResCount - diff.OldResCount
+							if diff.NewResCount-diff.OldResCount < 0 {
+								total *= -1
+							}
 						}
 
 						records = append(records, &billingpb.Record{
