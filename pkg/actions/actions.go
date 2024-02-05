@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
@@ -40,18 +41,19 @@ type ServiceAction func(
 ) (*ipb.InvokeResponse, error)
 
 var Actions = map[string]ServiceAction{
-	"poweroff":     Poweroff,
-	"suspend":      Suspend,
-	"reboot":       Reboot,
-	"resume":       Resume,
-	"reinstall":    Reinstall,
-	"monitoring":   Monitoring,
-	"state":        State,
-	"snapcreate":   SnapCreate,
-	"snapdelete":   SnapDelete,
-	"snaprevert":   SnapRevert,
-	"start_vnc":    StartVNC,
-	"cancel_renew": CancelRenew,
+	"poweroff":        Poweroff,
+	"suspend":         Suspend,
+	"reboot":          Reboot,
+	"resume":          Resume,
+	"reinstall":       Reinstall,
+	"monitoring":      Monitoring,
+	"state":           State,
+	"snapcreate":      SnapCreate,
+	"snapdelete":      SnapDelete,
+	"snaprevert":      SnapRevert,
+	"start_vnc":       StartVNC,
+	"cancel_renew":    CancelRenew,
+	"get_backup_info": GetBackupInfo,
 }
 
 var BillingActions = map[string]ServiceAction{
@@ -59,7 +61,8 @@ var BillingActions = map[string]ServiceAction{
 }
 
 var AdminActions = map[string]bool{
-	"suspend": true,
+	"suspend":         true,
+	"get_backup_info": true,
 }
 
 // Creates new snapshot of vm
@@ -506,4 +509,53 @@ func CancelRenew(
 	instData["canceled_remove"] = structpb.NewBoolValue(true)
 	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
 	return &ipb.InvokeResponse{Result: true}, nil
+}
+
+func GetBackupInfo(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	instData := inst.GetData()
+
+	if instData == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Instance data is nil")
+	}
+
+	vmid, ok := instData["vmid"]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No vm id")
+	}
+	vmidVal := int(vmid.GetNumberValue())
+
+	vm, err := client.GetVM(vmidVal)
+	if err != nil {
+		return nil, err
+	}
+
+	str, err := vm.MonitoringInfos.GetStr("DISK_0_ACTUAL_PATH")
+	if err != nil {
+		return nil, err
+	}
+
+	split := strings.Split(str, " ")
+	if len(split) != 2 {
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to get info")
+	}
+
+	datastore := split[0][1 : len(split[0])-1]
+	split = strings.Split(split[1], "/")
+
+	if len(split) == 1 {
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to get dir")
+	}
+	dir := split[0]
+
+	return &ipb.InvokeResponse{
+		Result: true,
+		Meta: map[string]*structpb.Value{
+			"datastore": structpb.NewStringValue(datastore),
+			"dir":       structpb.NewStringValue(dir),
+		},
+	}, nil
 }
