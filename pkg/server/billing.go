@@ -709,7 +709,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			Priority: billingpb.Priority_URGENT,
 			Instance: i.GetUuid(),
 			Product:  product,
-			Total:    p.GetPrice(),
+			Total:    1,
 		})
 
 		i.Data["last_monitoring"] = structpb.NewNumberValue(float64(end))
@@ -753,9 +753,6 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			log.Debug("Temp", zap.Any("price", resource.GetPrice()), zap.Any("val", value))
 
-			total := math.Round(resource.GetPrice()*value*100) / 100.0
-			log.Debug("Total", zap.Any("t", total))
-
 			recs = append(recs, &billingpb.Record{
 				Start:    start,
 				End:      end,
@@ -763,7 +760,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
 				Resource: resource.GetKey(),
-				Total:    total,
+				Total:    value,
 			})
 		} else {
 			value := resources[resource.GetKey()].GetNumberValue()
@@ -774,9 +771,6 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			log.Debug("Temp", zap.Any("price", resource.GetPrice()), zap.Any("val", value))
 
-			total := math.Round(resource.GetPrice()*value*100) / 100.0
-			log.Debug("Total", zap.Any("t", total))
-
 			recs = append(recs, &billingpb.Record{
 				Start:    start,
 				End:      end,
@@ -784,7 +778,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 				Priority: billingpb.Priority_URGENT,
 				Instance: i.GetUuid(),
 				Resource: resource.GetKey(),
-				Total:    total,
+				Total:    value,
 			})
 		}
 		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(end))
@@ -956,7 +950,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 						Instance: i.GetUuid(),
 						Start:    rec.Start, End: rec.End,
 						Exec:  rec.End,
-						Total: math.Round(float64((rec.End-rec.Start)/res.Period)*res.Price*amount()*100) / 100.0,
+						Total: math.Round(float64((rec.End-rec.Start)/res.Period)*amount()*100) / 100.0,
 					})
 				}
 			}
@@ -986,7 +980,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 				Instance: i.GetUuid(),
 				Priority: billingpb.Priority_URGENT,
 				Start:    last, End: end, Exec: last,
-				Total: math.Round(res.Price*amount()*100) / 100.0,
+				Total: amount(),
 				Meta:  md,
 			})
 			last = end
@@ -1030,7 +1024,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
 				Priority: billingpb.Priority_NORMAL,
-				Total:    math.Round(product.Price*100) / 100.0,
+				Total:    1,
 			})
 		}
 	} else {
@@ -1056,7 +1050,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 				Instance: i.GetUuid(),
 				Start:    last, End: end, Exec: last,
 				Priority: priority,
-				Total:    math.Round(product.Price*100) / 100.0,
+				Total:    1,
 			})
 			last = end
 		}
@@ -1075,7 +1069,7 @@ func handleCapacityZeroBilling(log *zap.Logger, amount func() float64, ltl LazyT
 		Start:    now, End: now + 1,
 		Exec:     now,
 		Priority: billingpb.Priority_URGENT,
-		Total:    math.Round(res.Price*amount()*100) / 100.0,
+		Total:    amount(),
 	})
 
 	return records, last
@@ -1083,7 +1077,7 @@ func handleCapacityZeroBilling(log *zap.Logger, amount func() float64, ltl LazyT
 
 func handleStaticZeroBilling(log *zap.Logger, i *ipb.Instance, last int64, priority billingpb.Priority) ([]*billingpb.Record, int64) {
 	log.Debug("Handling Static Billing", zap.Int64("last", last))
-	product, ok := i.BillingPlan.Products[*i.Product]
+	_, ok := i.BillingPlan.Products[*i.Product]
 	if !ok {
 		log.Warn("Product not found", zap.String("product", *i.Product))
 		return nil, last
@@ -1095,7 +1089,7 @@ func handleStaticZeroBilling(log *zap.Logger, i *ipb.Instance, last int64, prior
 		Instance: i.GetUuid(),
 		Start:    last, End: last + 1, Exec: last,
 		Priority: billingpb.Priority_URGENT,
-		Total:    math.Round(product.Price*100) / 100.0,
+		Total:    1,
 	})
 
 	return records, last
@@ -1136,7 +1130,7 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 					if res.Kind == billingpb.Kind_PREPAID {
 						timeDiff := int64(lastMonitoring.GetNumberValue()) - now
 
-						total := res.Price * (float64(timeDiff) / float64(res.GetPeriod())) * (diff.NewResCount - diff.OldResCount)
+						total := (float64(timeDiff) / float64(res.GetPeriod())) * (diff.NewResCount - diff.OldResCount)
 						total = math.Round(total*100) / 100.0
 
 						if diff.ResName == "ips_public" {
