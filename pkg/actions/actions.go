@@ -16,8 +16,12 @@ limitations under the License.
 package actions
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/server"
+	"github.com/slntopp/nocloud-proto/ansible"
 	"io"
 	"net/http"
 	"strings"
@@ -40,6 +44,13 @@ type ServiceAction func(
 	map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error)
 
+type AnsibleAction func(
+	ansible.AnsibleServiceClient,
+	*server.AnsibleConfig,
+	*ipb.Instance,
+	map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error)
+
 var Actions = map[string]ServiceAction{
 	"poweroff":        Poweroff,
 	"suspend":         Suspend,
@@ -58,6 +69,10 @@ var Actions = map[string]ServiceAction{
 
 var BillingActions = map[string]ServiceAction{
 	"manual_renew": ManualRenew,
+}
+
+var AnsibleActions = map[string]AnsibleAction{
+	"exec": Exec,
 }
 
 var AdminActions = map[string]bool{
@@ -557,5 +572,52 @@ func GetBackupInfo(
 			"datastore": structpb.NewStringValue(datastore),
 			"dir":       structpb.NewStringValue(dir),
 		},
+	}, nil
+}
+
+func Exec(
+	client ansible.AnsibleServiceClient,
+	cfg *server.AnsibleConfig,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	playbookUuid, ok := data["playbookUuid"]
+	host := data["host"].GetStringValue()
+	if !ok {
+		return nil, errors.New("no playbook uuid")
+	}
+	playbookUuidVal := playbookUuid.GetStringValue()
+
+	create, err := client.Create(context.Background(), &ansible.CreateRunRequest{
+		Run: &ansible.Run{
+			Instances: []*ansible.Instance{
+				{
+					Host: host,
+				},
+			},
+			PlaybookUuid: playbookUuidVal,
+			SshKey:       &cfg.SshKey,
+			Vars:         cfg.Vars,
+			Hop:          &cfg.Hop,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = client.Exec(context.Background(), &ansible.ExecRunRequest{
+		Uuid: create.GetUuid(),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+
+	return &ipb.InvokeResponse{
+		Result: true,
 	}, nil
 }
