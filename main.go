@@ -18,8 +18,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
+	"google.golang.org/grpc/credentials/insecure"
+	"gopkg.in/yaml.v2"
 	"net"
+	"os"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -45,6 +49,7 @@ var (
 	RabbitMQConn string
 	SIGNING_KEY  []byte
 	redisHost    string
+	ansibleHost  string
 )
 
 func init() {
@@ -65,6 +70,9 @@ func init() {
 
 	viper.SetDefault("REDIS_HOST", "redis:6379")
 	redisHost = viper.GetString("REDIS_HOST")
+
+	viper.SetDefault("ANSIBLE_HOST", "")
+	ansibleHost = viper.GetString("ANSIBLE_HOST")
 }
 
 func main() {
@@ -107,6 +115,27 @@ func main() {
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
 	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
+
+	if ansibleHost != "" {
+		dial, err := grpc.Dial(ansibleHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err == nil {
+			ansibleClient := ansible.NewAnsibleServiceClient(dial)
+			var cfg server.AnsibleConfig
+			file, err := os.ReadFile("ansible-config.yaml")
+			if err != nil {
+				log.Fatal("Failed to read ansible config", zap.Error(err))
+			}
+
+			err = yaml.Unmarshal(file, &cfg)
+			if err != nil {
+				log.Fatal("Failed to unmarshal ansible config", zap.Error(err))
+			}
+
+			srv.SetAnsibleClient(ansibleClient, &cfg)
+		} else {
+			log.Fatal("Failed to setup ansible connection", zap.Error(err))
+		}
+	}
 
 	pb.RegisterDriverServiceServer(s, srv)
 

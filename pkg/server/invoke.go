@@ -17,8 +17,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
-
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
+	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -49,6 +51,24 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
+	runningPlaybook := instance.GetData()["running_playbook"].GetStringValue()
+
+	if runningPlaybook != "" {
+		get, err := s.ansibleClient.Get(ctx, &ansible.GetRunRequest{
+			Uuid: runningPlaybook,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if get.GetStatus() == "running" {
+			return nil, errors.New("playbook still running")
+		}
+		if get.GetStatus() == "successful" || get.GetStatus() == "failed" || get.GetStatus() == "undefined" {
+			instance.Data["running_playbook"] = structpb.NewStringValue("")
+			go datas.DataPublisher(datas.POST_INST_DATA)(instance.GetUuid(), instance.GetData())
+		}
+	}
+
 	action, ok := actions.Actions[method]
 	if !ok {
 		s.log.Warn(fmt.Sprintf("Action %s not declared for %s", method, DRIVER_TYPE))
@@ -63,6 +83,11 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		}
 
 		return action(client, instance, req.GetParams())
+	}
+
+	ansibleAction, ok := actions.AnsibleActions[method]
+	if ok {
+		return ansibleAction(s.ansibleClient, s.ansibleConfig, instance, req.GetParams())
 	}
 
 	action, ok = actions.BillingActions[method]

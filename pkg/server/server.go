@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"github.com/slntopp/nocloud-proto/ansible"
 	"time"
 
 	redis "github.com/go-redis/redis/v8"
@@ -48,17 +49,30 @@ func SetDriverType(_type string) {
 	DRIVER_TYPE = _type
 }
 
+type AnsibleConfig struct {
+	Vars   map[string]string `yaml:"vars"`
+	SshKey string            `yaml:"sshKey"`
+	Hop    ansible.Instance  `yaml:"hop"`
+}
+
 type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
 	HandlePublishEvents  EventsPublisherFunc
+	ansibleClient        ansible.AnsibleServiceClient
+	ansibleConfig        *AnsibleConfig
 	rdb                  *redis.Client
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *DriverServiceServer {
 	auth.SetContext(log, rdb, key)
 	return &DriverServiceServer{log: log, rdb: rdb}
+}
+
+func (s *DriverServiceServer) SetAnsibleClient(client ansible.AnsibleServiceClient, cfg *AnsibleConfig) {
+	s.ansibleClient = client
+	s.ansibleConfig = cfg
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
