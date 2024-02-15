@@ -71,7 +71,7 @@ func init() {
 	viper.SetDefault("REDIS_HOST", "redis:6379")
 	redisHost = viper.GetString("REDIS_HOST")
 
-	viper.SetDefault("ANSIBLE_HOST", "ansible:8000")
+	viper.SetDefault("ANSIBLE_HOST", "")
 	ansibleHost = viper.GetString("ANSIBLE_HOST")
 }
 
