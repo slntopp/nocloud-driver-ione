@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
 	"github.com/slntopp/nocloud-proto/ansible"
 	"time"
 
@@ -49,19 +50,13 @@ func SetDriverType(_type string) {
 	DRIVER_TYPE = _type
 }
 
-type AnsibleConfig struct {
-	Vars   map[string]string `yaml:"vars"`
-	SshKey string            `yaml:"sshKey"`
-	Hop    ansible.Instance  `yaml:"hop"`
-}
-
 type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
 	HandlePublishEvents  EventsPublisherFunc
 	ansibleClient        ansible.AnsibleServiceClient
-	ansibleConfig        *AnsibleConfig
+	ansibleConfig        *ansible_config.AnsibleConfig
 	rdb                  *redis.Client
 }
 
@@ -70,7 +65,7 @@ func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *Dri
 	return &DriverServiceServer{log: log, rdb: rdb}
 }
 
-func (s *DriverServiceServer) SetAnsibleClient(client ansible.AnsibleServiceClient, cfg *AnsibleConfig) {
+func (s *DriverServiceServer) SetAnsibleClient(client ansible.AnsibleServiceClient, cfg *ansible_config.AnsibleConfig) {
 	s.ansibleClient = client
 	s.ansibleConfig = cfg
 }

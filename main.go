@@ -18,6 +18,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
 	"google.golang.org/grpc/credentials/insecure"
@@ -120,7 +121,7 @@ func main() {
 		dial, err := grpc.Dial(ansibleHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err == nil {
 			ansibleClient := ansible.NewAnsibleServiceClient(dial)
-			var cfg server.AnsibleConfig
+			var cfg ansible_config.AnsibleConfig
 			file, err := os.ReadFile("ansible-config.yaml")
 			if err != nil {
 				log.Fatal("Failed to read ansible config", zap.Error(err))

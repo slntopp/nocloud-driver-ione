@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/slntopp/nocloud-driver-ione/pkg/server"
+	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
 	"github.com/slntopp/nocloud-proto/ansible"
 	"io"
 	"net/http"
@@ -46,7 +46,7 @@ type ServiceAction func(
 
 type AnsibleAction func(
 	ansible.AnsibleServiceClient,
-	*server.AnsibleConfig,
+	*ansible_config.AnsibleConfig,
 	*ipb.Instance,
 	map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error)
@@ -577,7 +577,7 @@ func GetBackupInfo(
 
 func Exec(
 	client ansible.AnsibleServiceClient,
-	cfg *server.AnsibleConfig,
+	cfg *ansible_config.AnsibleConfig,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
