@@ -583,6 +583,8 @@ func Exec(
 ) (*ipb.InvokeResponse, error) {
 	playbookUuid, ok := data["playbookUuid"]
 	host := data["host"].GetStringValue()
+	vm_dir := data["vm_dir"].GetStringValue()
+	snapshot_date := data["snapshot_date"].GetStringValue()
 	if !ok {
 		return nil, errors.New("no playbook uuid")
 	}
@@ -597,8 +599,11 @@ func Exec(
 			},
 			PlaybookUuid: playbookUuidVal,
 			SshKey:       &cfg.SshKey,
-			Vars:         cfg.Vars,
-			Hop:          &cfg.Hop,
+			Vars: map[string]string{
+				"vm_dir":        vm_dir,
+				"snapshot_date": snapshot_date,
+			},
+			Hop: &cfg.Hop,
 		},
 	})
 
