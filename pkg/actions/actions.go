@@ -45,6 +45,7 @@ type ServiceAction func(
 ) (*ipb.InvokeResponse, error)
 
 type AnsibleAction func(
+	context.Context,
 	ansible.AnsibleServiceClient,
 	*ansible_config.AnsibleConfig,
 	*ipb.Instance,
@@ -576,6 +577,7 @@ func GetBackupInfo(
 }
 
 func Exec(
+	ctx context.Context,
 	client ansible.AnsibleServiceClient,
 	cfg *ansible_config.AnsibleConfig,
 	inst *ipb.Instance,
@@ -590,7 +592,7 @@ func Exec(
 	}
 	playbookUuidVal := playbookUuid.GetStringValue()
 
-	create, err := client.Create(context.Background(), &ansible.CreateRunRequest{
+	create, err := client.Create(ctx, &ansible.CreateRunRequest{
 		Run: &ansible.Run{
 			Instances: []*ansible.Instance{
 				{

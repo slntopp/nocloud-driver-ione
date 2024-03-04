@@ -21,7 +21,10 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
+	"github.com/slntopp/nocloud/pkg/nocloud/auth"
+	"github.com/slntopp/nocloud/pkg/nocloud/schema"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"gopkg.in/yaml.v2"
 	"net"
 	"os"
@@ -133,7 +136,10 @@ func main() {
 				log.Fatal("Failed to unmarshal ansible config", zap.Error(err))
 			}
 
-			srv.SetAnsibleClient(ansibleClient, &cfg)
+			token, _ := auth.MakeToken(schema.ROOT_ACCOUNT_KEY)
+			ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "bearer "+token)
+
+			srv.SetAnsibleClient(ctx, ansibleClient, &cfg)
 		} else {
 			log.Fatal("Failed to setup ansible connection", zap.Error(err))
 		}

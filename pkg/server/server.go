@@ -55,6 +55,7 @@ type DriverServiceServer struct {
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
 	HandlePublishEvents  EventsPublisherFunc
+	ansibleCtx           context.Context
 	ansibleClient        ansible.AnsibleServiceClient
 	ansibleConfig        *ansible_config.AnsibleConfig
 	rdb                  *redis.Client
@@ -65,7 +66,8 @@ func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *Dri
 	return &DriverServiceServer{log: log, rdb: rdb}
 }
 
-func (s *DriverServiceServer) SetAnsibleClient(client ansible.AnsibleServiceClient, cfg *ansible_config.AnsibleConfig) {
+func (s *DriverServiceServer) SetAnsibleClient(ctx context.Context, client ansible.AnsibleServiceClient, cfg *ansible_config.AnsibleConfig) {
+	s.ansibleCtx = ctx
 	s.ansibleClient = client
 	s.ansibleConfig = cfg
 }
