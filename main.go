@@ -118,6 +118,7 @@ func main() {
 	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
 
 	if ansibleHost != "" {
+		log.Info("Ansible host", zap.String("Host", ansibleHost))
 		dial, err := grpc.Dial(ansibleHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err == nil {
 			ansibleClient := ansible.NewAnsibleServiceClient(dial)
