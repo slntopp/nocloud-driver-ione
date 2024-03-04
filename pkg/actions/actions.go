@@ -613,7 +613,7 @@ func Exec(
 		return nil, err
 	}
 
-	_, err = client.Exec(context.Background(), &ansible.ExecRunRequest{
+	_, err = client.Exec(ctx, &ansible.ExecRunRequest{
 		Uuid: create.GetUuid(),
 	})
 
