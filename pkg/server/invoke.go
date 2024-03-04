@@ -87,7 +87,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 
 	ansibleAction, ok := actions.AnsibleActions[method]
 	if ok {
-		return ansibleAction(s.ansibleClient, s.ansibleConfig, instance, req.GetParams())
+		return ansibleAction(s.ansibleCtx, s.ansibleClient, s.ansibleConfig, instance, req.GetParams())
 	}
 
 	action, ok = actions.BillingActions[method]
