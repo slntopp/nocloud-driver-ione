@@ -54,7 +54,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	runningPlaybook := instance.GetData()["running_playbook"].GetStringValue()
 
 	if runningPlaybook != "" {
-		get, err := s.ansibleClient.Get(ctx, &ansible.GetRunRequest{
+		get, err := s.ansibleClient.Get(s.ansibleCtx, &ansible.GetRunRequest{
 			Uuid: runningPlaybook,
 		})
 		if err != nil {
