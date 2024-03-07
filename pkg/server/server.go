@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
 	"github.com/slntopp/nocloud-proto/ansible"
+	epb "github.com/slntopp/nocloud-proto/events"
 	"time"
 
 	redis "github.com/go-redis/redis/v8"
@@ -449,6 +450,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				cfg = make(map[string]*structpb.Value)
 			}
 
+			if inst.GetData() == nil {
+				inst.Data = map[string]*structpb.Value{}
+			}
+
 			cfgAutoStart := cfg["auto_start"].GetBoolValue()
 			metaAutoStart := meta["auto_start"].GetBoolValue()
 
@@ -459,6 +464,22 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
 			} else {
+				if !inst.GetData()["creation_notification"].GetBoolValue() {
+					networking, ok := inst.GetState().GetMeta()["networking"]
+					if ok {
+						networkingValue := networking.GetStructValue().AsMap()
+						_, ok := networkingValue["public"].([]interface{})
+						if ok {
+							go s.HandlePublishEvents(ctx, &epb.Event{
+								Uuid: inst.GetUuid(),
+								Key:  "instance_created",
+								Data: map[string]*structpb.Value{},
+							})
+							inst.Data["creation_notification"] = structpb.NewBoolValue(true)
+							go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+						}
+					}
+				}
 				_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 				if err != nil {
 					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
