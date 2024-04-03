@@ -297,7 +297,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 	}
 }
 
-func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
+func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus, balance *float64) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 
 	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
@@ -511,6 +511,31 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			})
 		}
 	}
+
+	var sum float64
+	for _, rec := range resourceRecords {
+		sum += rec.GetTotal()
+	}
+	for _, rec := range productRecords {
+		sum += rec.GetTotal()
+	}
+
+	if sum < *balance {
+		if state != "SUSPENDED" {
+			if err := client.SuspendVM(vmid); err != nil {
+				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+			}
+
+			go events(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_suspended",
+				Data: map[string]*structpb.Value{},
+			})
+		}
+		return
+	}
+
+	*balance -= sum
 
 	go records(context.Background(), append(resourceRecords, productRecords...))
 	if len(productRecords) != 0 && state != "SUSPENDED" {

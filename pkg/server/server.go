@@ -20,10 +20,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"time"
+
 	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
-	"time"
 
 	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -377,6 +378,12 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	client.SetVars(vars)
 
+	creationBalance, monitoringBalance := map[string]float64{}, map[string]float64{}
+	for key, val := range req.GetBalance() {
+		creationBalance[key] = val
+		monitoringBalance[key] = val
+	}
+
 	group := secrets["group"].GetNumberValue()
 
 	redisKey := fmt.Sprintf("%s-SP-%s", MONITORING_REDIS, sp.Uuid)
@@ -430,7 +437,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
-			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
 			log.Debug("Events instances", zap.Any("resp", successResp))
 			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
@@ -494,11 +501,15 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 			}
 
+			balance := monitoringBalance[ig.GetUuid()]
+
 			if autoRenew {
-				go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+				go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance)
 			} else {
 				go handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
 			}
+
+			monitoringBalance[ig.GetUuid()] = balance
 		}
 	}
 
