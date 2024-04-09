@@ -18,14 +18,13 @@ package actions
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
-	"github.com/slntopp/nocloud-proto/ansible"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/slntopp/nocloud-proto/ansible"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 
@@ -47,7 +46,8 @@ type ServiceAction func(
 type AnsibleAction func(
 	context.Context,
 	ansible.AnsibleServiceClient,
-	*ansible_config.AnsibleConfig,
+	string,
+	map[string]any,
 	*ipb.Instance,
 	map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error)
@@ -73,7 +73,7 @@ var BillingActions = map[string]ServiceAction{
 }
 
 var AnsibleActions = map[string]AnsibleAction{
-	"exec": Exec,
+	"exec": BackupInstance,
 }
 
 var AdminActions = map[string]bool{
@@ -576,36 +576,68 @@ func GetBackupInfo(
 	}, nil
 }
 
-func Exec(
+func BackupInstance(
 	ctx context.Context,
 	client ansible.AnsibleServiceClient,
-	cfg *ansible_config.AnsibleConfig,
+	playbookUuid string,
+	hop map[string]any,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
-	playbookUuid, ok := data["playbookUuid"]
 	host := data["host"].GetStringValue()
 	vm_dir := data["vm_dir"].GetStringValue()
 	snapshot_date := data["snapshot_date"].GetStringValue()
-	if !ok {
-		return nil, errors.New("no playbook uuid")
+
+	ansibleInstance := &ansible.Instance{
+		Host: host,
 	}
-	playbookUuidVal := playbookUuid.GetStringValue()
+
+	hopHost, ok := hop["host"].(string)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No hop host")
+	}
+	hopPort, ok := hop["port"].(string)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No hop port")
+	}
+
+	info := hop["info"]
+	if info != nil {
+		infoVal, ok := info.(map[string]any)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to parse info")
+		}
+
+		hostInfo, ok := infoVal[host].(map[string]any)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to host info")
+		}
+		ansibleHost, ok := hostInfo["ansible_host"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to get host")
+		}
+		python, ok := hostInfo["ansible_host"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to get python")
+		}
+		ansibleInstance.Python = &python
+		ansibleInstance.AnsibleHost = &ansibleHost
+	}
 
 	create, err := client.Create(ctx, &ansible.CreateRunRequest{
 		Run: &ansible.Run{
 			Instances: []*ansible.Instance{
-				{
-					Host: host,
-				},
+				ansibleInstance,
 			},
-			PlaybookUuid: playbookUuidVal,
-			SshKey:       &cfg.SshKey,
+			PlaybookUuid: playbookUuid,
 			Vars: map[string]string{
 				"vm_dir":        vm_dir,
 				"snapshot_date": snapshot_date,
 			},
-			Hop: &cfg.Hop,
+			Hop: &ansible.Instance{
+				Host: hopHost,
+				Port: &hopPort,
+			},
 		},
 	})
 

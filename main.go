@@ -18,16 +18,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
+	"net"
+
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
 	"github.com/slntopp/nocloud/pkg/nocloud/schema"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
-	"gopkg.in/yaml.v2"
-	"net"
-	"os"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -125,21 +123,10 @@ func main() {
 		dial, err := grpc.Dial(ansibleHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err == nil {
 			ansibleClient := ansible.NewAnsibleServiceClient(dial)
-			var cfg ansible_config.AnsibleConfig
-			file, err := os.ReadFile("ansible-config.yaml")
-			if err != nil {
-				log.Fatal("Failed to read ansible config", zap.Error(err))
-			}
-
-			err = yaml.Unmarshal(file, &cfg)
-			if err != nil {
-				log.Fatal("Failed to unmarshal ansible config", zap.Error(err))
-			}
-
 			token, _ := auth.MakeToken(schema.ROOT_ACCOUNT_KEY)
 			ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "bearer "+token)
 
-			srv.SetAnsibleClient(ctx, ansibleClient, &cfg)
+			srv.SetAnsibleClient(ctx, ansibleClient)
 		} else {
 			log.Fatal("Failed to setup ansible connection", zap.Error(err))
 		}

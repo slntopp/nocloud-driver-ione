@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
@@ -70,10 +71,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	}
 
 	action, ok := actions.Actions[method]
-	if !ok {
-		s.log.Warn(fmt.Sprintf("Action %s not declared for %s", method, DRIVER_TYPE))
-	} else {
-
+	if ok {
 		if method == "suspend" {
 			go s.HandlePublishEvents(ctx, &epb.Event{
 				Uuid: instance.GetUuid(),
@@ -87,7 +85,23 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 
 	ansibleAction, ok := actions.AnsibleActions[method]
 	if ok {
-		return ansibleAction(s.ansibleCtx, s.ansibleClient, s.ansibleConfig, instance, req.GetParams())
+		secrets := sp.GetSecrets()
+		ansibleSecret, ok := secrets["ansible"]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No ansible config")
+		}
+
+		ansibleSecretValue := ansibleSecret.GetStructValue().AsMap()
+		playbookUuid, ok := ansibleSecretValue["playbook_uuid"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
+		}
+		hop, ok := ansibleSecretValue["hop"].(map[string]any)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
+		}
+
+		return ansibleAction(s.ansibleCtx, s.ansibleClient, playbookUuid, hop, instance, req.GetParams())
 	}
 
 	action, ok = actions.BillingActions[method]

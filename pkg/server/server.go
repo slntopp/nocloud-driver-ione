@@ -68,10 +68,9 @@ func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *Dri
 	return &DriverServiceServer{log: log, rdb: rdb}
 }
 
-func (s *DriverServiceServer) SetAnsibleClient(ctx context.Context, client ansible.AnsibleServiceClient, cfg *ansible_config.AnsibleConfig) {
+func (s *DriverServiceServer) SetAnsibleClient(ctx context.Context, client ansible.AnsibleServiceClient) {
 	s.ansibleCtx = ctx
 	s.ansibleClient = client
-	s.ansibleConfig = cfg
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
