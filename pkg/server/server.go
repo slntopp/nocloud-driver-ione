@@ -20,9 +20,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"time"
+
 	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
 	"github.com/slntopp/nocloud-proto/ansible"
-	"time"
+	epb "github.com/slntopp/nocloud-proto/events"
 
 	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -66,10 +68,9 @@ func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *Dri
 	return &DriverServiceServer{log: log, rdb: rdb}
 }
 
-func (s *DriverServiceServer) SetAnsibleClient(ctx context.Context, client ansible.AnsibleServiceClient, cfg *ansible_config.AnsibleConfig) {
+func (s *DriverServiceServer) SetAnsibleClient(ctx context.Context, client ansible.AnsibleServiceClient) {
 	s.ansibleCtx = ctx
 	s.ansibleClient = client
-	s.ansibleConfig = cfg
 }
 
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
@@ -376,6 +377,12 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	client.SetVars(vars)
 
+	creationBalance, monitoringBalance := map[string]float64{}, map[string]float64{}
+	for key, val := range req.GetBalance() {
+		creationBalance[key] = val
+		monitoringBalance[key] = val
+	}
+
 	group := secrets["group"].GetNumberValue()
 
 	redisKey := fmt.Sprintf("%s-SP-%s", MONITORING_REDIS, sp.Uuid)
@@ -429,7 +436,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
-			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
 			log.Debug("Events instances", zap.Any("resp", successResp))
 			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
@@ -449,6 +456,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				cfg = make(map[string]*structpb.Value)
 			}
 
+			if inst.GetData() == nil {
+				inst.Data = map[string]*structpb.Value{}
+			}
+
 			cfgAutoStart := cfg["auto_start"].GetBoolValue()
 			metaAutoStart := meta["auto_start"].GetBoolValue()
 
@@ -459,6 +470,22 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
 			} else {
+				if !inst.GetData()["creation_notification"].GetBoolValue() {
+					networking, ok := inst.GetState().GetMeta()["networking"]
+					if ok {
+						networkingValue := networking.GetStructValue().AsMap()
+						_, ok := networkingValue["public"].([]interface{})
+						if ok {
+							go s.HandlePublishEvents(ctx, &epb.Event{
+								Uuid: inst.GetUuid(),
+								Key:  "instance_created",
+								Data: map[string]*structpb.Value{},
+							})
+							inst.Data["creation_notification"] = structpb.NewBoolValue(true)
+							go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+						}
+					}
+				}
 				_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 				if err != nil {
 					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
@@ -473,11 +500,15 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 			}
 
+			balance := monitoringBalance[ig.GetUuid()]
+
 			if autoRenew {
-				go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance)
 			} else {
-				go handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
 			}
+
+			monitoringBalance[ig.GetUuid()] = balance
 		}
 	}
 
