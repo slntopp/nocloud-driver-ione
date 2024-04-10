@@ -616,7 +616,7 @@ func BackupInstance(
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to get host")
 		}
-		python, ok := hostInfo["ansible_host"].(string)
+		python, ok := hostInfo["python"].(string)
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to get python")
 		}
