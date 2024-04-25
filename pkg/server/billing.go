@@ -288,11 +288,6 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		}
 
 		go records(context.Background(), append(resourceRecords, productRecords...))
-		go events(context.Background(), &epb.Event{
-			Uuid: i.GetUuid(),
-			Key:  "instance_renew",
-			Data: map[string]*structpb.Value{},
-		})
 		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 	}
 }
@@ -404,6 +399,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	log.Debug("Next payment", zap.Any("p", nextPaymentDate))
 
+	var first_payment bool
 	if plan.Kind == billingpb.PlanKind_STATIC {
 		var last int64
 		var priority billingpb.Priority
@@ -413,6 +409,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			last = int64(i.Data["last_monitoring"].GetNumberValue())
 			priority = billingpb.Priority_NORMAL
 		} else {
+			first_payment = true
 			last = created
 			priority = billingpb.Priority_URGENT
 		}
@@ -539,11 +536,13 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	go records(context.Background(), append(resourceRecords, productRecords...))
 	if len(productRecords) != 0 && state != "SUSPENDED" {
-		go events(context.Background(), &epb.Event{
-			Uuid: i.GetUuid(),
-			Key:  "instance_renew",
-			Data: map[string]*structpb.Value{},
-		})
+		if !first_payment {
+			go events(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_renew",
+				Data: map[string]*structpb.Value{},
+			})
+		}
 	}
 	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 }
