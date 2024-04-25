@@ -197,7 +197,6 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		var productRecords, resourceRecords []*billingpb.Record
 		// Records to capture soon expiring instances
 		var productRecordsOffset, resourceRecordsOffset []*billingpb.Record
-		offset := int64(10000)
 
 		for _, resource := range plan.Resources {
 			var last int64
@@ -216,6 +215,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			}
 			log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
 			new, last := handler(log, timeline, i, vm, resource, client, last, clock)
+			offset := resource.GetPeriod() / 10
 			wOffset, _ := handler(log, timeline, i, vm, resource, client, last-offset, clock)
 
 			if resource.GetPeriod() == 0 {
@@ -274,6 +274,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			if i.BillingPlan.Products[*i.Product].GetPeriod() == 0 {
 				if !ok {
 					new, last := handleStaticZeroBilling(log, i, last, priority)
+					offset := int64(0)
 					wOffset, _ := handleStaticZeroBilling(log, i, last-offset, priority)
 					productRecords = append(productRecords, new...)
 					productRecordsOffset = append(productRecordsOffset, wOffset...)
@@ -281,6 +282,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 				}
 			} else {
 				new, last := handleStaticBilling(log, i, last, priority)
+				offset := i.BillingPlan.Products[*i.Product].GetPeriod() / 10
 				wOffset, _ := handleStaticBilling(log, i, last-offset, priority)
 
 				if len(new) != 0 {
@@ -360,7 +362,6 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, exp
 	var productRecords, resourceRecords []*billingpb.Record
 	// Records to capture soon expiring instances
 	var productRecordsOffset, resourceRecordsOffset []*billingpb.Record
-	offset := int64(10000)
 
 	for _, resource := range plan.Resources {
 		var last int64
@@ -380,6 +381,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, exp
 		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
 		new, last := handler(log, timeline, i, vm, resource, client, last, clock)
 		// Getting soon expiring records
+		offset := resource.Period / 10
 		wOffset, _ := handler(log, timeline, i, vm, resource, client, last-offset, clock)
 
 		if resource.GetPeriod() == 0 {
@@ -444,6 +446,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, exp
 			isOnePayment = true
 			if !ok {
 				new, last := handleStaticZeroBilling(log, i, last, priority)
+				offset := int64(0)
 				wOffset, _ := handleStaticZeroBilling(log, i, last-offset, priority)
 				// Expiring records
 				productRecords = append(productRecords, new...)
@@ -453,6 +456,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, exp
 			}
 		} else {
 			new, last := handleStaticBilling(log, i, last, priority)
+			offset := i.BillingPlan.Products[*i.Product].GetPeriod() / 10
 			wOffset, _ := handleStaticBilling(log, i, last-offset, priority)
 
 			if len(new) != 0 {
