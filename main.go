@@ -189,6 +189,7 @@ func SetupExpiringPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 		if err != nil {
 			log.Error("Error while publishing records to queue", zap.Error(err), zap.String("queue", queue.Name))
 		}
+		log.Info("Published expiring records", zap.String("queue", queue.Name), zap.String("records", string(body)))
 	}
 }
 
