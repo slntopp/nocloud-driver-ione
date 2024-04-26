@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 
@@ -116,6 +117,7 @@ func main() {
 
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
+	srv.HandlePublishExpiringRecords = SetupExpiringPublisher(rbmq)
 	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
 
 	if ansibleHost != "" {
@@ -160,6 +162,32 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 			ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
 				ContentType: "text/plain", Body: body,
 			})
+		}
+	}
+}
+
+func SetupExpiringPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
+	return func(ctx context.Context, payload []*billingpb.Record) {
+		ch, err := rbmq.Channel()
+		if err != nil {
+			log.Fatal("Failed to open a channel", zap.Error(err))
+		}
+		defer ch.Close()
+
+		queue, _ := ch.QueueDeclare(
+			"instance_expiring",
+			true, false, false, true, nil,
+		)
+
+		body, err := json.Marshal(payload)
+		if err != nil {
+			log.Error("Error while marshalling records in json", zap.Error(err))
+		}
+		err = ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
+			ContentType: "text/plain", Body: body,
+		})
+		if err != nil {
+			log.Error("Error while publishing records to queue", zap.Error(err), zap.String("queue", queue.Name))
 		}
 	}
 }

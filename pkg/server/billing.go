@@ -83,7 +83,7 @@ type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
 type EventsPublisherFunc func(context.Context, *epb.Event)
 
-func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client *one.ONeClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
+func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, expiringRecords RecordsPublisherFunc, events EventsPublisherFunc, client *one.ONeClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
 	log := logger.Named("NonRegularInstanceBillingHandler").Named(i.GetUuid())
 	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
 		log.Debug("Instance was deleted. No billing")
@@ -195,6 +195,8 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		})
 
 		var productRecords, resourceRecords []*billingpb.Record
+		// Records to capture soon expiring instances
+		var productRecordsOffset, resourceRecordsOffset []*billingpb.Record
 
 		for _, resource := range plan.Resources {
 			var last int64
@@ -213,10 +215,13 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			}
 			log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
 			new, last := handler(log, timeline, i, vm, resource, client, last, clock)
+			offset := resource.GetPeriod() / 10
+			wOffset, _ := handler(log, timeline, i, vm, resource, client, last-offset, clock)
 
 			if resource.GetPeriod() == 0 {
 				if !ok {
 					resourceRecords = append(resourceRecords, new...)
+					resourceRecordsOffset = append(resourceRecordsOffset, wOffset...)
 				}
 			} else {
 				if len(new) != 0 {
@@ -236,9 +241,11 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 
 						if inStates || (!inStates && resource.Except) {
 							resourceRecords = append(resourceRecords, new...)
+							resourceRecordsOffset = append(resourceRecordsOffset, wOffset...)
 						}
 					} else {
 						resourceRecords = append(resourceRecords, new...)
+						resourceRecordsOffset = append(resourceRecordsOffset, wOffset...)
 					}
 					i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 				}
@@ -267,14 +274,21 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			if i.BillingPlan.Products[*i.Product].GetPeriod() == 0 {
 				if !ok {
 					new, last := handleStaticZeroBilling(log, i, last, priority)
+					offset := int64(0)
+					wOffset, _ := handleStaticZeroBilling(log, i, last-offset, priority)
 					productRecords = append(productRecords, new...)
+					productRecordsOffset = append(productRecordsOffset, wOffset...)
 					i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 				}
 			} else {
 				new, last := handleStaticBilling(log, i, last, priority)
+				offset := i.BillingPlan.Products[*i.Product].GetPeriod() / 10
+				wOffset, _ := handleStaticBilling(log, i, last-offset, priority)
 
 				if len(new) != 0 {
 					productRecords = append(productRecords, new...)
+					productRecordsOffset = append(productRecordsOffset, wOffset...)
+
 					i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 				}
 
@@ -287,6 +301,9 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			}
 		}
 
+		// Send expiring records to dedicated queue
+		go expiringRecords(context.Background(), append(resourceRecordsOffset, productRecordsOffset...))
+
 		go records(context.Background(), append(resourceRecords, productRecords...))
 		go events(context.Background(), &epb.Event{
 			Uuid: i.GetUuid(),
@@ -297,7 +314,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 	}
 }
 
-func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus, balance *float64) {
+func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, expiringRecords RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus, balance *float64) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 
 	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
@@ -343,6 +360,8 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	})
 
 	var productRecords, resourceRecords []*billingpb.Record
+	// Records to capture soon expiring instances
+	var productRecordsOffset, resourceRecordsOffset []*billingpb.Record
 
 	for _, resource := range plan.Resources {
 		var last int64
@@ -361,10 +380,14 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		}
 		log.Debug("Handling", zap.String("resource", resource.Key), zap.Int64("last", last), zap.Int64("created", created), zap.Any("kind", resource.Kind))
 		new, last := handler(log, timeline, i, vm, resource, client, last, clock)
+		// Getting soon expiring records
+		offset := resource.Period / 10
+		wOffset, _ := handler(log, timeline, i, vm, resource, client, last-offset, clock)
 
 		if resource.GetPeriod() == 0 {
 			if !ok {
 				resourceRecords = append(resourceRecords, new...)
+				resourceRecordsOffset = append(resourceRecordsOffset, wOffset...)
 			}
 		} else {
 			if len(new) != 0 {
@@ -384,9 +407,11 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 					if inStates || (!inStates && resource.Except) {
 						resourceRecords = append(resourceRecords, new...)
+						resourceRecordsOffset = append(resourceRecordsOffset, wOffset...)
 					}
 				} else {
 					resourceRecords = append(resourceRecords, new...)
+					resourceRecordsOffset = append(resourceRecordsOffset, wOffset...)
 				}
 				i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(last))
 			}
@@ -421,14 +446,22 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			isOnePayment = true
 			if !ok {
 				new, last := handleStaticZeroBilling(log, i, last, priority)
+				offset := int64(0)
+				wOffset, _ := handleStaticZeroBilling(log, i, last-offset, priority)
+				// Expiring records
 				productRecords = append(productRecords, new...)
+				productRecordsOffset = append(productRecordsOffset, wOffset...)
+
 				i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 			}
 		} else {
 			new, last := handleStaticBilling(log, i, last, priority)
+			offset := i.BillingPlan.Products[*i.Product].GetPeriod() / 10
+			wOffset, _ := handleStaticBilling(log, i, last-offset, priority)
 
 			if len(new) != 0 {
 				productRecords = append(productRecords, new...)
+				productRecordsOffset = append(productRecordsOffset, wOffset...)
 				i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
 			}
 
@@ -536,6 +569,9 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	}
 
 	*balance -= sum
+
+	// Send expiring records to dedicated queue
+	go expiringRecords(context.Background(), append(resourceRecordsOffset, productRecordsOffset...))
 
 	go records(context.Background(), append(resourceRecords, productRecords...))
 	if len(productRecords) != 0 && state != "SUSPENDED" {
