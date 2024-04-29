@@ -54,14 +54,13 @@ func SetDriverType(_type string) {
 
 type DriverServiceServer struct {
 	pb.UnimplementedDriverServiceServer
-	log                          *zap.Logger
-	HandlePublishRecords         RecordsPublisherFunc
-	HandlePublishEvents          EventsPublisherFunc
-	HandlePublishExpiringRecords RecordsPublisherFunc
-	ansibleCtx                   context.Context
-	ansibleClient                ansible.AnsibleServiceClient
-	ansibleConfig                *ansible_config.AnsibleConfig
-	rdb                          *redis.Client
+	log                  *zap.Logger
+	HandlePublishRecords RecordsPublisherFunc
+	HandlePublishEvents  EventsPublisherFunc
+	ansibleCtx           context.Context
+	ansibleClient        ansible.AnsibleServiceClient
+	ansibleConfig        *ansible_config.AnsibleConfig
+	rdb                  *redis.Client
 }
 
 func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *DriverServiceServer {
@@ -504,9 +503,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			balance := monitoringBalance[ig.GetUuid()]
 
 			if autoRenew {
-				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishExpiringRecords, s.HandlePublishEvents, client, inst, igStatus, &balance)
+				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance)
 			} else {
-				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishExpiringRecords, s.HandlePublishEvents, client, inst, igStatus)
+				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
 			}
 
 			monitoringBalance[ig.GetUuid()] = balance
