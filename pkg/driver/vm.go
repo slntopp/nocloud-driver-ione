@@ -27,7 +27,6 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
-	"github.com/slntopp/nocloud-proto/billing"
 	"github.com/slntopp/nocloud-proto/hasher"
 	pb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
@@ -534,29 +533,32 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 
 	created := resp.ToBeCreated
 	for i := 0; i < len(created); i++ {
-		bp := created[i].GetBillingPlan()
-		if bp.GetKind() == billing.PlanKind_STATIC {
-			price := bp.GetProducts()[created[i].GetProduct()].GetPrice()
+		/*
+			bp := created[i].GetBillingPlan()
 
-			resources := created[i].GetResources()
-			ram := resources["ram"].GetNumberValue() / 1024
-			drive_size := resources["drive_size"].GetNumberValue() / 1024
-			drive_type := strings.ToLower(resources["drive_type"].GetStringValue())
+			if bp.GetKind() == billing.PlanKind_STATIC {
+				price := bp.GetProducts()[created[i].GetProduct()].GetPrice()
 
-			for _, res := range bp.GetResources() {
-				if res.GetKey() == "ram" {
-					price += ram * res.GetPrice()
-				} else if res.GetKey() == drive_type {
-					price += drive_size * res.GetPrice()
+				resources := created[i].GetResources()
+				ram := resources["ram"].GetNumberValue() / 1024
+				drive_size := resources["drive_size"].GetNumberValue() / 1024
+				drive_type := strings.ToLower(resources["drive_type"].GetStringValue())
+
+				for _, res := range bp.GetResources() {
+					if res.GetKey() == "ram" {
+						price += ram * res.GetPrice()
+					} else if res.GetKey() == drive_type {
+						price += drive_size * res.GetPrice()
+					}
 				}
-			}
 
-			if price < balance[ig.GetUuid()] {
-				continue
-			}
+				if price < balance[ig.GetUuid()] {
+					continue
+				}
 
-			balance[ig.GetUuid()] -= price
-		}
+				balance[ig.GetUuid()] -= price
+			}
+		*/
 
 		token, err := auth.MakeTokenInstance(created[i].GetUuid())
 		if err != nil {
