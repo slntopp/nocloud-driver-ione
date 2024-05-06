@@ -537,10 +537,13 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	go records(context.Background(), append(resourceRecords, productRecords...))
 	if len(productRecords) != 0 && state != "SUSPENDED" {
 		if !first_payment {
+			price := getInstancePrice(i)
 			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_renew",
-				Data: map[string]*structpb.Value{},
+				Data: map[string]*structpb.Value{
+					"price": structpb.NewNumberValue(price),
+				},
 			})
 		}
 	}
@@ -1184,4 +1187,35 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 	}
 
 	publish(context.Background(), records)
+}
+
+func getInstancePrice(i *ipb.Instance) float64 {
+	product := i.GetProduct()
+	plan := i.GetBillingPlan()
+	p := plan.GetProducts()[product]
+	resources := i.GetResources()
+
+	price := p.GetPrice()
+
+	for _, resource := range plan.GetResources() {
+		if strings.Contains(resource.GetKey(), "drive") {
+			driveType := resources["drive_type"].GetStringValue()
+			if resource.GetKey() != "drive_"+strings.ToLower(driveType) {
+				continue
+			}
+			value := resources["drive_size"].GetNumberValue() / 1024
+			total := math.Round(resource.GetPrice()*value*100) / 100.0
+			price += total
+
+		} else {
+			value := resources[resource.GetKey()].GetNumberValue()
+			if resource.GetKey() == "ram" {
+				value /= 1024
+			}
+			total := math.Round(resource.GetPrice()*value*100) / 100.0
+			price += total
+		}
+	}
+
+	return price
 }
