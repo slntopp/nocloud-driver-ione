@@ -100,6 +100,8 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 	if lastMonitoring, ok := data["last_monitoring"]; ok {
 		now := time.Now().Unix()
 		lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+		freeze := data["freeze"].GetBoolValue()
+		freeze_date := int64(data["freeze_date"].GetNumberValue())
 
 		vmid, err := one.GetVMIDFromData(client, i)
 		if err != nil {
@@ -114,7 +116,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 
 		suspendedManually := data["suspended_manually"].GetBoolValue()
 
-		if now > lastMonitoringValue && state != "SUSPENDED" {
+		if now > lastMonitoringValue && state != "SUSPENDED" && (!freeze || (freeze && now > freeze_date)) {
 			err := client.SuspendVM(vmid)
 			if err != nil {
 				log.Error("Failed to suspend vm", zap.Error(err))

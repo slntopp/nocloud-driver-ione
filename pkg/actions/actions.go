@@ -66,6 +66,8 @@ var Actions = map[string]ServiceAction{
 	"start_vnc":       StartVNC,
 	"cancel_renew":    CancelRenew,
 	"get_backup_info": GetBackupInfo,
+	"freeze":          Freeze,
+	"unfreeze":        Unfreeze,
 }
 
 var BillingActions = map[string]ServiceAction{
@@ -278,6 +280,29 @@ func Resume(
 
 	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	// return &ipb.InvokeResponse{Result: true}, nil
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+}
+
+func Freeze(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	inst.Data["freeze"] = structpb.NewBoolValue(true)
+	inst.Data["freeze_date"] = data["date"]
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+}
+
+func Unfreeze(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	inst.Data["freeze"] = structpb.NewBoolValue(false)
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
