@@ -276,6 +276,10 @@ func Resume(
 		return nil, status.Errorf(codes.Internal, "Can't Resume VM, error: %v", err)
 	}
 
+	if _, ok := data["date"]; ok {
+		inst.Data["immune_date"] = data["date"]
+	}
+
 	inst.Data["suspended_manually"] = structpb.NewBoolValue(false)
 
 	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
@@ -289,7 +293,6 @@ func Freeze(
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 	inst.Data["freeze"] = structpb.NewBoolValue(true)
-	inst.Data["freeze_date"] = data["date"]
 
 	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
