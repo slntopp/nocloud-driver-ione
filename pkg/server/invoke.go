@@ -70,6 +70,16 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		}
 	}
 
+	_, ok := actions.BillingActions[method]
+	if ok {
+		go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+		return &ipb.InvokeResponse{Result: true}, err
+	}
+
+	if req.GetInstance().GetData()["freeze"].GetBoolValue() {
+		return nil, status.Error(codes.PermissionDenied, "Instance is freeze")
+	}
+
 	action, ok := actions.Actions[method]
 	if ok {
 		if method == "suspend" {
@@ -104,14 +114,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return ansibleAction(s.ansibleCtx, s.ansibleClient, playbookUuid, hop, instance, req.GetParams())
 	}
 
-	action, ok = actions.BillingActions[method]
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
-	}
-
-	go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
-
-	return &ipb.InvokeResponse{Result: true}, err
+	return nil, status.Errorf(codes.PermissionDenied, "Action %s is not declared", method)
 }
 
 func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequest) (res *spb.InvokeResponse, err error) {

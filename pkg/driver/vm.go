@@ -535,6 +535,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 	for i := 0; i < len(created); i++ {
 		/*
 			bp := created[i].GetBillingPlan()
+
 			if bp.GetKind() == billing.PlanKind_STATIC {
 				price := bp.GetProducts()[created[i].GetProduct()].GetPrice()
 

@@ -476,10 +476,13 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 						networkingValue := networking.GetStructValue().AsMap()
 						_, ok := networkingValue["public"].([]interface{})
 						if ok {
+							price := getInstancePrice(inst)
 							go s.HandlePublishEvents(ctx, &epb.Event{
 								Uuid: inst.GetUuid(),
 								Key:  "instance_created",
-								Data: map[string]*structpb.Value{},
+								Data: map[string]*structpb.Value{
+									"price": structpb.NewNumberValue(price),
+								},
 							})
 							inst.Data["creation_notification"] = structpb.NewBoolValue(true)
 							go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)

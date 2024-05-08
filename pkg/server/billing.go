@@ -100,6 +100,14 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 	if lastMonitoring, ok := data["last_monitoring"]; ok {
 		now := time.Now().Unix()
 		lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+		freeze := data["freeze"].GetBoolValue()
+		var immune_date_val int64
+		immune_date, ok := data["immune_date"]
+		if !ok {
+			immune_date_val = now
+		} else {
+			immune_date_val = int64(immune_date.GetNumberValue())
+		}
 
 		vmid, err := one.GetVMIDFromData(client, i)
 		if err != nil {
@@ -114,7 +122,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 
 		suspendedManually := data["suspended_manually"].GetBoolValue()
 
-		if now > lastMonitoringValue && state != "SUSPENDED" {
+		if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
 			err := client.SuspendVM(vmid)
 			if err != nil {
 				log.Error("Failed to suspend vm", zap.Error(err))
@@ -288,11 +296,6 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		}
 
 		go records(context.Background(), append(resourceRecords, productRecords...))
-		go events(context.Background(), &epb.Event{
-			Uuid: i.GetUuid(),
-			Key:  "instance_renew",
-			Data: map[string]*structpb.Value{},
-		})
 		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 	}
 }
@@ -404,6 +407,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	log.Debug("Next payment", zap.Any("p", nextPaymentDate))
 
+	var first_payment bool
 	if plan.Kind == billingpb.PlanKind_STATIC {
 		var last int64
 		var priority billingpb.Priority
@@ -413,6 +417,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			last = int64(i.Data["last_monitoring"].GetNumberValue())
 			priority = billingpb.Priority_NORMAL
 		} else {
+			first_payment = true
 			last = created
 			priority = billingpb.Priority_URGENT
 		}
@@ -539,11 +544,16 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	go records(context.Background(), append(resourceRecords, productRecords...))
 	if len(productRecords) != 0 && state != "SUSPENDED" {
-		go events(context.Background(), &epb.Event{
-			Uuid: i.GetUuid(),
-			Key:  "instance_renew",
-			Data: map[string]*structpb.Value{},
-		})
+		if !first_payment {
+			price := getInstancePrice(i)
+			go events(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_renew",
+				Data: map[string]*structpb.Value{
+					"price": structpb.NewNumberValue(price),
+				},
+			})
+		}
 	}
 	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
 }
@@ -1179,4 +1189,35 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 	}
 
 	publish(context.Background(), records)
+}
+
+func getInstancePrice(i *ipb.Instance) float64 {
+	product := i.GetProduct()
+	plan := i.GetBillingPlan()
+	p := plan.GetProducts()[product]
+	resources := i.GetResources()
+
+	price := p.GetPrice()
+
+	for _, resource := range plan.GetResources() {
+		if strings.Contains(resource.GetKey(), "drive") {
+			driveType := resources["drive_type"].GetStringValue()
+			if resource.GetKey() != "drive_"+strings.ToLower(driveType) {
+				continue
+			}
+			value := resources["drive_size"].GetNumberValue() / 1024
+			total := math.Round(resource.GetPrice()*value*100) / 100.0
+			price += total
+
+		} else {
+			value := resources[resource.GetKey()].GetNumberValue()
+			if resource.GetKey() == "ram" {
+				value /= 1024
+			}
+			total := math.Round(resource.GetPrice()*value*100) / 100.0
+			price += total
+		}
+	}
+
+	return price
 }
