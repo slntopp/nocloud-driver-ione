@@ -303,6 +303,15 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus, balance *float64) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 
+	now := time.Now().Unix()
+	var immune_date_val int64
+	immune_date, ok := i.GetData()["immune_date"]
+	if !ok {
+		immune_date_val = now
+	} else {
+		immune_date_val = int64(immune_date.GetNumberValue())
+	}
+
 	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
 		log.Debug("Instance was deleted. No billing")
 		return
@@ -450,7 +459,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 		log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
 		_, isStatic := i.Data["last_monitoring"]
-		if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL {
+		if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL && now >= immune_date_val {
 			if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
 				if err := client.SuspendVM(vmid); err != nil {
 					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
