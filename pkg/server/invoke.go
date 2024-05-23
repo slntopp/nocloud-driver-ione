@@ -77,7 +77,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	}
 
 	if req.GetInstance().GetData()["freeze"].GetBoolValue() && req.GetMethod() != "unfreeze" {
-		return nil, status.Error(codes.PermissionDenied, "Instance is freeze")
+		return nil, status.Error(codes.Canceled, "Instance is freeze")
 	}
 
 	action, ok := actions.Actions[method]
