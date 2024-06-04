@@ -652,6 +652,8 @@ func BackupInstance(
 		ansibleInstance.AnsibleHost = &ansibleHost
 	}
 
+	log.Debug("inst", zap.Any("inst", ansibleInstance))
+
 	create, err := client.Create(ctx, &ansible.CreateRunRequest{
 		Run: &ansible.Run{
 			Instances: []*ansible.Instance{
