@@ -628,6 +628,10 @@ func BackupInstance(
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "No hop port")
 	}
+	hopSsh, ok := hop["ssh"].(string)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No hop ssh")
+	}
 
 	info := hop["info"]
 	if info != nil {
@@ -656,6 +660,7 @@ func BackupInstance(
 
 	create, err := client.Create(ctx, &ansible.CreateRunRequest{
 		Run: &ansible.Run{
+			SshKey: &hopSsh,
 			Instances: []*ansible.Instance{
 				ansibleInstance,
 			},
