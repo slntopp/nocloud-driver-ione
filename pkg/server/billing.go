@@ -693,8 +693,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			if lastDay-endDay == 1 {
 				end += 86400
-			} else if lastDay-endDay == -29 {
-				end += 2 * 86400
+			} else if lastDay-endDay == -30 {
+				end += 86400
 			} else if lastDay-endDay == -1 {
 				end -= 86400
 			} else if lastDay-endDay == -2 {
@@ -733,8 +733,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			if lastDay-endDay == 1 {
 				end += 86400
-			} else if lastDay-endDay == -29 {
-				end += 2 * 86400
+			} else if lastDay-endDay == -30 {
+				end += 86400
 			} else if lastDay-endDay == -1 {
 				end -= 86400
 			} else if lastDay-endDay == -2 {
@@ -972,8 +972,8 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 
 				if last-end == 86400 {
 					end += 86400
-				} else if last-end == -29*86400 {
-					end += 2 * 86400
+				} else if last-end == -30*86400 {
+					end += 86400
 				} else if last-end == -1*86400 {
 					end -= 86400
 				} else if last-end == -2*86400 {
@@ -1016,8 +1016,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 
 				if lastDay-endDay == 1 {
 					end += 86400
-				} else if lastDay-endDay == -29 {
-					end += 2 * 86400
+				} else if lastDay-endDay == -30 {
+					end += 86400
 				} else if lastDay-endDay == -1 {
 					end -= 86400
 				} else if lastDay-endDay == -2 {
@@ -1043,8 +1043,8 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 
 				if lastDay-endDay == 1 {
 					end += 86400
-				} else if lastDay-endDay == -29 {
-					end += 2 * 86400
+				} else if lastDay-endDay == -30 {
+					end += 86400
 				} else if lastDay-endDay == -1 {
 					end -= 86400
 				} else if lastDay-endDay == -2 {
