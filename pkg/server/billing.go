@@ -777,8 +777,8 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 			if lastDay-endDay == 1 {
 				end += 86400
-			} else if lastDay-endDay == -29 {
-				end += 2 * 86400
+			} else if lastDay-endDay == -30 {
+				end += 86400
 			} else if lastDay-endDay == -1 {
 				end -= 86400
 			} else if lastDay-endDay == -2 {
