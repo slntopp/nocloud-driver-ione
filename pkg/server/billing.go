@@ -50,6 +50,38 @@ var suspendNotificationsPeriods = []ExpiryDiff{
 	{86400, 1},
 }
 
+func AlignPaymentDate(start int64, end int64, period int64) int64 {
+	// Apply only on month period
+	if period != 30*86400 {
+		return end
+	}
+
+	daysInMonth := func(year int, month time.Month) int {
+		return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	}
+
+	startTime := time.Unix(start, 0).In(time.UTC)
+	dayStart := startTime.Day()
+	daysInMonthStart := daysInMonth(startTime.Year(), startTime.Month())
+	endTime := time.Unix(end, 0).In(time.UTC)
+	yearAfterStartDate := startTime.AddDate(0, 0, daysInMonthStart-startTime.Day()+1).Year()
+	monthAfterStartDate := startTime.AddDate(0, 0, daysInMonthStart-startTime.Day()+1).Month()
+	daysInMonthEnd := daysInMonth(yearAfterStartDate, monthAfterStartDate)
+
+	// Happens when start is 1st day in 31day month
+	if startTime.Month() == endTime.Month() {
+		return startTime.AddDate(0, 1, 0).Unix()
+	}
+
+	// Default case, just add month
+	if dayStart <= daysInMonthEnd {
+		return startTime.AddDate(0, 1, 0).Unix()
+	}
+
+	// Overlapping case. Add month and subtract days
+	return startTime.AddDate(0, 1, daysInMonthEnd-dayStart).Unix()
+}
+
 func Lazy[T any](f func() T) func() T {
 	var o T
 	var once sync.Once
@@ -687,19 +719,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		end := start + period
 
 		if p.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-
-			lastDay := time.Unix(start, 0).Day()
-			endDay := time.Unix(end, 0).Day()
-
-			if lastDay-endDay == 1 {
-				end += 86400
-			} else if lastDay-endDay == -30 {
-				end += 86400
-			} else if lastDay-endDay == -1 {
-				end -= 86400
-			} else if lastDay-endDay == -2 {
-				end -= 2 * 86400
-			}
+			end = AlignPaymentDate(start, end, p.Period)
 		}
 
 		recs = append(recs, &billingpb.Record{
@@ -727,19 +747,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		end := start + resource.GetPeriod()
 
 		if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-
-			lastDay := time.Unix(start, 0).Day()
-			endDay := time.Unix(end, 0).Day()
-
-			if lastDay-endDay == 1 {
-				end += 86400
-			} else if lastDay-endDay == -30 {
-				end += 86400
-			} else if lastDay-endDay == -1 {
-				end -= 86400
-			} else if lastDay-endDay == -2 {
-				end -= 2 * 86400
-			}
+			end = AlignPaymentDate(start, end, resource.Period)
 		}
 
 		if strings.Contains(resource.GetKey(), "drive") {
@@ -969,16 +977,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			}
 
 			if res.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-
-				if last-end == 86400 {
-					end += 86400
-				} else if last-end == -30*86400 {
-					end += 86400
-				} else if last-end == -1*86400 {
-					end -= 86400
-				} else if last-end == -2*86400 {
-					end -= 2 * 86400
-				}
+				end = AlignPaymentDate(last, end, res.Period)
 			}
 
 			records = append(records, &billingpb.Record{
@@ -1010,19 +1009,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 		for end := last + product.Period; end <= time.Now().Unix(); end += product.Period {
 
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-
-				lastDay := time.Unix(last, 0).Day()
-				endDay := time.Unix(end, 0).Day()
-
-				if lastDay-endDay == 1 {
-					end += 86400
-				} else if lastDay-endDay == -30 {
-					end += 86400
-				} else if lastDay-endDay == -1 {
-					end -= 86400
-				} else if lastDay-endDay == -2 {
-					end -= 2 * 86400
-				}
+				end = AlignPaymentDate(last, end, product.Period)
 			}
 
 			records = append(records, &billingpb.Record{
@@ -1038,18 +1025,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 		log.Debug("Handling Prepaid Billing", zap.Any("product", product), zap.Int64("end", end), zap.Int64("now", time.Now().Unix()))
 		for ; last <= time.Now().Unix(); end += product.Period {
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				lastDay := time.Unix(last, 0).Day()
-				endDay := time.Unix(end, 0).Day()
-
-				if lastDay-endDay == 1 {
-					end += 86400
-				} else if lastDay-endDay == -30 {
-					end += 86400
-				} else if lastDay-endDay == -1 {
-					end -= 86400
-				} else if lastDay-endDay == -2 {
-					end -= 2 * 86400
-				}
+				end = AlignPaymentDate(last, end, product.Period)
 			}
 			records = append(records, &billingpb.Record{
 				Product:  *i.Product,
