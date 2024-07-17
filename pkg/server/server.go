@@ -467,6 +467,18 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
 			} else if !(metaAutoStart || cfgAutoStart) {
+				if !inst.GetData()["pending_notification"].GetBoolValue() {
+					price := getInstancePrice(inst)
+					go s.HandlePublishEvents(ctx, &epb.Event{
+						Uuid: inst.GetUuid(),
+						Key:  "pending_notification",
+						Data: map[string]*structpb.Value{
+							"price": structpb.NewNumberValue(price),
+						},
+					})
+					inst.Data["pending_notification"] = structpb.NewBoolValue(true)
+					go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+				}
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
 			} else {
