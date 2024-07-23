@@ -19,7 +19,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -532,8 +534,20 @@ func ManualRenew(
 
 	period := billingPlan.GetProducts()[instProduct].GetPeriod()
 
-	lastMonitoringValue += period
+	lastMonitoringValue = utils.AlignPaymentDate(lastMonitoringValue, lastMonitoringValue+period, period)
 	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
+
+	for _, resource := range billingPlan.GetResources() {
+		period := resource.GetPeriod()
+		key := fmt.Sprintf("%s_last_monitoring", resource.Key)
+		lmValue, ok := instData[key]
+		if _, has := inst.GetResources()[resource.Key]; !ok || period == 0 || !has {
+			continue
+		}
+		lm := int64(lmValue.GetNumberValue())
+		lm = utils.AlignPaymentDate(lm, lm+period, period)
+		instData[key] = structpb.NewNumberValue(float64(lm))
+	}
 
 	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
 	return &ipb.InvokeResponse{Result: true}, nil
@@ -545,12 +559,39 @@ func CancelRenew(
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
 	instData := inst.GetData()
+	instProduct := inst.GetProduct()
+	billingPlan := inst.GetBillingPlan()
 
-	if instData == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "Instance data is nil")
+	kind := billingPlan.GetKind()
+	if kind != billingpb.PlanKind_STATIC {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "Not implemented for dynamic plan")
 	}
 
-	instData["canceled_remove"] = structpb.NewBoolValue(true)
+	lastMonitoring, ok := instData["last_monitoring"]
+	if !ok {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "No last_monitoring data")
+	}
+	lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+
+	period := billingPlan.GetProducts()[instProduct].GetPeriod()
+
+	lastMonitoringValue = utils.AlignPaymentDate(lastMonitoringValue, lastMonitoringValue-period, period)
+	lastMonitoringValue = int64(math.Max(float64(lastMonitoringValue), float64(inst.Created)))
+	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
+
+	for _, resource := range billingPlan.GetResources() {
+		period := resource.GetPeriod()
+		key := fmt.Sprintf("%s_last_monitoring", resource.Key)
+		lmValue, ok := instData[key]
+		if _, has := inst.GetResources()[resource.Key]; !ok || period == 0 || !has {
+			continue
+		}
+		lm := int64(lmValue.GetNumberValue())
+		lm = utils.AlignPaymentDate(lm, lm-period, period)
+		lm = int64(math.Max(float64(lm), float64(inst.Created)))
+		instData[key] = structpb.NewNumberValue(float64(lm))
+	}
+
 	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
 	return &ipb.InvokeResponse{Result: true}, nil
 }
