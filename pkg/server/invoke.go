@@ -70,9 +70,13 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		}
 	}
 
-	_, ok := actions.BillingActions[method]
+	action, ok := actions.BillingActions[method]
 	if ok {
-		go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+		if method == "manual_renew" {
+			go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+		} else {
+			return action(client, instance, req.GetParams())
+		}
 		return &ipb.InvokeResponse{Result: true}, err
 	}
 
@@ -80,7 +84,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Error(codes.Canceled, "Instance is freeze")
 	}
 
-	action, ok := actions.Actions[method]
+	action, ok = actions.Actions[method]
 	if ok {
 		if method == "suspend" {
 			go s.HandlePublishEvents(ctx, &epb.Event{

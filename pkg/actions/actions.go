@@ -66,14 +66,15 @@ var Actions = map[string]ServiceAction{
 	"snapdelete":      SnapDelete,
 	"snaprevert":      SnapRevert,
 	"start_vnc":       StartVNC,
-	"cancel_renew":    CancelRenew,
 	"get_backup_info": GetBackupInfo,
 	"freeze":          Freeze,
 	"unfreeze":        Unfreeze,
 }
 
 var BillingActions = map[string]ServiceAction{
-	"manual_renew": ManualRenew,
+	"manual_renew": nil,
+	"cancel_renew": CancelRenew,
+	"renew":        ManualRenew,
 }
 
 var AnsibleActions = map[string]AnsibleAction{
