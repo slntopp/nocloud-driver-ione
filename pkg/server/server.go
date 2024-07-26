@@ -77,6 +77,46 @@ func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRe
 	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
 }
 
+func (s *DriverServiceServer) GetExpiration(_ context.Context, request *pb.GetExpirationRequest) (*pb.GetExpirationResponse, error) {
+	records := make([]*pb.ExpirationRecord, 0)
+	inst := request.GetInstance()
+	bp := inst.GetBillingPlan()
+	data := inst.GetData()
+
+	product, hasProduct := bp.GetProducts()[inst.GetProduct()]
+	if hasProduct {
+		if lm, ok := data["last_monitoring"]; ok && product.GetPeriod() > 0 {
+			records = append(records, &pb.ExpirationRecord{
+				Expires: int64(lm.GetNumberValue()),
+				Product: inst.GetProduct(),
+				Period:  product.GetPeriod(),
+			})
+		}
+
+		for _, a := range inst.GetAddons() {
+			if lm, ok := data[fmt.Sprintf("addon_%s_last_monitoring", a)]; ok && product.GetPeriod() > 0 {
+				records = append(records, &pb.ExpirationRecord{
+					Expires: int64(lm.GetNumberValue()),
+					Addon:   a,
+					Period:  product.GetPeriod(),
+				})
+			}
+		}
+	}
+
+	for _, res := range bp.Resources {
+		if lm, ok := data[fmt.Sprintf("%s_last_monitoring", res.GetKey())]; ok && res.GetPeriod() > 0 {
+			records = append(records, &pb.ExpirationRecord{
+				Expires: int64(lm.GetNumberValue()),
+				Product: res.GetKey(),
+				Period:  res.GetPeriod(),
+			})
+		}
+	}
+
+	return &pb.GetExpirationResponse{Records: records}, nil
+}
+
 func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *ipb.TestInstancesGroupConfigRequest) (*ipb.TestInstancesGroupConfigResponse, error) {
 	s.log.Debug("TestInstancesGroupConfig request received", zap.Any("request", request))
 	igroup := request.GetGroup()
