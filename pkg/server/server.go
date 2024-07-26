@@ -107,9 +107,9 @@ func (s *DriverServiceServer) GetExpiration(_ context.Context, request *pb.GetEx
 	for _, res := range bp.Resources {
 		if lm, ok := data[fmt.Sprintf("%s_last_monitoring", res.GetKey())]; ok && res.GetPeriod() > 0 {
 			records = append(records, &pb.ExpirationRecord{
-				Expires: int64(lm.GetNumberValue()),
-				Product: res.GetKey(),
-				Period:  res.GetPeriod(),
+				Expires:  int64(lm.GetNumberValue()),
+				Resource: res.GetKey(),
+				Period:   res.GetPeriod(),
 			})
 		}
 	}
