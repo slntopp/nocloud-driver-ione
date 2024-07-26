@@ -6,7 +6,7 @@ require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20230517101801-6d09265b614f
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/slntopp/nocloud v0.0.19-0.20240725075336-bb1a4b4fe0f0
-	github.com/slntopp/nocloud-proto v0.0.0-20240725075204-5b651f2670e3
+	github.com/slntopp/nocloud-proto v0.0.0-20240726073351-538d344e414e
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	go.uber.org/zap v1.27.0
