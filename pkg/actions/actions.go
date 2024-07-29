@@ -550,6 +550,16 @@ func ManualRenew(
 		instData[key] = structpb.NewNumberValue(float64(lm))
 	}
 
+	for _, addonId := range inst.Addons {
+		key := fmt.Sprintf("addon_%s_last_monitoring", addonId)
+		lmValue, ok := instData[key]
+		if ok {
+			lm := int64(lmValue.GetNumberValue())
+			lm = utils.AlignPaymentDate(lm, lm+period, period)
+			instData[key] = structpb.NewNumberValue(float64(lm))
+		}
+	}
+
 	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
 	return &ipb.InvokeResponse{Result: true}, nil
 }
@@ -591,6 +601,16 @@ func CancelRenew(
 		lm = utils.AlignPaymentDate(lm, lm-period, period)
 		lm = int64(math.Max(float64(lm), float64(inst.Created)))
 		instData[key] = structpb.NewNumberValue(float64(lm))
+	}
+
+	for _, addonId := range inst.Addons {
+		key := fmt.Sprintf("addon_%s_last_monitoring", addonId)
+		lmValue, ok := instData[key]
+		if ok {
+			lm := int64(lmValue.GetNumberValue())
+			lm = utils.AlignPaymentDate(lm, lm-period, period)
+			instData[key] = structpb.NewNumberValue(float64(lm))
+		}
 	}
 
 	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
