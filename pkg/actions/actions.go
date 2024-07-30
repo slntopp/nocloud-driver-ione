@@ -74,7 +74,7 @@ var Actions = map[string]ServiceAction{
 var BillingActions = map[string]ServiceAction{
 	"manual_renew": nil,
 	"cancel_renew": CancelRenew,
-	"renew":        ManualRenew,
+	"free_renew":   FreeRenew,
 }
 
 var AnsibleActions = map[string]AnsibleAction{
@@ -513,7 +513,7 @@ func Monitoring(
 	return resp, nil
 }
 
-func ManualRenew(
+func FreeRenew(
 	client one.IClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
