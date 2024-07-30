@@ -888,6 +888,37 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		i.Data[resource.Key+"_last_monitoring"] = structpb.NewNumberValue(float64(end))
 	}
 
+	prod, ok := i.BillingPlan.Products[i.GetProduct()]
+	if !ok {
+		log.Warn("Product not found", zap.String("product", *i.Product))
+	}
+	for _, addonId := range i.GetAddons() {
+		if prod.GetPeriod() == 0 {
+			continue
+		}
+		var (
+			lm int64
+		)
+		lmValue, ok := i.Data[fmt.Sprintf("addon_%s_last_monitoring", addonId)]
+		if !ok {
+			continue
+		} else {
+			lm = int64(lmValue.GetNumberValue())
+		}
+
+		end := utils.AlignPaymentDate(lm, lm+prod.GetPeriod(), prod.GetPeriod())
+		i.Data[fmt.Sprintf("addon_%s_last_monitoring", addonId)] = structpb.NewNumberValue(float64(end))
+		recs = append(recs, &billingpb.Record{
+			Start:    lm,
+			End:      end,
+			Exec:     time.Now().Unix(),
+			Priority: billingpb.Priority_URGENT,
+			Instance: i.GetUuid(),
+			Addon:    addonId,
+			Total:    1,
+		})
+	}
+
 	log.Debug("Data", zap.Any("d", i.GetData()))
 
 	log.Debug("records", zap.Any("r", recs))
