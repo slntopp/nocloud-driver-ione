@@ -193,7 +193,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 				i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
 			}
 		}
-		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+		go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
 
 	} else {
 		plan := i.BillingPlan
@@ -325,7 +325,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			Key:  "instance_renew",
 			Data: map[string]*structpb.Value{},
 		})
-		go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+		go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
 	}
 }
 
@@ -552,7 +552,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			Data: map[string]*structpb.Value{},
 		})
 	}
-	go datas.DataPublisher(datas.POST_INST_DATA)(i.Uuid, i.Data)
+	go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
 }
 
 func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
@@ -802,7 +802,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 	log.Debug("records", zap.Any("r", recs))
 	go records(context.Background(), recs)
-	datas.DataPublisher(datas.POST_INST_DATA)(i.GetUuid(), i.GetData())
+	go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
 }
 
 type BillingHandlerFunc func(

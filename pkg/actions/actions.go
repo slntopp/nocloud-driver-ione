@@ -18,6 +18,7 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	"io"
 	"net/http"
 	"time"
@@ -488,7 +489,7 @@ func ManualRenew(
 	lastMonitoringValue += period
 	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
 
-	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
+	go utils.SendActualMonitoringData(instData, instData, inst.GetUuid(), datas.DataPublisher(datas.POST_INST_DATA))
 	return &ipb.InvokeResponse{Result: true}, nil
 }
 
