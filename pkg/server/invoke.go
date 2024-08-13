@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud-proto/ansible"
@@ -73,6 +74,8 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	action, ok := actions.BillingActions[method]
 	if ok {
 		if method == "manual_renew" {
+			time.Sleep(time.Duration(4) * time.Second)
+			return &ipb.InvokeResponse{Result: true}, nil
 			go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
 		} else {
 			return action(client, instance, req.GetParams())
