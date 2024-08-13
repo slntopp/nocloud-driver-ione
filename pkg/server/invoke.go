@@ -74,7 +74,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	action, ok := actions.BillingActions[method]
 	if ok {
 		if method == "manual_renew" {
-			time.Sleep(time.Duration(4) * time.Second)
+			time.Sleep(time.Duration(3) * time.Second)
 			return &ipb.InvokeResponse{Result: true}, nil
 			go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
 		} else {
