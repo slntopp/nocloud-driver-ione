@@ -50,6 +50,12 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.Inst
 	tmpl := vm.NewTemplate()
 	data := make(map[string]*structpb.Value)
 	conf := instance.GetConfig()
+	bp := instance.GetBillingPlan()
+
+	isHighCPU := false
+	if val, ok := bp.GetMeta()["highCPU"]; ok && val.GetBoolValue() {
+		isHighCPU = true
+	}
 
 	tmpl.Add(driver_shared.NOCLOUD_VM, "TRUE")
 	tmpl.Add(driver_shared.NOCLOUD_VM_TOKEN, token)
@@ -132,7 +138,11 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.Inst
 		}
 	}
 
-	sched, err := GetVarValue(c.vars[SCHED], "default")
+	key := "default"
+	if isHighCPU {
+		key = "HCPU"
+	}
+	sched, err := GetVarValue(c.vars[SCHED], key)
 	if err != nil {
 		return -1, err
 	}
