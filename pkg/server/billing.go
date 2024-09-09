@@ -132,6 +132,13 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 	if lastMonitoring, ok := data["last_monitoring"]; ok {
 		now := time.Now().Unix()
 		lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+		var immune_date_val int64
+		immune_date, ok := data["immune_date"]
+		if !ok {
+			immune_date_val = now
+		} else {
+			immune_date_val = int64(immune_date.GetNumberValue())
+		}
 
 		vmid, err := one.GetVMIDFromData(client, i)
 		if err != nil {
@@ -146,7 +153,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 
 		suspendedManually := data["suspended_manually"].GetBoolValue()
 
-		if now > lastMonitoringValue && state != "SUSPENDED" {
+		if now > lastMonitoringValue && state != "SUSPENDED" && now >= immune_date_val {
 			err := client.SuspendVM(vmid)
 			if err != nil {
 				log.Error("Failed to suspend vm", zap.Error(err))
@@ -332,6 +339,15 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 
+	now := time.Now().Unix()
+	var immune_date_val int64
+	immune_date, ok := i.GetData()["immune_date"]
+	if !ok {
+		immune_date_val = now
+	} else {
+		immune_date_val = int64(immune_date.GetNumberValue())
+	}
+
 	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
 		log.Debug("Instance was deleted. No billing")
 		return
@@ -477,7 +493,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 		log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
 		_, isStatic := i.Data["last_monitoring"]
-		if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL {
+		if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL && now >= immune_date_val {
 			if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
 				if err := client.SuspendVM(vmid); err != nil {
 					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
