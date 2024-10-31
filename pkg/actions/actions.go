@@ -534,9 +534,14 @@ func FreeRenew(
 	lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
 
 	period := billingPlan.GetProducts()[instProduct].GetPeriod()
+	pkind := billingPlan.GetProducts()[instProduct].GetPeriodKind()
 
-	lastMonitoringValue = utils.AlignPaymentDate(lastMonitoringValue, lastMonitoringValue+period, period)
-	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
+	end := lastMonitoringValue + period
+	if pkind != billingpb.PeriodKind_DEFAULT {
+		end = utils.AlignPaymentDate(lastMonitoringValue, end, period)
+	}
+
+	instData["last_monitoring"] = structpb.NewNumberValue(float64(end))
 
 	for _, resource := range billingPlan.GetResources() {
 		period := resource.GetPeriod()
@@ -546,8 +551,11 @@ func FreeRenew(
 			continue
 		}
 		lm := int64(lmValue.GetNumberValue())
-		lm = utils.AlignPaymentDate(lm, lm+period, period)
-		instData[key] = structpb.NewNumberValue(float64(lm))
+		end := lm + period
+		if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+			end = utils.AlignPaymentDate(lm, end, period)
+		}
+		instData[key] = structpb.NewNumberValue(float64(end))
 	}
 
 	for _, addonId := range inst.Addons {
@@ -555,8 +563,11 @@ func FreeRenew(
 		lmValue, ok := instData[key]
 		if ok {
 			lm := int64(lmValue.GetNumberValue())
-			lm = utils.AlignPaymentDate(lm, lm+period, period)
-			instData[key] = structpb.NewNumberValue(float64(lm))
+			end := lm + period
+			if pkind != billingpb.PeriodKind_DEFAULT {
+				end = utils.AlignPaymentDate(lm, end, period)
+			}
+			instData[key] = structpb.NewNumberValue(float64(end))
 		}
 	}
 
