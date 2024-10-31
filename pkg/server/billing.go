@@ -906,7 +906,11 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 			lm = int64(lmValue.GetNumberValue())
 		}
 
-		end := utils.AlignPaymentDate(lm, lm+prod.GetPeriod(), prod.GetPeriod())
+		end := lm + prod.GetPeriod()
+		if prod.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+			end = utils.AlignPaymentDate(lm, end, prod.GetPeriod())
+		}
+
 		i.Data[fmt.Sprintf("addon_%s_last_monitoring", addonId)] = structpb.NewNumberValue(float64(end))
 		recs = append(recs, &billingpb.Record{
 			Start:    lm,
