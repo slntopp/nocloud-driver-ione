@@ -571,7 +571,7 @@ func FreeRenew(
 		}
 	}
 
-	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
+	go utils.SendActualMonitoringData(instData, instData, inst.GetUuid(), datas.DataPublisher(datas.POST_INST_DATA))
 	return &ipb.InvokeResponse{Result: true}, nil
 }
 
