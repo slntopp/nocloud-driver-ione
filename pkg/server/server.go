@@ -520,7 +520,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 					go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
 				}
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
+				instDataPublisher := datas.DataPublisher(datas.POST_INST_DATA)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
+				instDataPublisher(inst.GetUuid(), inst.GetData())
 			} else {
 				if !inst.GetData()["creation_notification"].GetBoolValue() {
 					networking, ok := inst.GetState().GetMeta()["networking"]
