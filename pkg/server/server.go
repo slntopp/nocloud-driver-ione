@@ -407,6 +407,8 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	sp := req.GetServicesProvider()
 	log.Info("Starting Routine", zap.String("sp", sp.GetUuid()))
 
+	time.Sleep(8 * time.Second)
+
 	client, err := one.NewClientFromSP(sp, log)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
