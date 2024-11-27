@@ -77,7 +77,6 @@ func init() {
 	ansibleHost = viper.GetString("ANSIBLE_HOST")
 }
 
-// dev
 func main() {
 	defer func() {
 		_ = log.Sync()
