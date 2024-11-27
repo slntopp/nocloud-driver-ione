@@ -22,6 +22,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
+	"github.com/slntopp/nocloud-proto/ansible"
+	epb "github.com/slntopp/nocloud-proto/events"
+
 	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
@@ -53,6 +57,9 @@ type DriverServiceServer struct {
 	log                  *zap.Logger
 	HandlePublishRecords RecordsPublisherFunc
 	HandlePublishEvents  EventsPublisherFunc
+	ansibleCtx           context.Context
+	ansibleClient        ansible.AnsibleServiceClient
+	ansibleConfig        *ansible_config.AnsibleConfig
 	rdb                  *redis.Client
 }
 
@@ -61,8 +68,53 @@ func NewDriverServiceServer(log *zap.Logger, key []byte, rdb *redis.Client) *Dri
 	return &DriverServiceServer{log: log, rdb: rdb}
 }
 
+func (s *DriverServiceServer) SetAnsibleClient(ctx context.Context, client ansible.AnsibleServiceClient) {
+	s.ansibleCtx = ctx
+	s.ansibleClient = client
+}
+
 func (s *DriverServiceServer) GetType(ctx context.Context, request *pb.GetTypeRequest) (*pb.GetTypeResponse, error) {
 	return &pb.GetTypeResponse{Type: DRIVER_TYPE}, nil
+}
+
+func (s *DriverServiceServer) GetExpiration(_ context.Context, request *pb.GetExpirationRequest) (*pb.GetExpirationResponse, error) {
+	records := make([]*pb.ExpirationRecord, 0)
+	inst := request.GetInstance()
+	bp := inst.GetBillingPlan()
+	data := inst.GetData()
+
+	product, hasProduct := bp.GetProducts()[inst.GetProduct()]
+	if hasProduct {
+		if lm, ok := data["last_monitoring"]; ok && product.GetPeriod() > 0 {
+			records = append(records, &pb.ExpirationRecord{
+				Expires: int64(lm.GetNumberValue()),
+				Product: inst.GetProduct(),
+				Period:  product.GetPeriod(),
+			})
+		}
+
+		for _, a := range inst.GetAddons() {
+			if lm, ok := data[fmt.Sprintf("addon_%s_last_monitoring", a)]; ok && product.GetPeriod() > 0 {
+				records = append(records, &pb.ExpirationRecord{
+					Expires: int64(lm.GetNumberValue()),
+					Addon:   a,
+					Period:  product.GetPeriod(),
+				})
+			}
+		}
+	}
+
+	for _, res := range bp.Resources {
+		if lm, ok := data[fmt.Sprintf("%s_last_monitoring", res.GetKey())]; ok && res.GetPeriod() > 0 {
+			records = append(records, &pb.ExpirationRecord{
+				Expires:  int64(lm.GetNumberValue()),
+				Resource: res.GetKey(),
+				Period:   res.GetPeriod(),
+			})
+		}
+	}
+
+	return &pb.GetExpirationResponse{Records: records}, nil
 }
 
 func (s *DriverServiceServer) TestInstancesGroupConfig(ctx context.Context, request *ipb.TestInstancesGroupConfigRequest) (*ipb.TestInstancesGroupConfigResponse, error) {
@@ -365,6 +417,12 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	client.SetVars(vars)
 
+	creationBalance, monitoringBalance := map[string]float64{}, map[string]float64{}
+	for key, val := range req.GetBalance() {
+		creationBalance[key] = val
+		monitoringBalance[key] = val
+	}
+
 	group := secrets["group"].GetNumberValue()
 
 	redisKey := fmt.Sprintf("%s-SP-%s", MONITORING_REDIS, sp.Uuid)
@@ -418,7 +476,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
-			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group))
+			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
 			log.Debug("Events instances", zap.Any("resp", successResp))
 			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
@@ -438,6 +496,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				cfg = make(map[string]*structpb.Value)
 			}
 
+			if inst.GetData() == nil {
+				inst.Data = map[string]*structpb.Value{}
+			}
+
 			cfgAutoStart := cfg["auto_start"].GetBoolValue()
 			metaAutoStart := meta["auto_start"].GetBoolValue()
 
@@ -445,9 +507,42 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
 			} else if !(metaAutoStart || cfgAutoStart) {
+				if !inst.GetData()["pending_notification"].GetBoolValue() {
+					price := getInstancePrice(inst)
+					go s.HandlePublishEvents(ctx, &epb.Event{
+						Uuid: inst.GetUuid(),
+						Key:  "pending_notification",
+						Data: map[string]*structpb.Value{
+							"price": structpb.NewNumberValue(price),
+						},
+					})
+					inst.Data["pending_notification"] = structpb.NewBoolValue(true)
+					go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+				}
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
+				instDataPublisher := datas.DataPublisher(datas.POST_INST_DATA)
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
+				instDataPublisher(inst.GetUuid(), inst.GetData())
 			} else {
+				if !inst.GetData()["creation_notification"].GetBoolValue() {
+					networking, ok := inst.GetState().GetMeta()["networking"]
+					if ok {
+						networkingValue := networking.GetStructValue().AsMap()
+						_, ok := networkingValue["public"].([]interface{})
+						if ok {
+							price := getInstancePrice(inst)
+							go s.HandlePublishEvents(ctx, &epb.Event{
+								Uuid: inst.GetUuid(),
+								Key:  "instance_created",
+								Data: map[string]*structpb.Value{
+									"price": structpb.NewNumberValue(price),
+								},
+							})
+							inst.Data["creation_notification"] = structpb.NewBoolValue(true)
+							go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+						}
+					}
+				}
 				_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
 				if err != nil {
 					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
@@ -462,11 +557,15 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 			}
 
+			balance := monitoringBalance[ig.GetUuid()]
+
 			if autoRenew {
-				go handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance, req.Addons)
 			} else {
-				go handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus)
+				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, req.Addons)
 			}
+
+			monitoringBalance[ig.GetUuid()] = balance
 		}
 	}
 

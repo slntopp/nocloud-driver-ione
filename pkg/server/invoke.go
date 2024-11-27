@@ -17,8 +17,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
-
+	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
+	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -49,11 +51,41 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
-	action, ok := actions.Actions[method]
-	if !ok {
-		s.log.Warn(fmt.Sprintf("Action %s not declared for %s", method, DRIVER_TYPE))
-	} else {
+	runningPlaybook := instance.GetData()["running_playbook"].GetStringValue()
 
+	if runningPlaybook != "" {
+		get, err := s.ansibleClient.Get(s.ansibleCtx, &ansible.GetRunRequest{
+			Uuid: runningPlaybook,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if get.GetStatus() == "running" {
+			return nil, errors.New("playbook still running")
+		}
+		if get.GetStatus() == "successful" || get.GetStatus() == "failed" || get.GetStatus() == "undefined" {
+			instance.Data["running_playbook"] = structpb.NewStringValue("")
+			go datas.DataPublisher(datas.POST_INST_DATA)(instance.GetUuid(), instance.GetData())
+		}
+	}
+
+	action, ok := actions.BillingActions[method]
+	if ok {
+		if method == "manual_renew" {
+			go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+			return &ipb.InvokeResponse{Result: true}, nil
+		} else {
+			return action(client, instance, req.GetParams())
+		}
+		return &ipb.InvokeResponse{Result: true}, err
+	}
+
+	if req.GetInstance().GetData()["freeze"].GetBoolValue() && req.GetMethod() != "unfreeze" {
+		return nil, status.Error(codes.Canceled, "Instance is freeze")
+	}
+
+	action, ok = actions.Actions[method]
+	if ok {
 		if method == "suspend" {
 			go s.HandlePublishEvents(ctx, &epb.Event{
 				Uuid: instance.GetUuid(),
@@ -65,14 +97,28 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return action(client, instance, req.GetParams())
 	}
 
-	action, ok = actions.BillingActions[method]
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "Action '%s' not declared for %s", method, DRIVER_TYPE)
+	ansibleAction, ok := actions.AnsibleActions[method]
+	if ok {
+		secrets := sp.GetSecrets()
+		ansibleSecret, ok := secrets["ansible"]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No ansible config")
+		}
+
+		ansibleSecretValue := ansibleSecret.GetStructValue().AsMap()
+		playbookUuid, ok := ansibleSecretValue["playbook_uuid"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
+		}
+		hop, ok := ansibleSecretValue["hop"].(map[string]any)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
+		}
+
+		return ansibleAction(s.ansibleCtx, s.ansibleClient, playbookUuid, hop, instance, req.GetParams())
 	}
 
-	go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
-
-	return &ipb.InvokeResponse{Result: true}, err
+	return nil, status.Errorf(codes.PermissionDenied, "Action %s is not declared", method)
 }
 
 func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequest) (res *spb.InvokeResponse, err error) {

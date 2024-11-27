@@ -16,12 +16,17 @@ limitations under the License.
 package actions
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	"io"
+	"math"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/slntopp/nocloud-proto/ansible"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 
@@ -40,27 +45,45 @@ type ServiceAction func(
 	map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error)
 
+type AnsibleAction func(
+	context.Context,
+	ansible.AnsibleServiceClient,
+	string,
+	map[string]any,
+	*ipb.Instance,
+	map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error)
+
 var Actions = map[string]ServiceAction{
-	"poweroff":     Poweroff,
-	"suspend":      Suspend,
-	"reboot":       Reboot,
-	"resume":       Resume,
-	"reinstall":    Reinstall,
-	"monitoring":   Monitoring,
-	"state":        State,
-	"snapcreate":   SnapCreate,
-	"snapdelete":   SnapDelete,
-	"snaprevert":   SnapRevert,
-	"start_vnc":    StartVNC,
-	"cancel_renew": CancelRenew,
+	"poweroff":        Poweroff,
+	"suspend":         Suspend,
+	"reboot":          Reboot,
+	"resume":          Resume,
+	"reinstall":       Reinstall,
+	"monitoring":      Monitoring,
+	"state":           State,
+	"snapcreate":      SnapCreate,
+	"snapdelete":      SnapDelete,
+	"snaprevert":      SnapRevert,
+	"start_vnc":       StartVNC,
+	"get_backup_info": GetBackupInfo,
+	"freeze":          Freeze,
+	"unfreeze":        Unfreeze,
 }
 
 var BillingActions = map[string]ServiceAction{
-	"manual_renew": ManualRenew,
+	"manual_renew": nil,
+	"cancel_renew": CancelRenew,
+	"free_renew":   FreeRenew,
+}
+
+var AnsibleActions = map[string]AnsibleAction{
+	"exec": BackupInstance,
 }
 
 var AdminActions = map[string]bool{
-	"suspend": true,
+	"suspend":         true,
+	"get_backup_info": true,
 }
 
 // Creates new snapshot of vm
@@ -267,6 +290,28 @@ func Resume(
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
+func Freeze(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	inst.Data["freeze"] = structpb.NewBoolValue(true)
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+}
+
+func Unfreeze(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	inst.Data["freeze"] = structpb.NewBoolValue(false)
+
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+}
+
 // Returns the VM state of the VirtualMachine
 func State(
 	client one.IClient,
@@ -468,7 +513,69 @@ func Monitoring(
 	return resp, nil
 }
 
-func ManualRenew(
+func FreeRenew(
+	client one.IClient,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	instData := inst.GetData()
+	instProduct := inst.GetProduct()
+	billingPlan := inst.GetBillingPlan()
+
+	kind := billingPlan.GetKind()
+	if kind != billingpb.PlanKind_STATIC {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "Not implemented for dynamic plan")
+	}
+
+	lastMonitoring, ok := instData["last_monitoring"]
+	if !ok {
+		return &ipb.InvokeResponse{Result: false}, status.Error(codes.Internal, "No last_monitoring data")
+	}
+	lastMonitoringValue := int64(lastMonitoring.GetNumberValue())
+
+	period := billingPlan.GetProducts()[instProduct].GetPeriod()
+	pkind := billingPlan.GetProducts()[instProduct].GetPeriodKind()
+
+	end := lastMonitoringValue + period
+	if pkind != billingpb.PeriodKind_DEFAULT {
+		end = utils.AlignPaymentDate(lastMonitoringValue, end, period)
+	}
+
+	instData["last_monitoring"] = structpb.NewNumberValue(float64(end))
+
+	for _, resource := range billingPlan.GetResources() {
+		period := resource.GetPeriod()
+		key := fmt.Sprintf("%s_last_monitoring", resource.Key)
+		lmValue, ok := instData[key]
+		if _, has := inst.GetResources()[resource.Key]; !ok || period == 0 || !has {
+			continue
+		}
+		lm := int64(lmValue.GetNumberValue())
+		end := lm + period
+		if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
+			end = utils.AlignPaymentDate(lm, end, period)
+		}
+		instData[key] = structpb.NewNumberValue(float64(end))
+	}
+
+	for _, addonId := range inst.Addons {
+		key := fmt.Sprintf("addon_%s_last_monitoring", addonId)
+		lmValue, ok := instData[key]
+		if ok {
+			lm := int64(lmValue.GetNumberValue())
+			end := lm + period
+			if pkind != billingpb.PeriodKind_DEFAULT {
+				end = utils.AlignPaymentDate(lm, end, period)
+			}
+			instData[key] = structpb.NewNumberValue(float64(end))
+		}
+	}
+
+	go utils.SendActualMonitoringData(instData, instData, inst.GetUuid(), datas.DataPublisher(datas.POST_INST_DATA))
+	return &ipb.InvokeResponse{Result: true}, nil
+}
+
+func CancelRenew(
 	client one.IClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
@@ -490,14 +597,38 @@ func ManualRenew(
 
 	period := billingPlan.GetProducts()[instProduct].GetPeriod()
 
-	lastMonitoringValue += period
+	lastMonitoringValue = utils.AlignPaymentDate(lastMonitoringValue, lastMonitoringValue-period, period)
+	lastMonitoringValue = int64(math.Max(float64(lastMonitoringValue), float64(inst.Created)))
 	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
 
-	go utils.SendActualMonitoringData(instData, instData, inst.GetUuid(), datas.DataPublisher(datas.POST_INST_DATA))
+	for _, resource := range billingPlan.GetResources() {
+		period := resource.GetPeriod()
+		key := fmt.Sprintf("%s_last_monitoring", resource.Key)
+		lmValue, ok := instData[key]
+		if _, has := inst.GetResources()[resource.Key]; !ok || period == 0 || !has {
+			continue
+		}
+		lm := int64(lmValue.GetNumberValue())
+		lm = utils.AlignPaymentDate(lm, lm-period, period)
+		lm = int64(math.Max(float64(lm), float64(inst.Created)))
+		instData[key] = structpb.NewNumberValue(float64(lm))
+	}
+
+	for _, addonId := range inst.Addons {
+		key := fmt.Sprintf("addon_%s_last_monitoring", addonId)
+		lmValue, ok := instData[key]
+		if ok {
+			lm := int64(lmValue.GetNumberValue())
+			lm = utils.AlignPaymentDate(lm, lm-period, period)
+			instData[key] = structpb.NewNumberValue(float64(lm))
+		}
+	}
+
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
 	return &ipb.InvokeResponse{Result: true}, nil
 }
 
-func CancelRenew(
+func GetBackupInfo(
 	client one.IClient,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
@@ -508,7 +639,132 @@ func CancelRenew(
 		return nil, status.Errorf(codes.InvalidArgument, "Instance data is nil")
 	}
 
-	instData["canceled_remove"] = structpb.NewBoolValue(true)
-	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
-	return &ipb.InvokeResponse{Result: true}, nil
+	vmid, ok := instData["vmid"]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No vm id")
+	}
+	vmidVal := int(vmid.GetNumberValue())
+
+	vm, err := client.GetVM(vmidVal)
+	if err != nil {
+		return nil, err
+	}
+
+	str, err := vm.MonitoringInfos.GetStr("DISK_0_ACTUAL_PATH")
+	if err != nil {
+		return nil, err
+	}
+
+	split := strings.Split(str, " ")
+	if len(split) != 2 {
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to get info")
+	}
+
+	datastore := split[0][1 : len(split[0])-1]
+	split = strings.Split(split[1], "/")
+
+	if len(split) == 1 {
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to get dir")
+	}
+	dir := split[0]
+
+	return &ipb.InvokeResponse{
+		Result: true,
+		Meta: map[string]*structpb.Value{
+			"datastore": structpb.NewStringValue(datastore),
+			"dir":       structpb.NewStringValue(dir),
+		},
+	}, nil
+}
+
+func BackupInstance(
+	ctx context.Context,
+	client ansible.AnsibleServiceClient,
+	playbookUuid string,
+	hop map[string]any,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	host := data["host"].GetStringValue()
+	vm_dir := data["vm_dir"].GetStringValue()
+	snapshot_date := data["snapshot_date"].GetStringValue()
+
+	ansibleInstance := &ansible.Instance{
+		Host: host,
+	}
+
+	hopHost, ok := hop["host"].(string)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No hop host")
+	}
+	hopPort, ok := hop["port"].(string)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No hop port")
+	}
+	hopSsh, ok := hop["ssh"].(string)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No hop ssh")
+	}
+
+	info := hop["info"]
+	if info != nil {
+		infoVal, ok := info.(map[string]any)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to parse info")
+		}
+
+		hostInfo, ok := infoVal[host].(map[string]any)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to host info")
+		}
+		ansibleHost, ok := hostInfo["ansible_host"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to get host")
+		}
+		python, ok := hostInfo["python"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "Failed to get python")
+		}
+		ansibleInstance.Python = &python
+		ansibleInstance.AnsibleHost = &ansibleHost
+	}
+
+	log.Debug("inst", zap.Any("inst", ansibleInstance))
+
+	create, err := client.Create(ctx, &ansible.CreateRunRequest{
+		Run: &ansible.Run{
+			SshKey: &hopSsh,
+			Instances: []*ansible.Instance{
+				ansibleInstance,
+			},
+			PlaybookUuid: playbookUuid,
+			Vars: map[string]string{
+				"vm_dir":        vm_dir,
+				"snapshot_date": snapshot_date,
+			},
+			Hop: &ansible.Instance{
+				Host: hopHost,
+				Port: &hopPort,
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = client.Exec(ctx, &ansible.ExecRunRequest{
+		Uuid: create.GetUuid(),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+
+	return &ipb.InvokeResponse{
+		Result: true,
+	}, nil
 }

@@ -18,8 +18,14 @@ package main
 import (
 	"context"
 	"fmt"
-	epb "github.com/slntopp/nocloud-proto/events"
 	"net"
+
+	"github.com/slntopp/nocloud-proto/ansible"
+	epb "github.com/slntopp/nocloud-proto/events"
+	"github.com/slntopp/nocloud/pkg/nocloud/auth"
+	"github.com/slntopp/nocloud/pkg/nocloud/schema"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
@@ -45,6 +51,7 @@ var (
 	RabbitMQConn string
 	SIGNING_KEY  []byte
 	redisHost    string
+	ansibleHost  string
 )
 
 func init() {
@@ -65,6 +72,9 @@ func init() {
 
 	viper.SetDefault("REDIS_HOST", "redis:6379")
 	redisHost = viper.GetString("REDIS_HOST")
+
+	viper.SetDefault("ANSIBLE_HOST", "")
+	ansibleHost = viper.GetString("ANSIBLE_HOST")
 }
 
 func main() {
@@ -107,6 +117,20 @@ func main() {
 	srv := server.NewDriverServiceServer(log.Named("IONe Driver"), SIGNING_KEY, rdb)
 	srv.HandlePublishRecords = SetupRecordsPublisher(rbmq)
 	srv.HandlePublishEvents = SetupEventPublisher(rbmq)
+
+	if ansibleHost != "" {
+		log.Info("Ansible host", zap.String("Host", ansibleHost))
+		dial, err := grpc.Dial(ansibleHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err == nil {
+			ansibleClient := ansible.NewAnsibleServiceClient(dial)
+			token, _ := auth.MakeToken(schema.ROOT_ACCOUNT_KEY)
+			ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "bearer "+token)
+
+			srv.SetAnsibleClient(ctx, ansibleClient)
+		} else {
+			log.Fatal("Failed to setup ansible connection", zap.Error(err))
+		}
+	}
 
 	pb.RegisterDriverServiceServer(s, srv)
 

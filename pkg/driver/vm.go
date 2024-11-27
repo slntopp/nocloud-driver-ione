@@ -519,7 +519,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	return &resp, nil
 }
 
-func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int) *CheckInstancesGroupResponse {
+func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroupResponse, ig *pb.InstancesGroup, group int, balance map[string]float64) *CheckInstancesGroupResponse {
 	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
 
@@ -533,6 +533,33 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 
 	created := resp.ToBeCreated
 	for i := 0; i < len(created); i++ {
+		/*
+			bp := created[i].GetBillingPlan()
+
+			if bp.GetKind() == billing.PlanKind_STATIC {
+				price := bp.GetProducts()[created[i].GetProduct()].GetPrice()
+
+				resources := created[i].GetResources()
+				ram := resources["ram"].GetNumberValue() / 1024
+				drive_size := resources["drive_size"].GetNumberValue() / 1024
+				drive_type := strings.ToLower(resources["drive_type"].GetStringValue())
+
+				for _, res := range bp.GetResources() {
+					if res.GetKey() == "ram" {
+						price += ram * res.GetPrice()
+					} else if res.GetKey() == drive_type {
+						price += drive_size * res.GetPrice()
+					}
+				}
+
+				if price < balance[ig.GetUuid()] {
+					continue
+				}
+
+				balance[ig.GetUuid()] -= price
+			}
+		*/
+
 		token, err := auth.MakeTokenInstance(created[i].GetUuid())
 		if err != nil {
 			c.log.Error("Error generating VM token", zap.String("instance", created[i].GetUuid()), zap.Error(err))
@@ -545,7 +572,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 		}
 		c.Chown("vm", vmid, userid, group)
 
-		created[i].Data["creation"] = structpb.NewStringValue(time.Now().Format(`2006-01-02`))
+		created[i].Data["creation"] = structpb.NewNumberValue(float64(time.Now().Unix()))
 
 		go instDatasPublisher(created[i].Uuid, created[i].Data)
 		successResp.ToBeCreated = append(successResp.ToBeCreated, created[i])
