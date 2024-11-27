@@ -87,7 +87,7 @@ func main() {
 		log.Fatal("Failed to listen", zap.String("address", port), zap.Error(err))
 	}
 
-	log.Info("Dialing RabbitMQ", zap.String("url", RabbitMQConn))
+	log.Info("Dialing RabbitMQ connection", zap.String("url", RabbitMQConn))
 	amqp.DialConfig(RabbitMQConn, amqp.Config{
 		Properties: amqp.Table{
 			"connection_name": "driver." + type_key,
