@@ -505,7 +505,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 			if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
-				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
+				if inst.State == nil {
+					inst.State = &stpb.State{}
+				}
+				inst.State.State = stpb.NoCloudState_DELETED
+				instStatePublisher(inst.GetUuid(), inst.State)
 			} else if !(metaAutoStart || cfgAutoStart) {
 				if !inst.GetData()["pending_notification"].GetBoolValue() {
 					price := getInstancePrice(inst)
