@@ -20,6 +20,7 @@ import (
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
+	spb "github.com/slntopp/nocloud-proto/statuses"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -63,6 +64,10 @@ func StatusesClient(
 	result *ipb.InvokeResponse,
 ) (*ipb.InvokeResponse, error) {
 	log.Debug("StatusesClient request received")
+
+	if inst.Status == spb.NoCloudStatus_DEL {
+		return &ipb.InvokeResponse{Result: result.Result, Meta: result.Meta}, nil
+	}
 
 	par, err := State(client, inst, data)
 	if err != nil {
