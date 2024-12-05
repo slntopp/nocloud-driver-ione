@@ -505,7 +505,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			metaAutoStart := meta["auto_start"].GetBoolValue()
 
 			if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
-				log.Debug("Instance deleted")
+				log.Debug("Instance deleted", zap.Any("body", inst))
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
 				if inst.State == nil {
 					inst.State = &stpb.State{}
