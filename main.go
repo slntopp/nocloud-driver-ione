@@ -140,6 +140,8 @@ func main() {
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 	return func(ctx context.Context, payload []*billingpb.Record) {
+		log := log.Named("RecordsPublisher")
+		log.Info("Publishing records", zap.Int("count", len(payload)))
 		ch, err := rbmq.Channel()
 		if err != nil {
 			log.Fatal("Failed to open a channel", zap.Error(err))
@@ -151,6 +153,7 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 			qName,
 			true, false, false, true, nil,
 		); err != nil {
+			log.Error("Failed to ensure queue", zap.Error(err))
 			ch, err = rbmq.Channel()
 			if err != nil {
 				log.Fatal("Failed to open a channel", zap.Error(err))
@@ -164,9 +167,11 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 				log.Error("Error while marshalling record", zap.Error(err))
 				continue
 			}
-			ch.PublishWithContext(ctx, "", qName, false, false, amqp.Publishing{
+			if err = ch.PublishWithContext(ctx, "", qName, false, false, amqp.Publishing{
 				ContentType: "text/plain", Body: body,
-			})
+			}); err != nil {
+				log.Error("Error while publishing record", zap.Error(err))
+			}
 		}
 	}
 }
