@@ -149,14 +149,14 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 		defer ch.Close()
 
 		qName := "records"
-		if _, err = ch.QueueDeclare(qName, true, false, false, false, nil); err != nil {
-			log.Error("Failed to ensure queue", zap.Error(err))
-			ch, err = rbmq.Channel()
-			if err != nil {
-				log.Fatal("Failed to open a channel", zap.Error(err))
-			}
-			defer ch.Close()
-		}
+		//if _, err = ch.QueueDeclare(qName, true, false, false, false, nil); err != nil {
+		//	log.Error("Failed to ensure queue", zap.Error(err))
+		//	ch, err = rbmq.Channel()
+		//	if err != nil {
+		//		log.Fatal("Failed to open a channel", zap.Error(err))
+		//	}
+		//	defer ch.Close()
+		//}
 
 		for _, record := range payload {
 			body, err := proto.Marshal(record)
