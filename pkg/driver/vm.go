@@ -465,6 +465,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 
 	for _, inst := range IG.GetInstances() {
 		log := log.With(zap.String("instance", inst.GetUuid()))
+		log.Debug("Checking instance", zap.Any("body", inst))
 		if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
 			continue
 		}
