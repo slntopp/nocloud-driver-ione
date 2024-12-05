@@ -63,6 +63,7 @@ func StatusesClient(
 	data map[string]*structpb.Value,
 	result *ipb.InvokeResponse,
 ) (*ipb.InvokeResponse, error) {
+	log = log.With(zap.String("instance", inst.GetUuid()))
 	log.Debug("StatusesClient request received")
 
 	if inst.Status == spb.NoCloudStatus_DEL {

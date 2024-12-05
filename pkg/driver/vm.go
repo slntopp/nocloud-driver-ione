@@ -432,6 +432,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		}
 		instMapForFastSearch := make(map[int]*pb.Instance, len(IG.GetInstances()))
 		for _, inst := range IG.GetInstances() {
+			log := log.With(zap.String("instance", inst.GetUuid()))
 			vmid, err := GetVMIDFromData(c, inst)
 			if err != nil {
 				log.Warn("Coudln't get VM ID from Instance Data, Instance is not initialized", zap.String("instance", inst.Uuid))
@@ -446,6 +447,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 
 		for _, vm := range vms_pool.VMs {
 			inst, ok := instMapForFastSearch[vm.ID]
+			log := log.With(zap.String("instance", inst.GetUuid()))
 			if !ok || (ok && inst.GetStatus() == statuspb.NoCloudStatus_DEL) {
 				log.Debug("VM not found among initialized Instances or should be deleted", zap.Int("vmid", vm.ID))
 				vmInst, err := c.VMToInstance(vm.ID)
@@ -462,6 +464,7 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 	}
 
 	for _, inst := range IG.GetInstances() {
+		log := log.With(zap.String("instance", inst.GetUuid()))
 		if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
 			continue
 		}
@@ -580,10 +583,11 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 
 	deleted := resp.ToBeDeleted
 	for i := 0; i < len(deleted); i++ {
+		log := c.log.With(zap.String("instance", deleted[i].GetUuid()))
 		inst_res := deleted[i].GetResources()
 		vmid, err := GetVMIDFromData(c, deleted[i])
 		if err != nil {
-			c.log.Error("Error Getting VMID from Data", zap.Error(err))
+			log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
 		}
 		c.TerminateVM(vmid, true)
