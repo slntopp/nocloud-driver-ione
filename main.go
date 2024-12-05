@@ -149,10 +149,7 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 		defer ch.Close()
 
 		qName := "records"
-		if _, err = ch.QueueDeclare(
-			qName,
-			true, false, false, true, nil,
-		); err != nil {
+		if _, err = ch.QueueDeclare(qName, true, false, false, false, nil); err != nil {
 			log.Error("Failed to ensure queue", zap.Error(err))
 			ch, err = rbmq.Channel()
 			if err != nil {
