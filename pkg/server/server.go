@@ -406,6 +406,11 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 	log := s.log.Named("Monitoring")
 	sp := req.GetServicesProvider()
 	log.Info("Starting Routine", zap.String("sp", sp.GetUuid()))
+	for _, ig := range req.GetGroups() {
+		for _, inst := range ig.GetInstances() {
+			log.Debug("got instance to monitor", zap.String("instance", inst.GetUuid()), zap.Any("body", inst))
+		}
+	}
 
 	client, err := one.NewClientFromSP(sp, log)
 	if err != nil {
