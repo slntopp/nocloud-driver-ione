@@ -87,7 +87,7 @@ func main() {
 		log.Fatal("Failed to listen", zap.String("address", port), zap.Error(err))
 	}
 
-	log.Info("Dialing RabbitMQ", zap.String("url", RabbitMQConn))
+	log.Info("Dialing RabbitMQ connection", zap.String("url", RabbitMQConn))
 	amqp.DialConfig(RabbitMQConn, amqp.Config{
 		Properties: amqp.Table{
 			"connection_name": "driver." + type_key,
@@ -140,16 +140,23 @@ func main() {
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 	return func(ctx context.Context, payload []*billingpb.Record) {
+		log := log.Named("RecordsPublisher")
+		log.Info("Publishing records", zap.Int("count", len(payload)))
 		ch, err := rbmq.Channel()
 		if err != nil {
 			log.Fatal("Failed to open a channel", zap.Error(err))
 		}
 		defer ch.Close()
 
-		queue, _ := ch.QueueDeclare(
-			"records",
-			true, false, false, true, nil,
-		)
+		qName := "records"
+		//if _, err = ch.QueueDeclare(qName, true, false, false, false, nil); err != nil {
+		//	log.Error("Failed to ensure queue", zap.Error(err))
+		//	ch, err = rbmq.Channel()
+		//	if err != nil {
+		//		log.Fatal("Failed to open a channel", zap.Error(err))
+		//	}
+		//	defer ch.Close()
+		//}
 
 		for _, record := range payload {
 			body, err := proto.Marshal(record)
@@ -157,9 +164,11 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 				log.Error("Error while marshalling record", zap.Error(err))
 				continue
 			}
-			ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
+			if err = ch.PublishWithContext(ctx, "", qName, false, false, amqp.Publishing{
 				ContentType: "text/plain", Body: body,
-			})
+			}); err != nil {
+				log.Error("Error while publishing record", zap.Error(err))
+			}
 		}
 	}
 }
@@ -172,17 +181,18 @@ func SetupEventPublisher(rbmq *amqp.Connection) server.EventsPublisherFunc {
 		}
 		defer ch.Close()
 
-		queue, _ := ch.QueueDeclare(
-			"events",
-			true, false, false, true, nil,
-		)
+		qName := "events"
+		//queue, _ := ch.QueueDeclare(
+		//	"events",
+		//	true, false, false, true, nil,
+		//)
 
 		body, err := proto.Marshal(event)
 		if err != nil {
 			log.Error("Error while marshalling record", zap.Error(err))
 			return
 		}
-		ch.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
+		ch.PublishWithContext(ctx, "", qName, false, false, amqp.Publishing{
 			ContentType: "text/plain", Body: body,
 		})
 	}

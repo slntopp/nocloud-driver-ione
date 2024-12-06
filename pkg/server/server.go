@@ -483,9 +483,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 		igStatus := ig.GetStatus()
 
-		log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))
+		//log.Debug("Monitoring instances", zap.String("group", ig.GetUuid()), zap.Int("instances", len(ig.GetInstances())))
 		for _, inst := range ig.GetInstances() {
-			l.Debug("Monitoring instance", zap.String("instance", inst.GetUuid()), zap.String("title", inst.GetTitle()))
+			log := log.With(zap.String("instance", inst.GetUuid()))
+			l.Debug("Monitoring instance", zap.String("title", inst.GetTitle()))
 
 			meta := inst.GetBillingPlan().GetMeta()
 			if meta == nil {
@@ -504,9 +505,16 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			metaAutoStart := meta["auto_start"].GetBoolValue()
 
 			if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
+				log.Debug("Instance deleted", zap.Any("body", inst))
 				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
-				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_DELETED})
+				if inst.State == nil {
+					inst.State = &stpb.State{}
+				}
+				inst.State.State = stpb.NoCloudState_DELETED
+				log.Debug("send state", zap.Any("state", inst.State))
+				instStatePublisher(inst.GetUuid(), inst.State)
 			} else if !(metaAutoStart || cfgAutoStart) {
+				log.Debug("Instance pending")
 				if !inst.GetData()["pending_notification"].GetBoolValue() {
 					price := getInstancePrice(inst)
 					go s.HandlePublishEvents(ctx, &epb.Event{
@@ -524,6 +532,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
 				instDataPublisher(inst.GetUuid(), inst.GetData())
 			} else {
+				log.Debug("Instance active")
 				if !inst.GetData()["creation_notification"].GetBoolValue() {
 					networking, ok := inst.GetState().GetMeta()["networking"]
 					if ok {
