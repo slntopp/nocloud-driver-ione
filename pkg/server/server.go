@@ -511,6 +511,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 					inst.State = &stpb.State{}
 				}
 				inst.State.State = stpb.NoCloudState_DELETED
+				log.Debug("send state", zap.Any("state", inst.State))
 				instStatePublisher(inst.GetUuid(), inst.State)
 			} else if !(metaAutoStart || cfgAutoStart) {
 				log.Debug("Instance pending")
