@@ -14,6 +14,7 @@ limitations under the License.
 package actions
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
@@ -97,8 +98,44 @@ func StatusesClient(
 			}
 		}
 	}
-
 	request.State.Interfaces = interfaces
+
+	// Save ips history
+	const ipsHistoryKey = "ips_history"
+	historyVal := data[ipsHistoryKey].GetStructValue()
+	if historyVal == nil {
+		historyVal, _ = structpb.NewStruct(map[string]interface{}{})
+	}
+	history := historyVal.AsMap()
+	networkingValue := networking.GetStructValue().AsMap()
+	publicHistory, ok := history["public"].([]interface{})
+	if !ok {
+		publicHistory = []interface{}{}
+	}
+	privateHistory, ok := history["private"].([]interface{})
+	if !ok {
+		privateHistory = []interface{}{}
+	}
+	publicIps, ok := networkingValue["public"].([]interface{})
+	if ok {
+		for _, val := range publicIps {
+			if !slices.Contains(publicHistory, val) {
+				publicHistory = append(publicHistory, val)
+			}
+		}
+	}
+	privateIps, ok := networkingValue["private"].([]interface{})
+	if ok {
+		for _, val := range privateIps {
+			if !slices.Contains(privateHistory, val) {
+				privateHistory = append(privateHistory, val)
+			}
+		}
+	}
+	history["public"] = publicHistory
+	history["private"] = privateHistory
+	historyVal, _ = structpb.NewStruct(history)
+	data[ipsHistoryKey] = structpb.NewStructValue(historyVal)
 
 	_, err = datas.StIPub(request)
 	if err != nil {
