@@ -552,7 +552,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 						}
 					}
 				}
-				_, err = actions.StatusesClient(client, inst, inst.GetData(), &ipb.InvokeResponse{Result: true})
+				_, err = actions.StatusesClient(client, inst, inst.Data, &ipb.InvokeResponse{Result: true})
 				if err != nil {
 					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 				}
