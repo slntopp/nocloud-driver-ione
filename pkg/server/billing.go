@@ -623,7 +623,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		sum += rec.GetTotal()
 	}
 
-	if sum < *balance {
+	if sum > 0 && sum > *balance {
 		if state != "SUSPENDED" {
 			if err := client.SuspendVM(vmid); err != nil {
 				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
