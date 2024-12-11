@@ -32,6 +32,7 @@ import (
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 
+	rerrs "github.com/slntopp/nocloud-ansible/pkg/run_errors"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	billingpb "github.com/slntopp/nocloud-proto/billing"
 	ipb "github.com/slntopp/nocloud-proto/instances"
@@ -786,7 +787,7 @@ func VpnAction(
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
-	if inst.Config == nil {
+	if inst == nil || inst.Config == nil {
 		return nil, fmt.Errorf("instance has no configuration")
 	}
 	playbookUp, ok := ansibleParams["playbook_vpn_up"].(string)
@@ -816,6 +817,7 @@ func VpnAction(
 	default:
 		return nil, fmt.Errorf("invalid action provided")
 	}
+	log := log.Named("VpnAction").With(zap.String("instance", inst.GetUuid()))
 
 	// Get hosts data (based on driver)
 	var host, username, password string
@@ -873,7 +875,27 @@ func VpnAction(
 		return nil, fmt.Errorf("failed to get result run: %w", err)
 	}
 
-	fmt.Print(resRun)
+	var (
+		errUnreachable = fmt.Errorf("[UNREACHABLE]")
+	)
+	var resultError error
+	if resRun.GetStatus() == "failed" {
+		resultError = fmt.Errorf("run was failed")
+		runErrors := rerrs.GetErrors(resRun)
+		for _, rErr := range runErrors {
+			log.Debug("Got ansible error", zap.String("host", rErr.Host), zap.String("message", rErr.ErrorMessage))
+			if rErr.ErrorMessage == "UNREACHABLE" {
+				resultError = fmt.Errorf("%w: %w", resultError, errUnreachable)
+				continue
+			}
+			resultError = fmt.Errorf("%w: %s", resultError, rErr.ErrorMessage)
+		}
+	} else if resRun.GetStatus() != "successful" {
+		log.Error("Status is not successful", zap.String("status", resRun.GetStatus()))
+	}
+	if resultError != nil {
+		return nil, resultError
+	}
 
 	return &ipb.InvokeResponse{
 		Result: true,
