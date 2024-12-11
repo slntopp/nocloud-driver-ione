@@ -104,18 +104,8 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "No ansible config")
 		}
-
 		ansibleSecretValue := ansibleSecret.GetStructValue().AsMap()
-		playbookUuid, ok := ansibleSecretValue["playbook_uuid"].(string)
-		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
-		}
-		hop, ok := ansibleSecretValue["hop"].(map[string]any)
-		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
-		}
-
-		return ansibleAction(s.ansibleCtx, s.ansibleClient, playbookUuid, hop, instance, req.GetParams())
+		return ansibleAction(s.ansibleCtx, s.ansibleClient, ansibleSecretValue, instance, req.GetParams())
 	}
 
 	return nil, status.Errorf(codes.PermissionDenied, "Action %s is not declared", method)

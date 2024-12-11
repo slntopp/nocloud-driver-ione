@@ -52,6 +52,8 @@ var (
 	SIGNING_KEY  []byte
 	redisHost    string
 	ansibleHost  string
+
+	nocloudBaseUrl string
 )
 
 func init() {
@@ -75,6 +77,9 @@ func init() {
 
 	viper.SetDefault("ANSIBLE_HOST", "")
 	ansibleHost = viper.GetString("ANSIBLE_HOST")
+
+	viper.SetDefault("NOCLOUD_BASE_URL", "https://api.nc2dev.support.by")
+	nocloudBaseUrl = viper.GetString("NOCLOUD_BASE_URL")
 }
 
 func main() {
@@ -106,6 +111,7 @@ func main() {
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
+	actions.SetNocloudBaseURL(nocloudBaseUrl)
 
 	log.Info("Connecting redis", zap.String("url", redisHost))
 	rdb := redis.NewClient(&redis.Options{
