@@ -32,7 +32,6 @@ import (
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 
-	rerrs "github.com/slntopp/nocloud-ansible/pkg/run_errors"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
 	billingpb "github.com/slntopp/nocloud-proto/billing"
 	ipb "github.com/slntopp/nocloud-proto/instances"
@@ -780,6 +779,19 @@ func BackupInstance(
 	}, nil
 }
 
+type AnsibleError struct {
+	Code        string `json:"code"`
+	Message     string `json:"message"`
+	UserMessage string `json:"user_message"`
+}
+
+const (
+	codeUnreachable   = "UNREACHABLE"
+	codeUnsupportedOS = "NOT_SUPPORTED_OS"
+	codeStopped       = "STOPPED"
+	codeInternal      = "INTERNAL"
+)
+
 func VpnAction(
 	ctx context.Context,
 	client ansible.AnsibleServiceClient,
@@ -863,42 +875,42 @@ func VpnAction(
 		return nil, fmt.Errorf("failed to create new runnable instance: %w", err)
 	}
 
-	if _, err = client.Exec(ctx, &ansible.ExecRunRequest{
+	resp, err := client.Exec(ctx, &ansible.ExecRunRequest{
 		Uuid:       create.GetUuid(),
 		WaitFinish: true,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, fmt.Errorf("failed to execute: %w", err)
 	}
 
-	resRun, err := client.Get(ctx, &ansible.GetRunRequest{Uuid: create.GetUuid()})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get result run: %w", err)
-	}
+	errs := make([]any, 0)
+	if resp.GetStatus() == "failed" {
+		for _, rErr := range resp.GetError() {
+			log.Debug("Got ansible error", zap.String("host", rErr.Host), zap.String("message", rErr.GetError()))
 
-	var (
-		errUnreachable = fmt.Errorf("[UNREACHABLE]")
-	)
-	var resultError error
-	if resRun.GetStatus() == "failed" {
-		resultError = fmt.Errorf("run was failed")
-		runErrors := rerrs.GetErrors(resRun)
-		for _, rErr := range runErrors {
-			log.Debug("Got ansible error", zap.String("host", rErr.Host), zap.String("message", rErr.ErrorMessage))
-			if rErr.ErrorMessage == "UNREACHABLE" {
-				resultError = fmt.Errorf("%w: %w", resultError, errUnreachable)
-				continue
+			if rErr.GetError() == "UNREACHABLE" {
+				errs = append(errs, AnsibleError{Code: codeUnreachable, Message: "No access to host", UserMessage: "No access to remote host."})
+			} else if strings.Contains(rErr.GetError(), "UNSUPPORTED_OS") {
+				errs = append(errs, AnsibleError{Code: codeUnsupportedOS, Message: "Unsupported OS", UserMessage: "Remote host machine has unsupported operating system."})
+			} else if strings.Contains(rErr.GetError(), "STOPPED") {
+				errs = append(errs, AnsibleError{Code: codeStopped, Message: "VPN stopped", UserMessage: "VPN stopped."})
+			} else {
+				errs = append(errs, AnsibleError{Code: codeInternal, Message: "Internal error. Message: " + rErr.GetError(), UserMessage: "Internal error. Try again later or contact support."})
 			}
-			resultError = fmt.Errorf("%w: %s", resultError, rErr.ErrorMessage)
 		}
-	} else if resRun.GetStatus() != "successful" {
-		log.Error("Status is not successful", zap.String("status", resRun.GetStatus()))
-	}
-	if resultError != nil {
-		return nil, resultError
+	} else if resp.GetStatus() != "successful" {
+		log.Error("Status is not successful", zap.String("status", resp.GetStatus()))
 	}
 
+	val, err := structpb.NewValue(errs)
+	if err != nil {
+		log.Error("Failed to construct structpb.Value", zap.Error(err))
+	}
 	return &ipb.InvokeResponse{
 		Result: true,
+		Meta: map[string]*structpb.Value{
+			"errors": val,
+		},
 	}, nil
 }
 
