@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
+	"google.golang.org/protobuf/encoding/protojson"
 	"io"
 	"math"
 	"net/http"
@@ -883,7 +884,7 @@ func VpnAction(
 		return nil, fmt.Errorf("failed to execute: %w", err)
 	}
 
-	errs := make([]any, 0)
+	errs := make([]AnsibleError, 0)
 	if resp.GetStatus() == "failed" {
 		for _, rErr := range resp.GetError() {
 			log.Debug("Got ansible error", zap.String("host", rErr.Host), zap.String("message", rErr.GetError()))
@@ -902,14 +903,18 @@ func VpnAction(
 		log.Error("Status is not successful", zap.String("status", resp.GetStatus()))
 	}
 
-	val, err := structpb.NewValue(errs)
+	b, err := json.Marshal(errs)
 	if err != nil {
-		log.Error("Failed to construct structpb.Value", zap.Error(err))
+		log.Error("Failed to construct marshal errors", zap.Error(err))
+	}
+	s := &structpb.ListValue{}
+	if err = protojson.Unmarshal(b, s); err != nil {
+		log.Error("Failed to unmarshal to structpb.ListValue", zap.Error(err))
 	}
 	return &ipb.InvokeResponse{
 		Result: true,
 		Meta: map[string]*structpb.Value{
-			"errors": val,
+			"errors": structpb.NewListValue(s),
 		},
 	}, nil
 }
