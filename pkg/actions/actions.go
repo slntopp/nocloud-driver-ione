@@ -819,22 +819,31 @@ func VpnAction(
 	if !ok {
 		return nil, fmt.Errorf("no monitoring playbook in sp")
 	}
-	var playbookUuid string
+	var playbooksChain []string
 	action, ok := data["action"]
 	if !ok || action == nil || action.GetStringValue() == "" {
 		return nil, fmt.Errorf("no action provided")
 	}
 	switch action.GetStringValue() {
-	case "up":
-		playbookUuid = playbookUp
-	case "down":
-		playbookUuid = playbookDown
-	case "delete":
-		playbookUuid = playbookDelete
+	case "create":
+		playbooksChain = []string{playbookUp}
+	case "stop":
+		playbooksChain = []string{playbookDown}
+	case "start":
+		playbooksChain = []string{playbookUp}
+	case "hard_reset":
+		playbooksChain = []string{playbookDelete, playbookUp}
 	case "monitoring":
-		playbookUuid = playbookMonitoring
+		playbooksChain = []string{playbookMonitoring}
+	case "restart":
+		playbooksChain = []string{playbookDown, playbookUp}
+	case "delete":
+		playbooksChain = []string{playbookDelete}
 	default:
 		return nil, fmt.Errorf("invalid action provided")
+	}
+	if len(playbooksChain) == 0 {
+		return nil, fmt.Errorf("no playbooks to play")
 	}
 	log := log.Named("VpnAction").With(zap.String("instance", inst.GetUuid()), zap.String("action", action.GetStringValue()))
 
@@ -866,67 +875,82 @@ func VpnAction(
 	if err != nil {
 		return nil, fmt.Errorf("failed to issue instance token: %w", err)
 	}
-	create, err := client.Create(ctx, &ansible.CreateRunRequest{
-		Run: &ansible.Run{
-			Instances: []*ansible.Instance{
-				ansibleInstance,
+
+	runPlaybook := func(playbook string) ([]AnsibleError, error) {
+		log := log.With(zap.String("playbook", playbook))
+
+		create, err := client.Create(ctx, &ansible.CreateRunRequest{
+			Run: &ansible.Run{
+				Instances: []*ansible.Instance{
+					ansibleInstance,
+				},
+				PlaybookUuid: playbook,
+				Vars: map[string]string{
+					"INSTANCE_TOKEN": instToken,
+					"CALLBACK_URL":   path.Join(NOCLOUD_BASE_URL, "edge/post_config_data"),
+				},
 			},
-			PlaybookUuid: playbookUuid,
-			Vars: map[string]string{
-				"INSTANCE_TOKEN": instToken,
-				"CALLBACK_URL":   path.Join(NOCLOUD_BASE_URL, "edge/post_config_data"),
-			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new runnable instance: %w", err)
-	}
-
-	resp, err := client.Exec(ctx, &ansible.ExecRunRequest{
-		Uuid:       create.GetUuid(),
-		WaitFinish: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute: %w", err)
-	}
-
-	errs := make([]AnsibleError, 0)
-	if resp.GetStatus() == "failed" {
-		for _, e := range resp.GetError() {
-			log.Debug("Got ansible error", zap.String("host", e.Host), zap.String("message", e.GetError()))
-			msg := fmt.Sprintf("Host: %s Message: %s", e.Host, e.Error)
-
-			if e.GetError() == "UNREACHABLE" {
-				errs = append(errs, AnsibleError{Code: codeUnreachable,
-					Message: msg, UserMessage: "No access to remote host."})
-			} else if strings.Contains(e.GetError(), "UNSUPPORTED_OS") {
-				errs = append(errs, AnsibleError{Code: codeUnsupportedOS,
-					Message: msg, UserMessage: "Remote machine has unsupported operating system."})
-			} else if strings.Contains(e.GetError(), "STOPPED") {
-				errs = append(errs, AnsibleError{Code: codeStopped,
-					Message: msg, UserMessage: "VPN stopped."})
-			} else {
-				errs = append(errs, AnsibleError{Code: codeInternal,
-					Message: msg, UserMessage: "Internal error. Try again later or contact support."})
-			}
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new runnable instance: %w", err)
 		}
-	} else if resp.GetStatus() != "successful" {
-		log.Error("Status is not successful", zap.String("status", resp.GetStatus()))
+
+		resp, err := client.Exec(ctx, &ansible.ExecRunRequest{
+			Uuid:       create.GetUuid(),
+			WaitFinish: true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute: %w", err)
+		}
+
+		errs := make([]AnsibleError, 0)
+		if resp.GetStatus() == "failed" {
+			for _, e := range resp.GetError() {
+				log.Debug("Got ansible error", zap.String("host", e.Host), zap.String("message", e.GetError()))
+				msg := fmt.Sprintf("Host: %s Message: %s", e.Host, e.Error)
+
+				if e.GetError() == "UNREACHABLE" {
+					errs = append(errs, AnsibleError{Code: codeUnreachable,
+						Message: msg, UserMessage: "No access to remote host."})
+				} else if strings.Contains(e.GetError(), "UNSUPPORTED_OS") {
+					errs = append(errs, AnsibleError{Code: codeUnsupportedOS,
+						Message: msg, UserMessage: "Remote machine has unsupported operating system."})
+				} else if strings.Contains(e.GetError(), "STOPPED") {
+					errs = append(errs, AnsibleError{Code: codeStopped,
+						Message: msg, UserMessage: "VPN stopped."})
+				} else {
+					errs = append(errs, AnsibleError{Code: codeInternal,
+						Message: msg, UserMessage: "Internal error. Try again later or contact support."})
+				}
+			}
+		} else if resp.GetStatus() != "successful" {
+			log.Error("Status is not successful", zap.String("status", resp.GetStatus()))
+		}
+
+		return errs, nil
 	}
 
-	b, err := json.Marshal(errs)
-	if err != nil {
-		log.Error("Failed to construct marshal errors", zap.Error(err))
+	for _, p := range playbooksChain {
+		if ansErrs, err := runPlaybook(p); err != nil || len(ansErrs) > 0 {
+			b, err := json.Marshal(ansErrs)
+			if err != nil {
+				log.Error("Failed to construct marshal errors", zap.Error(err))
+			}
+			s := &structpb.ListValue{}
+			if err = protojson.Unmarshal(b, s); err != nil {
+				log.Error("Failed to unmarshal to structpb.ListValue", zap.Error(err))
+			}
+			return &ipb.InvokeResponse{
+				Result: true,
+				Meta: map[string]*structpb.Value{
+					"errors": structpb.NewListValue(s),
+				},
+			}, err
+		}
 	}
-	s := &structpb.ListValue{}
-	if err = protojson.Unmarshal(b, s); err != nil {
-		log.Error("Failed to unmarshal to structpb.ListValue", zap.Error(err))
-	}
+
 	return &ipb.InvokeResponse{
 		Result: true,
-		Meta: map[string]*structpb.Value{
-			"errors": structpb.NewListValue(s),
-		},
 	}, nil
 }
 
