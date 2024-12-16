@@ -901,7 +901,7 @@ func VpnAction(
 					Message: msg, UserMessage: "No access to remote host."})
 			} else if strings.Contains(e.GetError(), "UNSUPPORTED_OS") {
 				errs = append(errs, AnsibleError{Code: codeUnsupportedOS,
-					Message: msg, UserMessage: "Remote host machine has unsupported operating system."})
+					Message: msg, UserMessage: "Remote machine has unsupported operating system."})
 			} else if strings.Contains(e.GetError(), "STOPPED") {
 				errs = append(errs, AnsibleError{Code: codeStopped,
 					Message: msg, UserMessage: "VPN stopped."})
