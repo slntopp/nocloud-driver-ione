@@ -876,7 +876,7 @@ func VpnAction(
 		return nil, fmt.Errorf("failed to issue instance token: %w", err)
 	}
 
-	runPlaybook := func(playbook string) ([]AnsibleError, error) {
+	runPlaybook := func(playbook string) (errs []AnsibleError, err error) {
 		log := log.With(zap.String("playbook", playbook))
 
 		create, err := client.Create(ctx, &ansible.CreateRunRequest{
@@ -892,7 +892,7 @@ func VpnAction(
 			},
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to create new runnable instance: %w", err)
+			return errs, fmt.Errorf("failed to create new runnable instance: %w", err)
 		}
 
 		resp, err := client.Exec(ctx, &ansible.ExecRunRequest{
@@ -900,10 +900,9 @@ func VpnAction(
 			WaitFinish: true,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute: %w", err)
+			return errs, fmt.Errorf("failed to execute: %w", err)
 		}
 
-		errs := make([]AnsibleError, 0)
 		if resp.GetStatus() == "failed" {
 			for _, e := range resp.GetError() {
 				log.Debug("Got ansible error", zap.String("host", e.Host), zap.String("message", e.GetError()))
