@@ -886,17 +886,22 @@ func VpnAction(
 
 	errs := make([]AnsibleError, 0)
 	if resp.GetStatus() == "failed" {
-		for _, rErr := range resp.GetError() {
-			log.Debug("Got ansible error", zap.String("host", rErr.Host), zap.String("message", rErr.GetError()))
+		for _, e := range resp.GetError() {
+			log.Debug("Got ansible error", zap.String("host", e.Host), zap.String("message", e.GetError()))
+			msg := fmt.Sprintf("Host: %s Message: %s", e.Host, e.Error)
 
-			if rErr.GetError() == "UNREACHABLE" {
-				errs = append(errs, AnsibleError{Code: codeUnreachable, Message: "No access to host", UserMessage: "No access to remote host."})
-			} else if strings.Contains(rErr.GetError(), "UNSUPPORTED_OS") {
-				errs = append(errs, AnsibleError{Code: codeUnsupportedOS, Message: "Unsupported OS", UserMessage: "Remote host machine has unsupported operating system."})
-			} else if strings.Contains(rErr.GetError(), "STOPPED") {
-				errs = append(errs, AnsibleError{Code: codeStopped, Message: "VPN stopped", UserMessage: "VPN stopped."})
+			if e.GetError() == "UNREACHABLE" {
+				errs = append(errs, AnsibleError{Code: codeUnreachable,
+					Message: msg, UserMessage: "No access to remote host."})
+			} else if strings.Contains(e.GetError(), "UNSUPPORTED_OS") {
+				errs = append(errs, AnsibleError{Code: codeUnsupportedOS,
+					Message: msg, UserMessage: "Remote host machine has unsupported operating system."})
+			} else if strings.Contains(e.GetError(), "STOPPED") {
+				errs = append(errs, AnsibleError{Code: codeStopped,
+					Message: msg, UserMessage: "VPN stopped."})
 			} else {
-				errs = append(errs, AnsibleError{Code: codeInternal, Message: "Internal error. Message: " + rErr.GetError(), UserMessage: "Internal error. Try again later or contact support."})
+				errs = append(errs, AnsibleError{Code: codeInternal,
+					Message: msg, UserMessage: "Internal error. Try again later or contact support."})
 			}
 		}
 	} else if resp.GetStatus() != "successful" {
