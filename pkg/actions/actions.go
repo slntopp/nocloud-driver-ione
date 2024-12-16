@@ -830,7 +830,7 @@ func VpnAction(
 	default:
 		return nil, fmt.Errorf("invalid action provided")
 	}
-	log := log.Named("VpnAction").With(zap.String("instance", inst.GetUuid()))
+	log := log.Named("VpnAction").With(zap.String("instance", inst.GetUuid()), zap.String("action", action.GetStringValue()))
 
 	// Get hosts data (based on driver)
 	var host, username, password string
