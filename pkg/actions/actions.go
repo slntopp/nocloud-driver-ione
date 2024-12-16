@@ -811,6 +811,10 @@ func VpnAction(
 	if !ok {
 		return nil, fmt.Errorf("no down playbook in sp")
 	}
+	playbookDelete, ok := ansibleParams["playbook_vpn_delete"].(string)
+	if !ok {
+		return nil, fmt.Errorf("no delete playbook in sp")
+	}
 	playbookMonitoring, ok := ansibleParams["playbook_vpn_monitoring"].(string)
 	if !ok {
 		return nil, fmt.Errorf("no monitoring playbook in sp")
@@ -825,6 +829,8 @@ func VpnAction(
 		playbookUuid = playbookUp
 	case "down":
 		playbookUuid = playbookDown
+	case "delete":
+		playbookUuid = playbookDelete
 	case "monitoring":
 		playbookUuid = playbookMonitoring
 	default:
