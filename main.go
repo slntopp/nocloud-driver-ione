@@ -106,7 +106,6 @@ func main() {
 
 	s := grpc.NewServer()
 	server.SetDriverType(type_key)
-	actions.SetNocloudBaseURL(nocloudBaseUrl)
 
 	log.Info("Connecting redis", zap.String("url", redisHost))
 	rdb := redis.NewClient(&redis.Options{
