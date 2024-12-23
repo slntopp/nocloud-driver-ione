@@ -135,7 +135,9 @@ func StatusesClient(
 	history["public"] = publicHistory
 	history["private"] = privateHistory
 	historyVal, _ = structpb.NewStruct(history)
-	data[ipsHistoryKey] = structpb.NewStructValue(historyVal)
+	if data != nil {
+		data[ipsHistoryKey] = structpb.NewStructValue(historyVal)
+	}
 
 	_, err = datas.StIPub(request)
 	if err != nil {

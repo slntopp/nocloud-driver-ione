@@ -48,7 +48,6 @@ type ServiceAction func(
 type AnsibleAction func(
 	context.Context,
 	ansible.AnsibleServiceClient,
-	string,
 	map[string]any,
 	*ipb.Instance,
 	map[string]*structpb.Value,
@@ -680,11 +679,19 @@ func GetBackupInfo(
 func BackupInstance(
 	ctx context.Context,
 	client ansible.AnsibleServiceClient,
-	playbookUuid string,
-	hop map[string]any,
+	ansibleParams map[string]any,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
 ) (*ipb.InvokeResponse, error) {
+	playbookUuid, ok := ansibleParams["playbook_uuid"].(string)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
+	}
+	hop, ok := ansibleParams["hop"].(map[string]any)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
+	}
+
 	host := data["host"].GetStringValue()
 	vm_dir := data["vm_dir"].GetStringValue()
 	snapshot_date := data["snapshot_date"].GetStringValue()

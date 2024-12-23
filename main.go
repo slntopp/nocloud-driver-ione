@@ -17,12 +17,11 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net"
-
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
+	grpc_server "github.com/slntopp/nocloud/pkg/nocloud/grpc"
+	"github.com/slntopp/nocloud/pkg/nocloud/rabbitmq"
 	"github.com/slntopp/nocloud/pkg/nocloud/schema"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -52,6 +51,8 @@ var (
 	SIGNING_KEY  []byte
 	redisHost    string
 	ansibleHost  string
+
+	nocloudBaseUrl string
 )
 
 func init() {
@@ -75,17 +76,15 @@ func init() {
 
 	viper.SetDefault("ANSIBLE_HOST", "")
 	ansibleHost = viper.GetString("ANSIBLE_HOST")
+
+	viper.SetDefault("NOCLOUD_BASE_URL", "https://api.nc2dev.support.by")
+	nocloudBaseUrl = viper.GetString("NOCLOUD_BASE_URL")
 }
 
 func main() {
 	defer func() {
 		_ = log.Sync()
 	}()
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
-	if err != nil {
-		log.Fatal("Failed to listen", zap.String("address", port), zap.Error(err))
-	}
 
 	log.Info("Dialing RabbitMQ connection", zap.String("url", RabbitMQConn))
 	amqp.DialConfig(RabbitMQConn, amqp.Config{
@@ -99,6 +98,7 @@ func main() {
 		log.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
 	}
 	defer rbmq.Close()
+	rabbitmq.FatalOnConnectionClose(log, rbmq)
 	log.Info("RabbitMQ connection established")
 
 	datas.Configure(log, rbmq)
@@ -134,8 +134,7 @@ func main() {
 
 	pb.RegisterDriverServiceServer(s, srv)
 
-	log.Info(fmt.Sprintf("Serving gRPC on 0.0.0.0:%v", port))
-	log.Fatal("Failed to serve gRPC", zap.Error(s.Serve(lis)))
+	grpc_server.ServeGRPC(log, s, port)
 }
 
 func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {

@@ -22,6 +22,7 @@ import (
 	stpb "github.com/slntopp/nocloud-proto/states"
 	statuspb "github.com/slntopp/nocloud-proto/statuses"
 	i "github.com/slntopp/nocloud/pkg/instances"
+	"github.com/slntopp/nocloud/pkg/nocloud/rabbitmq"
 	pd "github.com/slntopp/nocloud/pkg/public_data"
 	s "github.com/slntopp/nocloud/pkg/states"
 	st "github.com/slntopp/nocloud/pkg/statuses"
@@ -43,8 +44,10 @@ var (
 	StatusPub st.Pub
 )
 
-func Configure(logger *zap.Logger, rbmq *amqp.Connection) {
+func Configure(logger *zap.Logger, _rbmq *amqp.Connection) {
 	log = logger.Named("Datas")
+	rbmq := rabbitmq.NewRabbitMQConnection(_rbmq)
+
 	i := i.NewPubSub(log, nil, rbmq)
 	ich := i.Channel()
 	i.TopicExchange(ich, "datas")
