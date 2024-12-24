@@ -11,7 +11,7 @@ import (
 
 type SPAction func(one.IClient, map[string]*structpb.Value) (*sppb.InvokeResponse, error)
 
-var SpActions = map[string]SPAction{
+var SpAdminActions = map[string]SPAction{
 	"get_users": GetUsers,
 }
 
