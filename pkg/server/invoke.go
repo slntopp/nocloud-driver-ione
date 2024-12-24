@@ -121,8 +121,8 @@ func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequ
 
 	method := req.GetMethod()
 
-	action, ok := actions.SpActions[method]
-	if !ok {
+	action, ok := actions.SpAdminActions[method]
+	if !ok || !req.AdminAccess {
 		return nil, fmt.Errorf("action '%s' not declared for %s", req.GetMethod(), DRIVER_TYPE)
 	}
 
