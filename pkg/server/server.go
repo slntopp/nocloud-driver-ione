@@ -249,7 +249,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 			s.log.Debug("Couldn't reserve Public IP addresses",
 				zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
 
-			client.DeleteUserAndVNets(oneID)
+			//client.DeleteUserAndVNets(oneID)
 
 			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
 		}
@@ -289,7 +289,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 				s.log.Debug("Couldn't reserve Private IP addresses",
 					zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
 
-				client.DeleteUserAndVNets(oneID)
+				//client.DeleteUserAndVNets(oneID)
 
 				return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 			}
@@ -299,7 +299,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 				s.log.Debug("Couldn't reserve Private IP addresses",
 					zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
 
-				client.DeleteUserAndVNets(oneID)
+				//client.DeleteUserAndVNets(oneID)
 
 				return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 			}
