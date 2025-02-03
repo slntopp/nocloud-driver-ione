@@ -440,6 +440,22 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			s.rdb.HSet(ctx, redisKey, ig.Uuid, "MONITORED")
 		}
 
+		// Obtain needed number of addresses for each group based on included instances
+		if ig.GetResources() == nil {
+			ig.Resources = map[string]*structpb.Value{}
+		}
+		publicAddresses := 0
+		privateAddresses := 0
+		for _, inst := range ig.GetInstances() {
+			if inst.GetStatus() == statuspb.NoCloudStatus_DEL || inst.GetResources() == nil {
+				continue
+			}
+			publicAddresses += int(inst.GetResources()["ips_public"].GetNumberValue())
+			privateAddresses += int(inst.GetResources()["ips_private"].GetNumberValue())
+		}
+		ig.Resources["ips_public"] = structpb.NewNumberValue(float64(publicAddresses))
+		ig.Resources["ips_private"] = structpb.NewNumberValue(float64(privateAddresses))
+
 		err = client.CheckOrphanInstanceGroup(ig, group)
 		if err != nil {
 			log.Error("Error Checking Orphan User of Instance Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
