@@ -585,23 +585,12 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 	deleted := resp.ToBeDeleted
 	for i := 0; i < len(deleted); i++ {
 		log := c.log.With(zap.String("instance", deleted[i].GetUuid()))
-		inst_res := deleted[i].GetResources()
 		vmid, err := GetVMIDFromData(c, deleted[i])
 		if err != nil {
 			log.Error("Error Getting VMID from Data", zap.Error(err))
 			continue
 		}
 		c.TerminateVM(vmid, true)
-		ips_free := int(data["public_ips_free"].GetNumberValue())
-		ips_total := int(data["public_ips_total"].GetNumberValue())
-
-		ips := int(inst_res["ips_public"].GetNumberValue())
-
-		ips_free_new, _ := structpb.NewValue(ips_free - ips)
-		ips_total_new, _ := structpb.NewValue(ips_total - ips)
-
-		data["public_ips_free"] = ips_free_new
-		data["public_ips_total"] = ips_total_new
 
 		go igDatasPublisher(ig.Uuid, data)
 		successResp.ToBeDeleted = append(successResp.ToBeDeleted, deleted[i])
@@ -685,14 +674,6 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 					c.log.Error("Wrong ip attach")
 				}
 
-				ips := int(data["public_ips_total"].GetNumberValue())
-
-				ips_free_new, _ := structpb.NewValue(ips + 1)
-				ips_total_new, _ := structpb.NewValue(ips + 1)
-
-				data["public_ips_free"] = ips_free_new
-				data["public_ips_total"] = ips_total_new
-
 				go igDatasPublisher(ig.Uuid, data)
 
 			} else {
@@ -720,14 +701,6 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 							c.log.Error("id", zap.Int("id", nicId))
 							c.log.Error("Wrong ip detach")
 						}
-
-						ips := int(data["public_ips_total"].GetNumberValue())
-
-						ips_free_new, _ := structpb.NewValue(ips - 1)
-						ips_total_new, _ := structpb.NewValue(ips - 1)
-
-						data["public_ips_free"] = ips_free_new
-						data["public_ips_total"] = ips_total_new
 
 						go igDatasPublisher(ig.Uuid, data)
 
