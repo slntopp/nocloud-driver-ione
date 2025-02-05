@@ -617,10 +617,14 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	var sum float64
 	for _, rec := range resourceRecords {
-		sum += rec.GetTotal()
+		sum += rec.GetTotal() * calculateResourcePrice(i, rec.Resource)
 	}
 	for _, rec := range productRecords {
-		sum += rec.GetTotal()
+		if rec.Addon != "" {
+			sum += rec.GetTotal() * calculateAddonPrice(addons, i, rec.Addon)
+		} else {
+			sum += rec.GetTotal() * calculateProductPrice(i, rec.Product)
+		}
 	}
 
 	if sum > 0 && sum > *balance {
@@ -654,6 +658,48 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		}
 	}
 	go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
+}
+
+func calculateResourcePrice(i *ipb.Instance, res string) float64 {
+	if i.BillingPlan == nil || i.BillingPlan.Resources == nil || i.Resources == nil {
+		return 0
+	}
+	count := i.Resources[res].GetNumberValue()
+	if res == "ram" || res == "drive_ssd" || res == "drive_hdd" {
+		count /= 1024
+	}
+	for _, bpRes := range i.BillingPlan.Resources {
+		if bpRes.Key == res {
+			return bpRes.Price * count
+		}
+	}
+	return 0
+}
+
+func calculateProductPrice(i *ipb.Instance, prod string) float64 {
+	if i.BillingPlan == nil || i.BillingPlan.Products == nil {
+		return 0
+	}
+	bpProd, ok := i.BillingPlan.Products[prod]
+	if !ok {
+		return 0
+	}
+	return bpProd.Price
+}
+
+func calculateAddonPrice(addons map[string]*apb.Addon, i *ipb.Instance, id string) float64 {
+	if i.BillingPlan == nil || i.BillingPlan.Products == nil || i.Product == nil {
+		return 0
+	}
+	addon, ok := addons[id]
+	if !ok {
+		return 0
+	}
+	if addon.Periods == nil {
+		return 0
+	}
+	period := i.BillingPlan.Products[*i.Product].Period
+	return addon.Periods[period]
 }
 
 func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {
