@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
+	"github.com/slntopp/nocloud/pkg/nocloud/suspend_rules"
 	"math"
 	"regexp"
 	"strings"
@@ -84,7 +86,8 @@ type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
 type EventsPublisherFunc func(context.Context, *epb.Event)
 
-func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client *one.ONeClient, i *ipb.Instance, status statuspb.NoCloudStatus, addons map[string]*apb.Addon) {
+func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client *one.ONeClient,
+	i *ipb.Instance, status statuspb.NoCloudStatus, addons map[string]*apb.Addon, sp *sppb.ServicesProvider) {
 	log := logger.Named("NonRegularInstanceBillingHandler").Named(i.GetUuid())
 	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
 		log.Debug("Instance was deleted. No billing")
@@ -124,16 +127,22 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		suspendedManually := data["suspended_manually"].GetBoolValue()
 
 		if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
-			err := client.SuspendVM(vmid)
-			if err != nil {
-				log.Error("Failed to suspend vm", zap.Error(err))
-				return
+
+			if suspend_rules.SuspendAllowed(sp.GetSuspendRules()) {
+				err := client.SuspendVM(vmid)
+				if err != nil {
+					log.Error("Failed to suspend vm", zap.Error(err))
+					return
+				}
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_suspended",
+					Data: map[string]*structpb.Value{},
+				})
+			} else {
+				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_suspended",
-				Data: map[string]*structpb.Value{},
-			})
+
 		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !suspendedManually {
 			err := client.ResumeVM(vmid)
 			if err != nil {
@@ -351,7 +360,8 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 	}
 }
 
-func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus, balance *float64, addons map[string]*apb.Addon) {
+func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance,
+	status statuspb.NoCloudStatus, balance *float64, addons map[string]*apb.Addon, sp *sppb.ServicesProvider) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 
 	now := time.Now().Unix()
@@ -550,18 +560,22 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		_, isStatic := i.Data["last_monitoring"]
 		if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL && now >= immune_date_val {
 			if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
-				if err := client.SuspendVM(vmid); err != nil {
-					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+
+				if suspend_rules.SuspendAllowed(sp.GetSuspendRules()) {
+					if err := client.SuspendVM(vmid); err != nil {
+						log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+					}
+					suspendTime := structpb.NewNumberValue(float64(time.Now().Unix()))
+					i.Data["suspend_time"] = suspendTime
+					go events(context.Background(), &epb.Event{
+						Uuid: i.GetUuid(),
+						Key:  "instance_suspended",
+						Data: map[string]*structpb.Value{},
+					})
+				} else {
+					log.Debug("Not suspending VM because it is forbidden by suspend rules")
 				}
 
-				suspendTime := structpb.NewNumberValue(float64(time.Now().Unix()))
-				i.Data["suspend_time"] = suspendTime
-
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_suspended",
-					Data: map[string]*structpb.Value{},
-				})
 			}
 
 			if state == "SUSPENDED" {
@@ -629,15 +643,20 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	if sum > 0 && sum > *balance {
 		if state != "SUSPENDED" {
-			if err := client.SuspendVM(vmid); err != nil {
-				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+
+			if suspend_rules.SuspendAllowed(sp.GetSuspendRules()) {
+				if err := client.SuspendVM(vmid); err != nil {
+					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+				}
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_suspended",
+					Data: map[string]*structpb.Value{},
+				})
+			} else {
+				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
 
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_suspended",
-				Data: map[string]*structpb.Value{},
-			})
 		}
 		return
 	}
