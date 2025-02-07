@@ -242,7 +242,11 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 	var freePubIps = 0
 	if vnetID, err := client.GetUserPublicVNet(oneID); err == nil {
 		if publicVnet, err := client.GetVNet(vnetID); err == nil {
-			freePubIps = len(publicVnet.ARs)
+			allIps := 0
+			for _, ar := range publicVnet.ARs {
+				allIps += len(ar.Leases)
+			}
+			freePubIps = allIps
 		}
 	} else if !errors.Is(err, errors.New("resource not found")) {
 		s.log.Debug("Failed to obtain user's public vnet",
