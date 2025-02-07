@@ -128,7 +128,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 
 		if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
 
-			if suspend_rules.SuspendAllowed(sp.GetSuspendRules()) {
+			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
 				err := client.SuspendVM(vmid)
 				if err != nil {
 					log.Error("Failed to suspend vm", zap.Error(err))
@@ -561,7 +561,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL && now >= immune_date_val {
 			if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
 
-				if suspend_rules.SuspendAllowed(sp.GetSuspendRules()) {
+				if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
 					if err := client.SuspendVM(vmid); err != nil {
 						log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 					}
@@ -644,7 +644,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 	if sum > 0 && sum > *balance {
 		if state != "SUSPENDED" {
 
-			if suspend_rules.SuspendAllowed(sp.GetSuspendRules()) {
+			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
 				if err := client.SuspendVM(vmid); err != nil {
 					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
 				}
