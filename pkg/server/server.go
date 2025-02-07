@@ -213,7 +213,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 	if data["userid"] == nil {
 		oneID, err := client.CreateUser(username, userPass, []int{int(group)})
 		if err != nil {
-			s.log.Debug("Couldn't create OpenNebula user",
+			s.log.Error("Couldn't create OpenNebula user",
 				zap.Error(err), zap.String("login", username),
 				zap.String("pass", userPass), zap.Int64("group", int64(group)))
 			return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
