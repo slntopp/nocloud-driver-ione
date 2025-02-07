@@ -327,27 +327,31 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 				priority = billingpb.Priority_URGENT
 			}
 
-			if i.BillingPlan.Products[*i.Product].GetPeriod() == 0 {
-				if !ok {
-					new, last := handleStaticZeroBilling(log, i, last, priority)
-					productRecords = append(productRecords, new...)
-					i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
-				}
-			} else {
-				new, last := handleStaticBilling(log, i, last, priority)
-
-				if len(new) != 0 {
-					productRecords = append(productRecords, new...)
-					i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
-				}
-
-				product := i.GetBillingPlan().GetProducts()[i.GetProduct()]
-				if product.GetKind() == billingpb.Kind_POSTPAID {
-					i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last + product.GetPeriod()))
+			prod := i.GetBillingPlan().GetProducts()[*i.Product]
+			if prod != nil {
+				if prod.GetPeriod() == 0 {
+					if !ok {
+						new, last := handleStaticZeroBilling(log, i, last, priority)
+						productRecords = append(productRecords, new...)
+						i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
+					}
 				} else {
-					i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
+					new, last := handleStaticBilling(log, i, last, priority)
+
+					if len(new) != 0 {
+						productRecords = append(productRecords, new...)
+						i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
+					}
+
+					product := i.GetBillingPlan().GetProducts()[i.GetProduct()]
+					if product.GetKind() == billingpb.Kind_POSTPAID {
+						i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last + product.GetPeriod()))
+					} else {
+						i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
+					}
 				}
 			}
+
 		}
 
 		go records(context.Background(), append(resourceRecords, productRecords...))
