@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
+	"github.com/slntopp/nocloud/pkg/nocloud/suspend_rules"
 	"math"
 	"regexp"
 	"strings"
@@ -84,7 +86,8 @@ type RecordsPublisherFunc func(context.Context, []*billingpb.Record)
 
 type EventsPublisherFunc func(context.Context, *epb.Event)
 
-func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client *one.ONeClient, i *ipb.Instance, status statuspb.NoCloudStatus, addons map[string]*apb.Addon) {
+func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client *one.ONeClient,
+	i *ipb.Instance, status statuspb.NoCloudStatus, addons map[string]*apb.Addon, sp *sppb.ServicesProvider) {
 	log := logger.Named("NonRegularInstanceBillingHandler").Named(i.GetUuid())
 	if i.GetStatus() == statuspb.NoCloudStatus_DEL {
 		log.Debug("Instance was deleted. No billing")
@@ -124,16 +127,22 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		suspendedManually := data["suspended_manually"].GetBoolValue()
 
 		if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
-			err := client.SuspendVM(vmid)
-			if err != nil {
-				log.Error("Failed to suspend vm", zap.Error(err))
-				return
+
+			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
+				err := client.SuspendVM(vmid)
+				if err != nil {
+					log.Error("Failed to suspend vm", zap.Error(err))
+					return
+				}
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_suspended",
+					Data: map[string]*structpb.Value{},
+				})
+			} else {
+				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_suspended",
-				Data: map[string]*structpb.Value{},
-			})
+
 		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !suspendedManually {
 			err := client.ResumeVM(vmid)
 			if err != nil {
@@ -318,27 +327,31 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 				priority = billingpb.Priority_URGENT
 			}
 
-			if i.BillingPlan.Products[*i.Product].GetPeriod() == 0 {
-				if !ok {
-					new, last := handleStaticZeroBilling(log, i, last, priority)
-					productRecords = append(productRecords, new...)
-					i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
-				}
-			} else {
-				new, last := handleStaticBilling(log, i, last, priority)
-
-				if len(new) != 0 {
-					productRecords = append(productRecords, new...)
-					i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
-				}
-
-				product := i.GetBillingPlan().GetProducts()[i.GetProduct()]
-				if product.GetKind() == billingpb.Kind_POSTPAID {
-					i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last + product.GetPeriod()))
+			prod := i.GetBillingPlan().GetProducts()[*i.Product]
+			if prod != nil {
+				if prod.GetPeriod() == 0 {
+					if !ok {
+						new, last := handleStaticZeroBilling(log, i, last, priority)
+						productRecords = append(productRecords, new...)
+						i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
+					}
 				} else {
-					i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
+					new, last := handleStaticBilling(log, i, last, priority)
+
+					if len(new) != 0 {
+						productRecords = append(productRecords, new...)
+						i.Data["last_monitoring"] = structpb.NewNumberValue(float64(last))
+					}
+
+					product := i.GetBillingPlan().GetProducts()[i.GetProduct()]
+					if product.GetKind() == billingpb.Kind_POSTPAID {
+						i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last + product.GetPeriod()))
+					} else {
+						i.Data["next_payment_date"] = structpb.NewNumberValue(float64(last))
+					}
 				}
 			}
+
 		}
 
 		go records(context.Background(), append(resourceRecords, productRecords...))
@@ -351,7 +364,8 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 	}
 }
 
-func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance, status statuspb.NoCloudStatus, balance *float64, addons map[string]*apb.Addon) {
+func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, events EventsPublisherFunc, client one.IClient, i *ipb.Instance,
+	status statuspb.NoCloudStatus, balance *float64, addons map[string]*apb.Addon, sp *sppb.ServicesProvider) {
 	log := logger.Named("InstanceBillingHandler").Named(i.GetUuid())
 
 	now := time.Now().Unix()
@@ -550,18 +564,22 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		_, isStatic := i.Data["last_monitoring"]
 		if status == statuspb.NoCloudStatus_SUS && i.GetStatus() != statuspb.NoCloudStatus_DEL && now >= immune_date_val {
 			if (len(productRecords) != 0 || (len(productRecords) == 0 && len(resourceRecords) != 0 && !isStatic)) && state != "SUSPENDED" {
-				if err := client.SuspendVM(vmid); err != nil {
-					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+
+				if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
+					if err := client.SuspendVM(vmid); err != nil {
+						log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+					}
+					suspendTime := structpb.NewNumberValue(float64(time.Now().Unix()))
+					i.Data["suspend_time"] = suspendTime
+					go events(context.Background(), &epb.Event{
+						Uuid: i.GetUuid(),
+						Key:  "instance_suspended",
+						Data: map[string]*structpb.Value{},
+					})
+				} else {
+					log.Debug("Not suspending VM because it is forbidden by suspend rules")
 				}
 
-				suspendTime := structpb.NewNumberValue(float64(time.Now().Unix()))
-				i.Data["suspend_time"] = suspendTime
-
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_suspended",
-					Data: map[string]*structpb.Value{},
-				})
 			}
 
 			if state == "SUSPENDED" {
@@ -617,23 +635,32 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 	var sum float64
 	for _, rec := range resourceRecords {
-		sum += rec.GetTotal()
+		sum += rec.GetTotal() * calculateResourcePrice(i, rec.Resource)
 	}
 	for _, rec := range productRecords {
-		sum += rec.GetTotal()
+		if rec.Addon != "" {
+			sum += rec.GetTotal() * calculateAddonPrice(addons, i, rec.Addon)
+		} else {
+			sum += rec.GetTotal() * calculateProductPrice(i, rec.Product)
+		}
 	}
 
 	if sum > 0 && sum > *balance {
 		if state != "SUSPENDED" {
-			if err := client.SuspendVM(vmid); err != nil {
-				log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+
+			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
+				if err := client.SuspendVM(vmid); err != nil {
+					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+				}
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_suspended",
+					Data: map[string]*structpb.Value{},
+				})
+			} else {
+				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
 
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_suspended",
-				Data: map[string]*structpb.Value{},
-			})
 		}
 		return
 	}
@@ -654,6 +681,48 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		}
 	}
 	go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
+}
+
+func calculateResourcePrice(i *ipb.Instance, res string) float64 {
+	if i.BillingPlan == nil || i.BillingPlan.Resources == nil || i.Resources == nil {
+		return 0
+	}
+	count := i.Resources[res].GetNumberValue()
+	if res == "ram" || res == "drive_ssd" || res == "drive_hdd" {
+		count /= 1024
+	}
+	for _, bpRes := range i.BillingPlan.Resources {
+		if bpRes.Key == res {
+			return bpRes.Price * count
+		}
+	}
+	return 0
+}
+
+func calculateProductPrice(i *ipb.Instance, prod string) float64 {
+	if i.BillingPlan == nil || i.BillingPlan.Products == nil {
+		return 0
+	}
+	bpProd, ok := i.BillingPlan.Products[prod]
+	if !ok {
+		return 0
+	}
+	return bpProd.Price
+}
+
+func calculateAddonPrice(addons map[string]*apb.Addon, i *ipb.Instance, id string) float64 {
+	if i.BillingPlan == nil || i.BillingPlan.Products == nil || i.Product == nil {
+		return 0
+	}
+	addon, ok := addons[id]
+	if !ok {
+		return 0
+	}
+	if addon.Periods == nil {
+		return 0
+	}
+	period := i.BillingPlan.Products[*i.Product].Period
+	return addon.Periods[period]
 }
 
 func handleSuspendEvent(i *ipb.Instance, events EventsPublisherFunc) {

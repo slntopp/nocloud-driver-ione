@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
@@ -212,7 +213,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 	if data["userid"] == nil {
 		oneID, err := client.CreateUser(username, userPass, []int{int(group)})
 		if err != nil {
-			s.log.Debug("Couldn't create OpenNebula user",
+			s.log.Error("Couldn't create OpenNebula user",
 				zap.Error(err), zap.String("login", username),
 				zap.String("pass", userPass), zap.Int64("group", int64(group)))
 			return nil, status.Error(codes.Internal, "Couldn't create OpenNebula user")
@@ -233,37 +234,41 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 	}
 
 	resources := igroup.GetResources()
-	var public_ips_amount int = 0
+	var public_ips_amount = 0
 	if resources["ips_public"] != nil {
 		public_ips_amount = int(resources["ips_public"].GetNumberValue())
 	}
 
-	var freePubIps int = 0
-	if data["public_ips_free"] != nil {
-		freePubIps = int(data["public_ips_free"].GetNumberValue())
+	var freePubIps = 0
+	if vnetID, err := client.GetUserPublicVNet(oneID); err == nil {
+		if publicVnet, err := client.GetVNet(vnetID); err == nil {
+			allIps := 0
+			for _, ar := range publicVnet.ARs {
+				allIps += ar.Size
+			}
+			freePubIps = allIps
+		}
+	} else if !strings.Contains(err.Error(), "resource not found") {
+		s.log.Error("Failed to obtain user's public vnet",
+			zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
+		return data, status.Error(codes.Internal, "Failed to obtain user's public vnet")
+	} else {
+		s.log.Warn("Failed to obtain user public vnet because it was not found. Vnet must be created on the next step",
+			zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
 	}
+
 	if public_ips_amount > 0 && public_ips_amount > freePubIps {
 		public_ips_amount -= freePubIps
 		public_ips_pool_id, err := client.ReservePublicIP(oneID, public_ips_amount)
 		if err != nil {
-			s.log.Debug("Couldn't reserve Public IP addresses",
+			s.log.Error("Couldn't reserve Public IP addresses",
 				zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
-
-			//client.DeleteUserAndVNets(oneID)
-
-			return nil, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
+			return data, status.Error(codes.Internal, "Couldn't reserve Public IP addresses")
 		}
 		data["public_vn"] = structpb.NewNumberValue(float64(public_ips_pool_id))
-		total := float64(public_ips_amount)
-		if data["public_ips_total"] != nil {
-			total += data["public_ips_total"].GetNumberValue()
-		}
-		data["public_ips_total"] = structpb.NewNumberValue(total)
-
-		data["public_ips_free"] = structpb.NewNumberValue(float64(freePubIps + public_ips_amount))
 	}
 
-	var private_ips_amount int = 0
+	var private_ips_amount = 0
 	if resources["ips_private"] != nil {
 		private_ips_amount = int(resources["ips_private"].GetNumberValue())
 	}
@@ -286,22 +291,16 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		if data["private_vn"] == nil && (err != nil && err.Error() == "resource not found") {
 			vnMad, freeVlan, err := client.FindFreeVlan(sp)
 			if err != nil {
-				s.log.Debug("Couldn't reserve Private IP addresses",
+				s.log.Error("Couldn't reserve Private IP addresses",
 					zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
-
-				//client.DeleteUserAndVNets(oneID)
-
-				return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+				return data, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 			}
 
 			private_ips_pool_id, err := client.ReservePrivateIP(oneID, vnMad, freeVlan)
 			if err != nil {
-				s.log.Debug("Couldn't reserve Private IP addresses",
+				s.log.Error("Couldn't reserve Private IP addresses",
 					zap.Error(err), zap.Int("amount", private_ips_amount), zap.Int("user", oneID))
-
-				//client.DeleteUserAndVNets(oneID)
-
-				return nil, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
+				return data, status.Error(codes.Internal, "Couldn't reserve Private IP addresses")
 			}
 			data["private_vn"] = structpb.NewNumberValue(float64(private_ips_pool_id))
 		}
@@ -440,6 +439,23 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			s.rdb.HSet(ctx, redisKey, ig.Uuid, "MONITORED")
 		}
 
+		// Obtain needed number of addresses for each group based on included instances
+		if ig.GetResources() == nil {
+			ig.Resources = map[string]*structpb.Value{}
+		}
+		publicAddresses := 0
+		privateAddresses := 0
+		for _, inst := range ig.GetInstances() {
+			if inst.GetStatus() == statuspb.NoCloudStatus_DEL || inst.GetResources() == nil {
+				continue
+			}
+			publicAddresses += int(inst.GetResources()["ips_public"].GetNumberValue())
+			privateAddresses += int(inst.GetResources()["ips_private"].GetNumberValue())
+		}
+		log.Debug("public ips for vnet", zap.Int("count", publicAddresses), zap.String("group", ig.GetUuid()))
+		ig.Resources["ips_public"] = structpb.NewNumberValue(float64(publicAddresses))
+		ig.Resources["ips_private"] = structpb.NewNumberValue(float64(privateAddresses))
+
 		err = client.CheckOrphanInstanceGroup(ig, group)
 		if err != nil {
 			log.Error("Error Checking Orphan User of Instance Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
@@ -450,8 +466,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 		} else {
 			log.Debug("Check Instances Group Response", zap.Any("resp", resp))
-
 			datasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+
+			toBeDeleted := client.HandleDeletedInstances(resp.ToBeDeleted)
 
 			if len(resp.ToBeCreated) > 0 {
 				group := secrets["group"].GetNumberValue()
@@ -463,20 +480,25 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				}
 
 				data, err = s.PrepareService(ctx, sp, ig, client, group)
+				if data != nil {
+					ig.Data = data
+					go datasPublisher(ig.Uuid, ig.Data)
+				}
 				if err != nil {
 					log.Error("Error Preparing Service", zap.Any("group", ig), zap.Error(err))
-					return nil, err
+					continue
 				}
 
-				ig.Data = data
-				go datasPublisher(ig.Uuid, ig.Data)
 			}
 
 			if len(resp.ToBeUpdated) != 0 {
 				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
-			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
+			_ = client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
+			successResp := &one.CheckInstancesGroupResponse{
+				ToBeDeleted: toBeDeleted,
+			}
 			log.Debug("Events instances", zap.Any("resp", successResp))
 			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
@@ -569,9 +591,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			balance := monitoringBalance[ig.GetUuid()]
 
 			if autoRenew {
-				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance, req.Addons)
+				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance, req.Addons, sp)
 			} else {
-				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, req.Addons)
+				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, req.Addons, sp)
 			}
 
 			monitoringBalance[ig.GetUuid()] = balance
