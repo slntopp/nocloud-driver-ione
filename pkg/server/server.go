@@ -244,7 +244,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 		if publicVnet, err := client.GetVNet(vnetID); err == nil {
 			allIps := 0
 			for _, ar := range publicVnet.ARs {
-				allIps += len(ar.Leases)
+				allIps += ar.Size
 			}
 			freePubIps = allIps
 		}
@@ -452,6 +452,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			publicAddresses += int(inst.GetResources()["ips_public"].GetNumberValue())
 			privateAddresses += int(inst.GetResources()["ips_private"].GetNumberValue())
 		}
+		log.Debug("public ips for vnet", zap.Int("count", publicAddresses), zap.String("group", ig.GetUuid()))
 		ig.Resources["ips_public"] = structpb.NewNumberValue(float64(publicAddresses))
 		ig.Resources["ips_private"] = structpb.NewNumberValue(float64(privateAddresses))
 
