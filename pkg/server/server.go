@@ -465,8 +465,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 		} else {
 			log.Debug("Check Instances Group Response", zap.Any("resp", resp))
-
 			datasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+
+			toBeDeleted := client.HandleDeletedInstances(resp.ToBeDeleted)
 
 			if len(resp.ToBeCreated) > 0 {
 				group := secrets["group"].GetNumberValue()
@@ -493,7 +494,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords)
 			}
 
-			successResp := client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
+			_ = client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
+			successResp := &one.CheckInstancesGroupResponse{
+				ToBeDeleted: toBeDeleted,
+			}
 			log.Debug("Events instances", zap.Any("resp", successResp))
 			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
 		}
