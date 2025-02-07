@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20230517101801-6d09265b614f
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/slntopp/nocloud v0.0.19-0.20250207055658-93d3dbf29ad3
+	github.com/slntopp/nocloud v0.0.19-0.20250207060517-7eddb37fe70a
 	github.com/slntopp/nocloud-proto v0.0.0-20250207050023-78355039f2b5
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.19.0
