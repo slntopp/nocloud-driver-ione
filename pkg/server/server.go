@@ -480,7 +480,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				data, err = s.PrepareService(ctx, sp, ig, client, group)
 				if err != nil {
 					log.Error("Error Preparing Service", zap.Any("group", ig), zap.Error(err))
-					return nil, err
+					continue
 				}
 
 				ig.Data = data
