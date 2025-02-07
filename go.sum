@@ -114,8 +114,6 @@ github.com/sagikazarmark/locafero v0.4.0/go.mod h1:Pe1W6UlPYUk/+wc/6KFhbORCfqzgY
 github.com/sagikazarmark/slog-shim v0.1.0 h1:diDBnUNK9N/354PgrxMywXnAwEr1QZcOr6gto+ugjYE=
 github.com/sagikazarmark/slog-shim v0.1.0/go.mod h1:SrcSrq8aKtyuqEI1uvTDTK1arOWRIczQRv+GVI1AkeQ=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
-github.com/slntopp/nocloud v0.0.19-0.20250207053230-7e857ab2d2e4 h1:29e8lypfPN+c9MAOLJkBAUzxmuhGUzQqSeCqcoeDtQU=
-github.com/slntopp/nocloud v0.0.19-0.20250207053230-7e857ab2d2e4/go.mod h1:ESOeBJ5UENCOZZcA3iVuQF6Y9D1jNs6UH3Th9IfMIPk=
 github.com/slntopp/nocloud v0.0.19-0.20250207055658-93d3dbf29ad3 h1:OHgT3UxYR50A7D2SPpHRZWSdrHE5zE8sKzqaxCvVFGo=
 github.com/slntopp/nocloud v0.0.19-0.20250207055658-93d3dbf29ad3/go.mod h1:ESOeBJ5UENCOZZcA3iVuQF6Y9D1jNs6UH3Th9IfMIPk=
 github.com/slntopp/nocloud-proto v0.0.0-20250207050023-78355039f2b5 h1:D+ijVHOP+6WGy25mcogcZyBAaWwLGPQGf2PJRFDgm/w=
