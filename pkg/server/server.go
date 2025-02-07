@@ -249,9 +249,12 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 			freePubIps = allIps
 		}
 	} else if !strings.Contains(err.Error(), "resource not found") {
-		s.log.Debug("Failed to obtain user's public vnet",
+		s.log.Error("Failed to obtain user's public vnet",
 			zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
 		return nil, status.Error(codes.Internal, "Failed to obtain user's public vnet")
+	} else {
+		s.log.Warn("Failed to obtain user public vnet because it was not found. Vnet must be created on the next step",
+			zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
 	}
 
 	if public_ips_amount > 0 && public_ips_amount > freePubIps {
