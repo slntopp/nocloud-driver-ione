@@ -581,9 +581,9 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			balance := monitoringBalance[ig.GetUuid()]
 
 			if autoRenew {
-				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance, req.Addons)
+				handleInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, &balance, req.Addons, sp)
 			} else {
-				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, req.Addons)
+				handleNonRegularInstanceBilling(log, s.HandlePublishRecords, s.HandlePublishEvents, client, inst, igStatus, req.Addons, sp)
 			}
 
 			monitoringBalance[ig.GetUuid()] = balance
