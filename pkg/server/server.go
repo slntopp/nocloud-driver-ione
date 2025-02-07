@@ -19,8 +19,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/ansible_config"
@@ -248,7 +248,7 @@ func (s *DriverServiceServer) PrepareService(ctx context.Context, sp *sppb.Servi
 			}
 			freePubIps = allIps
 		}
-	} else if !errors.Is(err, errors.New("resource not found")) {
+	} else if !strings.Contains(err.Error(), "resource not found") {
 		s.log.Debug("Failed to obtain user's public vnet",
 			zap.Error(err), zap.Int("amount", public_ips_amount), zap.Int("user", oneID))
 		return nil, status.Error(codes.Internal, "Failed to obtain user's public vnet")
