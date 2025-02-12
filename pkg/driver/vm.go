@@ -448,8 +448,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 		for _, vm := range vms_pool.VMs {
 			inst, ok := instMapForFastSearch[vm.ID]
 			log := log.With(zap.String("instance", inst.GetUuid()))
-			if !ok || (ok && inst.GetStatus() == statuspb.NoCloudStatus_DEL) {
-				log.Debug("VM not found among initialized Instances or should be deleted", zap.Int("vmid", vm.ID))
+			if ok && inst.GetStatus() == statuspb.NoCloudStatus_DEL {
+				log.Debug("VM should be deleted", zap.Int("vmid", vm.ID))
 				vmInst, err := c.VMToInstance(vm.ID)
 				if err != nil {
 					log.Warn("Error Converting VM to Instance", zap.Error(err))
@@ -459,6 +459,8 @@ func (c *ONeClient) CheckInstancesGroup(IG *pb.InstancesGroup) (*CheckInstancesG
 				uuid := vmInst.GetData()["vm_name"].GetStringValue()
 				vmInst.Uuid = uuid
 				resp.ToBeDeleted = append(resp.ToBeDeleted, vmInst)
+			} else if !ok {
+				log.Warn("WARN: VM NOT FOUND among NoCloud instance", zap.Int("vmid", vm.ID), zap.String("name", vm.Name))
 			}
 		}
 	}
