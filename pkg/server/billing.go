@@ -355,10 +355,13 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		}
 
 		go records(context.Background(), append(resourceRecords, productRecords...))
+		price := getInstancePrice(i)
 		go events(context.Background(), &epb.Event{
 			Uuid: i.GetUuid(),
 			Key:  "instance_renew",
-			Data: map[string]*structpb.Value{},
+			Data: map[string]*structpb.Value{
+				"price": structpb.NewNumberValue(price),
+			},
 		})
 		go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
 	}
