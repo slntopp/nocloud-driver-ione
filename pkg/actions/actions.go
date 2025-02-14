@@ -22,7 +22,9 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	"io"
 	"math"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,7 +79,8 @@ var BillingActions = map[string]ServiceAction{
 }
 
 var AnsibleActions = map[string]AnsibleAction{
-	"exec": BackupInstance,
+	"exec":              BackupInstance,
+	"check_linux_stats": CheckLinuxStats,
 }
 
 var AdminActions = map[string]bool{
@@ -774,4 +777,145 @@ func BackupInstance(
 	return &ipb.InvokeResponse{
 		Result: true,
 	}, nil
+}
+
+func CheckLinuxStats(
+	ctx context.Context,
+	client ansible.AnsibleServiceClient,
+	ansibleParams map[string]any,
+	inst *ipb.Instance,
+	data map[string]*structpb.Value,
+) (*ipb.InvokeResponse, error) {
+	playbook, ok := ansibleParams["check_linux_playbook"].(string)
+	if !ok {
+		return nil, fmt.Errorf("no linux playbook in sp")
+	}
+	if inst == nil || inst.Config == nil {
+		return nil, fmt.Errorf("no config data provided")
+	}
+	// Get hosts data (based on driver)
+	var host, username, password string
+	var port *string
+	//
+	username = inst.GetConfig()["username"].GetStringValue()
+	password = inst.GetConfig()["password"].GetStringValue()
+	host, port, _ = findInstanceHostPort(inst)
+	if err := validateCredentials(host, username, password); err != nil {
+		return nil, err
+	}
+
+	ansibleInstance := &ansible.Instance{
+		Uuid: inst.GetUuid(),
+		Host: host,
+		Port: port,
+		User: &username,
+		Pass: &password,
+	}
+	if err := validateIP(host); err != nil {
+		return &ipb.InvokeResponse{
+			Result: false,
+			Meta:   map[string]*structpb.Value{},
+		}, fmt.Errorf("wrong ip")
+	}
+	if err := validatePort(port); err != nil {
+		return &ipb.InvokeResponse{
+			Result: false,
+			Meta:   map[string]*structpb.Value{},
+		}, fmt.Errorf("wrong port")
+	}
+
+	create, err := client.Create(ctx, &ansible.CreateRunRequest{
+		Run: &ansible.Run{
+			Instances: []*ansible.Instance{
+				ansibleInstance,
+			},
+			PlaybookUuid: playbook,
+			Vars:         map[string]string{},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new runnable instance: %w", err)
+	}
+	_, err = client.Exec(ctx, &ansible.ExecRunRequest{
+		Uuid:       create.GetUuid(),
+		WaitFinish: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute: %w", err)
+	}
+	finished, err := client.Get(ctx, &ansible.GetRunRequest{Uuid: create.GetUuid()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get results: %w", err)
+	}
+	result := ""
+	for _, job := range finished.Jobs {
+		if strings.Contains(job, "Usage Stats") {
+			result = job
+		}
+	}
+
+	return &ipb.InvokeResponse{
+		Result: true,
+		Meta: map[string]*structpb.Value{
+			"result": structpb.NewStringValue(result),
+		},
+	}, nil
+}
+
+func findInstanceHostPort(inst *ipb.Instance) (string, *string, error) {
+	var port *string
+	if inst == nil {
+		return "", port, fmt.Errorf("instance is nil")
+	}
+	if val, ok := inst.GetConfig()["host"]; ok && val.GetStringValue() != "" {
+		if p, ok := inst.GetConfig()["port"]; ok && p.GetStringValue() != "" {
+			pVal := p.GetStringValue()
+			port = &pVal
+		}
+		return val.GetStringValue(), port, nil
+	}
+	for _, i := range inst.GetState().GetInterfaces() {
+		if host, ok := i.GetData()["host"]; ok && host != "" {
+			if p := i.GetData()["port"]; p != "" {
+				port = &p
+			}
+			return host, port, nil
+		}
+	}
+	return "", port, fmt.Errorf("not found")
+}
+func validateIP(ip string) error {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return fmt.Errorf("not valid IP address")
+	}
+
+	if parsedIP.To4() == nil && parsedIP.To16() == nil {
+		return fmt.Errorf("ip address not an IPv4 address nor IPv6")
+	}
+
+	return nil
+}
+func validatePort(port *string) error {
+	if port == nil {
+		return nil
+	}
+
+	if _, err := strconv.Atoi(*port); err != nil {
+		return fmt.Errorf("not a valid port. Must be a number")
+	}
+
+	return nil
+}
+func validateCredentials(host, password, username string) error {
+	if host == "" {
+		return fmt.Errorf("no host")
+	}
+	if username == "" {
+		return fmt.Errorf("no username")
+	}
+	if password == "" {
+		return fmt.Errorf("no password")
+	}
+	return nil
 }
