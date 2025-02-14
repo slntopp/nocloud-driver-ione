@@ -24,6 +24,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -848,9 +849,16 @@ func CheckLinuxStats(
 		return nil, fmt.Errorf("failed to get results: %w", err)
 	}
 	result := ""
-	for _, job := range finished.Jobs {
-		if strings.Contains(job, "Usage Stats") {
-			result = job
+	numbers := make([]int, 0)
+	for num := range finished.Jobs {
+		n, _ := strconv.Atoi(num)
+		numbers = append(numbers, n)
+	}
+	slices.Sort(numbers)
+	for _, num := range numbers {
+		content := finished.Jobs[strconv.Itoa(num)]
+		if strings.Contains(content, "Usage Stats") {
+			result = content
 		}
 	}
 
