@@ -855,6 +855,7 @@ func CheckLinuxStats(
 	}
 
 	jsonRes := make(map[string]any)
+	log.Debug("output", zap.String("ansible_result", result), zap.Any("in_json", jsonRes))
 	if err = json.Unmarshal([]byte(result), &jsonRes); err != nil {
 		return nil, fmt.Errorf("failed to get results: %w", err)
 	}
