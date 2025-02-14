@@ -868,7 +868,7 @@ func CheckLinuxStats(
 		return nil, fmt.Errorf("failed to get results: %w", err)
 	}
 	playbookOutput, ok := jsonRes["stdout"].(string)
-	if !ok {
+	if !ok || playbookOutput == "" {
 		return nil, fmt.Errorf("failed to get results. No results")
 	}
 
