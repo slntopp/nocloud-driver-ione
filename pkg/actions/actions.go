@@ -854,10 +854,19 @@ func CheckLinuxStats(
 		}
 	}
 
+	jsonRes := make(map[string]any)
+	if err = json.Unmarshal([]byte(result), &jsonRes); err != nil {
+		return nil, fmt.Errorf("failed to get results: %w", err)
+	}
+	playbookOutput, ok := jsonRes["stdout"].(string)
+	if !ok {
+		return nil, fmt.Errorf("failed to get results. No results")
+	}
+
 	return &ipb.InvokeResponse{
 		Result: true,
 		Meta: map[string]*structpb.Value{
-			"result": structpb.NewStringValue(result),
+			"result": structpb.NewStringValue(playbookOutput),
 		},
 	}, nil
 }
