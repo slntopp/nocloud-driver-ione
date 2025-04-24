@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/OpenNebula/one/src/oca/go/src/goca v0.0.0-20230517101801-6d09265b614f
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/slntopp/nocloud v0.0.19-0.20250423105430-e6a02ee58d30
+	github.com/slntopp/nocloud v0.0.19-0.20250424175511-23c6a04abd89
 	github.com/slntopp/nocloud-proto v0.0.0-20250422232916-e44764040fe0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.19.0
