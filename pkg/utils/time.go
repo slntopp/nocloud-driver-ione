@@ -1,6 +1,8 @@
 package utils
 
 import (
+	ipb "github.com/slntopp/nocloud-proto/instances"
+	"github.com/slntopp/nocloud/pkg/nocloud/periods"
 	"time"
 )
 
@@ -12,10 +14,14 @@ type Clock struct{}
 
 func (Clock) Now() time.Time { return time.Now() }
 
-func AlignPaymentDate(start int64, end int64, period int64) int64 {
+func AlignPaymentDate(start int64, end int64, period int64, inst *ipb.Instance) int64 {
 	// Apply only on month period
 	if period != 30*86400 {
 		return end
+	}
+	// If instance has start date, then apply billing month
+	if start <= end && (inst != nil && inst.GetMeta() != nil && inst.GetMeta().Started > 0) {
+		return periods.GetNextDate(start, periods.BillingMonth, inst.GetMeta().Started)
 	}
 
 	daysInMonth := func(year int, month time.Month) int {

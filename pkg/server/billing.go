@@ -892,7 +892,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		end := start + period
 
 		if p.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-			end = utils.AlignPaymentDate(start, end, period)
+			end = utils.AlignPaymentDate(start, end, period, i)
 		}
 
 		recs = append(recs, &billingpb.Record{
@@ -920,7 +920,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 		end := start + resource.GetPeriod()
 
 		if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-			end = utils.AlignPaymentDate(start, end, period)
+			end = utils.AlignPaymentDate(start, end, period, i)
 		}
 
 		if strings.Contains(resource.GetKey(), "drive") {
@@ -991,7 +991,7 @@ func handleManualRenewBilling(logger *zap.Logger, records RecordsPublisherFunc, 
 
 		end := lm + prod.GetPeriod()
 		if prod.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-			end = utils.AlignPaymentDate(lm, end, prod.GetPeriod())
+			end = utils.AlignPaymentDate(lm, end, prod.GetPeriod(), i)
 		}
 
 		i.Data[fmt.Sprintf("addon_%s_last_monitoring", addonId)] = structpb.NewNumberValue(float64(end))
@@ -1185,7 +1185,7 @@ func handleCapacityBilling(log *zap.Logger, amount func() float64, ltl LazyTimel
 			}
 
 			if res.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				end = utils.AlignPaymentDate(last, end, res.Period)
+				end = utils.AlignPaymentDate(last, end, res.Period, i)
 			}
 
 			records = append(records, &billingpb.Record{
@@ -1232,7 +1232,7 @@ func handleAddonBilling(log *zap.Logger, i *ipb.Instance, last int64, priority b
 		for end := last + period; end <= time.Now().Unix(); end += period {
 
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				end = utils.AlignPaymentDate(last, end, period)
+				end = utils.AlignPaymentDate(last, end, period, i)
 			}
 
 			records = append(records, &billingpb.Record{
@@ -1248,7 +1248,7 @@ func handleAddonBilling(log *zap.Logger, i *ipb.Instance, last int64, priority b
 		log.Debug("Handling Prepaid Billing", zap.Any("addon", addon.GetUuid()), zap.Int64("end", end), zap.Int64("now", time.Now().Unix()))
 		for ; last <= time.Now().Unix(); end += period {
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				end = utils.AlignPaymentDate(last, end, product.Period)
+				end = utils.AlignPaymentDate(last, end, product.Period, i)
 			}
 			records = append(records, &billingpb.Record{
 				Addon:    addon.GetUuid(),
@@ -1278,7 +1278,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 		for end := last + product.Period; end <= time.Now().Unix(); end += product.Period {
 
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				end = utils.AlignPaymentDate(last, end, product.Period)
+				end = utils.AlignPaymentDate(last, end, product.Period, i)
 			}
 
 			records = append(records, &billingpb.Record{
@@ -1294,7 +1294,7 @@ func handleStaticBilling(log *zap.Logger, i *ipb.Instance, last int64, priority 
 		log.Debug("Handling Prepaid Billing", zap.Any("product", product), zap.Int64("end", end), zap.Int64("now", time.Now().Unix()))
 		for ; last <= time.Now().Unix(); end += product.Period {
 			if product.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-				end = utils.AlignPaymentDate(last, end, product.Period)
+				end = utils.AlignPaymentDate(last, end, product.Period, i)
 			}
 			records = append(records, &billingpb.Record{
 				Product:  *i.Product,

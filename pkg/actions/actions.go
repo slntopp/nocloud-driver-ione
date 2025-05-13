@@ -541,7 +541,7 @@ func FreeRenew(
 
 	end := lastMonitoringValue + period
 	if pkind != billingpb.PeriodKind_DEFAULT {
-		end = utils.AlignPaymentDate(lastMonitoringValue, end, period)
+		end = utils.AlignPaymentDate(lastMonitoringValue, end, period, inst)
 	}
 
 	instData["last_monitoring"] = structpb.NewNumberValue(float64(end))
@@ -556,7 +556,7 @@ func FreeRenew(
 		lm := int64(lmValue.GetNumberValue())
 		end := lm + period
 		if resource.GetPeriodKind() != billingpb.PeriodKind_DEFAULT {
-			end = utils.AlignPaymentDate(lm, end, period)
+			end = utils.AlignPaymentDate(lm, end, period, inst)
 		}
 		instData[key] = structpb.NewNumberValue(float64(end))
 	}
@@ -568,7 +568,7 @@ func FreeRenew(
 			lm := int64(lmValue.GetNumberValue())
 			end := lm + period
 			if pkind != billingpb.PeriodKind_DEFAULT {
-				end = utils.AlignPaymentDate(lm, end, period)
+				end = utils.AlignPaymentDate(lm, end, period, inst)
 			}
 			instData[key] = structpb.NewNumberValue(float64(end))
 		}
@@ -600,7 +600,7 @@ func CancelRenew(
 
 	period := billingPlan.GetProducts()[instProduct].GetPeriod()
 
-	lastMonitoringValue = utils.AlignPaymentDate(lastMonitoringValue, lastMonitoringValue-period, period)
+	lastMonitoringValue = utils.AlignPaymentDate(lastMonitoringValue, lastMonitoringValue-period, period, inst)
 	lastMonitoringValue = int64(math.Max(float64(lastMonitoringValue), float64(inst.Created)))
 	instData["last_monitoring"] = structpb.NewNumberValue(float64(lastMonitoringValue))
 
@@ -612,7 +612,7 @@ func CancelRenew(
 			continue
 		}
 		lm := int64(lmValue.GetNumberValue())
-		lm = utils.AlignPaymentDate(lm, lm-period, period)
+		lm = utils.AlignPaymentDate(lm, lm-period, period, inst)
 		lm = int64(math.Max(float64(lm), float64(inst.Created)))
 		instData[key] = structpb.NewNumberValue(float64(lm))
 	}
@@ -622,7 +622,7 @@ func CancelRenew(
 		lmValue, ok := instData[key]
 		if ok {
 			lm := int64(lmValue.GetNumberValue())
-			lm = utils.AlignPaymentDate(lm, lm-period, period)
+			lm = utils.AlignPaymentDate(lm, lm-period, period, inst)
 			instData[key] = structpb.NewNumberValue(float64(lm))
 		}
 	}
