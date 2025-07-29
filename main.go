@@ -164,7 +164,8 @@ func SetupRecordsPublisher(rbmq *amqp.Connection) server.RecordsPublisherFunc {
 				continue
 			}
 			if err = ch.PublishWithContext(ctx, "", qName, false, false, amqp.Publishing{
-				ContentType: "text/plain", Body: body,
+				DeliveryMode: amqp.Persistent,
+				ContentType:  "text/plain", Body: body,
 			}); err != nil {
 				log.Error("Error while publishing record", zap.Error(err))
 			}
