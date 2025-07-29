@@ -578,6 +578,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				if err != nil {
 					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
 				}
+				datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
 			}
 			instConfig := inst.GetConfig()
 			autoRenew := false

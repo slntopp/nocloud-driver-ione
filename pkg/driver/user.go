@@ -103,6 +103,7 @@ func (c *ONeClient) CheckOrphanInstanceGroup(instanceGroup *pb.InstancesGroup, u
 		return nil
 	}
 
+	c.log.Warn("Old user not found. Changing user to new user", zap.Any("usergroup", userGroup), zap.String("ig", instanceGroup.GetUuid()))
 	hasher := sha256.New()
 	hasher.Write([]byte(username + time.Now().String()))
 	pass := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
