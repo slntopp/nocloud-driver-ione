@@ -782,17 +782,15 @@ func BackupInstance(
 	create, err := client.Create(ctx, &ansible.CreateRunRequest{
 		Run: run,
 	})
-
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create ansible run: %w", err)
 	}
 
 	_, err = client.Exec(ctx, &ansible.ExecRunRequest{
 		Uuid: create.GetUuid(),
 	})
-
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to start execution of ansible run: %w", err)
 	}
 
 	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
