@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
 	"io"
 	"math"
 	"net"
@@ -54,6 +55,7 @@ type AnsibleAction func(
 	map[string]any,
 	*ipb.Instance,
 	map[string]*structpb.Value,
+	*sppb.ServicesProvider,
 ) (*ipb.InvokeResponse, error)
 
 var Actions = map[string]ServiceAction{
@@ -686,7 +688,12 @@ func BackupInstance(
 	ansibleParams map[string]any,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
+	sp *sppb.ServicesProvider,
 ) (*ipb.InvokeResponse, error) {
+	oneClient, err := one.NewClientFromSP(sp, log)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
+	}
 	playbookUuid, ok := ansibleParams["playbook_uuid"].(string)
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
@@ -696,12 +703,26 @@ func BackupInstance(
 		return nil, status.Errorf(codes.InvalidArgument, "No ansible playbook")
 	}
 
-	host := data["host"].GetStringValue()
-	vm_dir := data["vm_dir"].GetStringValue()
-	snapshot_date := data["snapshot_date"].GetStringValue()
+	// Set all params
+	host, port, err := findInstanceHostPort(inst)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "No instance address")
+	}
+	vm, err := oneClient.FindVMByInstance(inst)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to get vm by instance: %s", err.Error()))
+	}
+	monitoring, err := oneClient.Monitoring(vm.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to do monitoring: %s", err.Error()))
+	}
+	log.Debug("Monitoring data", zap.Any("xml", monitoring.XMLName), zap.Any("records", monitoring.Records))
+	vmDir := data["vm_dir"].GetStringValue()
+	snapshotDate := data["snapshot_date"].GetStringValue()
 
 	ansibleInstance := &ansible.Instance{
 		Host: host,
+		Port: port,
 	}
 
 	hopHost, ok := hop["host"].(string)
@@ -740,24 +761,24 @@ func BackupInstance(
 		ansibleInstance.AnsibleHost = &ansibleHost
 	}
 
-	log.Debug("inst", zap.Any("inst", ansibleInstance))
-
-	create, err := client.Create(ctx, &ansible.CreateRunRequest{
-		Run: &ansible.Run{
-			SshKey: &hopSsh,
-			Instances: []*ansible.Instance{
-				ansibleInstance,
-			},
-			PlaybookUuid: playbookUuid,
-			Vars: map[string]string{
-				"vm_dir":        vm_dir,
-				"snapshot_date": snapshot_date,
-			},
-			Hop: &ansible.Instance{
-				Host: hopHost,
-				Port: &hopPort,
-			},
+	run := &ansible.Run{
+		SshKey: &hopSsh,
+		Instances: []*ansible.Instance{
+			ansibleInstance,
 		},
+		PlaybookUuid: playbookUuid,
+		Vars: map[string]string{
+			"vm_dir":        vmDir,
+			"snapshot_date": snapshotDate,
+		},
+		Hop: &ansible.Instance{
+			Host: hopHost,
+			Port: &hopPort,
+		},
+	}
+	log.Debug("Backup run", zap.Any("run", run))
+	create, err := client.Create(ctx, &ansible.CreateRunRequest{
+		Run: run,
 	})
 
 	if err != nil {
@@ -786,6 +807,7 @@ func CheckLinuxStats(
 	ansibleParams map[string]any,
 	inst *ipb.Instance,
 	data map[string]*structpb.Value,
+	sp *sppb.ServicesProvider,
 ) (*ipb.InvokeResponse, error) {
 	playbook, ok := ansibleParams["check_linux_playbook"].(string)
 	if !ok {
