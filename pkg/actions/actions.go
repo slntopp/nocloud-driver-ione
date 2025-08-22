@@ -690,7 +690,9 @@ func BackupInstance(
 	data map[string]*structpb.Value,
 	sp *sppb.ServicesProvider,
 ) (*ipb.InvokeResponse, error) {
-	oneClient, err := one.NewClientFromSP(sp, log)
+	logger := log.Named("BackupInstance")
+
+	oneClient, err := one.NewClientFromSP(sp, logger)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Error making client: %v", err)
 	}
@@ -716,7 +718,7 @@ func BackupInstance(
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to do monitoring: %s", err.Error()))
 	}
-	log.Debug("Monitoring data", zap.Any("xml", monitoring.XMLName), zap.Any("records", monitoring.Records))
+	logger.Debug("Monitoring data", zap.Any("xml", monitoring.XMLName), zap.Any("records", monitoring.Records))
 	vmDir := data["vm_dir"].GetStringValue()
 	snapshotDate := data["snapshot_date"].GetStringValue()
 
@@ -776,7 +778,7 @@ func BackupInstance(
 			Port: &hopPort,
 		},
 	}
-	log.Debug("Backup run", zap.Any("run", run))
+	logger.Debug("Backup run", zap.Any("run", run))
 	create, err := client.Create(ctx, &ansible.CreateRunRequest{
 		Run: run,
 	})
