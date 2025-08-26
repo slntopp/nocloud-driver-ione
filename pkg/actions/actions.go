@@ -718,8 +718,17 @@ func BackupInstance(
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to do monitoring: %s", err.Error()))
 	}
-	logger.Debug("Monitoring data", zap.Any("xml", monitoring.XMLName), zap.Any("records", monitoring.Records))
-	vmDir := data["vm_dir"].GetStringValue()
+	var vmDir string
+	for _, rec := range monitoring.Records {
+		el, err := rec.GetPair("DISK_0_ACTUAL_PATH")
+		if err == nil {
+			vmDir = el.Value
+		}
+	}
+	logger.Debug("Monitoring data", zap.String("vm_dir", vmDir))
+	if vmDir == "" {
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Empty vmdir"))
+	}
 	snapshotDate := data["snapshot_date"].GetStringValue()
 
 	ansibleInstance := &ansible.Instance{
