@@ -750,6 +750,10 @@ func BackupInstance(
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "No hop ssh")
 	}
+	var hopSshValue *string
+	if hopSsh != "" {
+		hopSshValue = &hopSsh
+	}
 
 	info := hop["info"]
 	if info != nil {
@@ -775,7 +779,7 @@ func BackupInstance(
 	}
 
 	run := &ansible.Run{
-		SshKey: &hopSsh,
+		SshKey: hopSshValue,
 		Instances: []*ansible.Instance{
 			ansibleInstance,
 		},
