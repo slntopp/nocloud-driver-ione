@@ -25,6 +25,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -725,6 +726,7 @@ func BackupInstance(
 			vmDir = el.Value
 		}
 	}
+	vmDir = ExtractVMDir(vmDir)
 	logger.Debug("Monitoring data", zap.String("vm_dir", vmDir))
 	if vmDir == "" {
 		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Empty vmdir"))
@@ -808,6 +810,22 @@ func BackupInstance(
 	return &ipb.InvokeResponse{
 		Result: true,
 	}, nil
+}
+
+func ExtractVMDir(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "[") {
+		if i := strings.IndexRune(s, ']'); i >= 0 {
+			s = strings.TrimSpace(s[i+1:])
+		}
+	}
+	s = strings.TrimSpace(s)
+	s = strings.TrimRight(s, "/")
+	if !strings.Contains(s, "/") {
+		return ""
+	}
+	dir := path.Dir(s)
+	return strings.Trim(dir, "/")
 }
 
 func CheckLinuxStats(
