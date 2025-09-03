@@ -745,10 +745,20 @@ func BackupInstance(
 	if !ok || datastoreHost == "" {
 		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to find datastore host: %s", datastoreKey))
 	}
-	defaultSSHPort := "22"
+	var port *string
+	datastorePort, ok := datastore["ansible_ssh_port"].(string)
+	if ok && datastorePort != "" {
+		port = &datastorePort
+	}
+	var python *string
+	datastorePython, ok := datastore["ansible_python_interpreter"].(string)
+	if ok && datastorePython != "" {
+		python = &datastorePython
+	}
 	ansibleInstance := &ansible.Instance{
-		Host: datastoreHost,
-		Port: &defaultSSHPort,
+		Host:   datastoreHost,
+		Port:   port,
+		Python: python,
 	}
 
 	var (
