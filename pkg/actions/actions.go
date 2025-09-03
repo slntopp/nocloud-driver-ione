@@ -707,7 +707,7 @@ func BackupInstance(
 	}
 
 	// Set all params
-	host, port, err := findInstanceHostPort(inst)
+	host, _, err := findInstanceHostPort(inst)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "No instance address")
 	}
@@ -726,37 +726,61 @@ func BackupInstance(
 			vmDir = el.Value
 		}
 	}
-	vmDir = ExtractVMDir(vmDir)
-	logger.Debug("Monitoring data", zap.String("vm_dir", vmDir))
+	vmDir, datastoreKey := ExtractVMDirAndDatastore(vmDir)
+	logger.Debug("Monitoring data", zap.String("vm_dir", vmDir), zap.String("datastore", datastoreKey))
 	if vmDir == "" {
 		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Empty vmdir"))
 	}
 	snapshotDate := data["snapshot_date"].GetStringValue()
 
+	datastores, ok := ansibleParams["datastores"].(map[string]any)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to find datastores in service provider"))
+	}
+	datastore, ok := datastores[datastoreKey].(map[string]any)
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to find datastore by found datastore key: %s", datastoreKey))
+	}
+	datastoreHost, ok := datastore["ansible_host"].(string)
+	if !ok || datastoreHost == "" {
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to find datastore host: %s", datastoreKey))
+	}
+	defaultSSHPort := "22"
 	ansibleInstance := &ansible.Instance{
-		Host: host,
-		Port: port,
+		Host: datastoreHost,
+		Port: &defaultSSHPort,
 	}
 
-	hopHost, ok := hop["host"].(string)
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "No hop host")
-	}
-	hopPort, ok := hop["port"].(string)
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "No hop port")
-	}
-	hopSsh, ok := hop["ssh"].(string)
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "No hop ssh")
-	}
-	var hopSshValue *string
-	if hopSsh != "" {
-		hopSshValue = &hopSsh
+	var (
+		hopInstance      *ansible.Instance
+		hopHost, hopPort string
+		hopSshValue      *string
+	)
+	hopEnabled, _ := hop["enabled"].(bool)
+	if hopEnabled {
+		hopHost, ok = hop["host"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No hop host")
+		}
+		hopPort, ok = hop["port"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No hop port")
+		}
+		hopSsh, ok := hop["ssh"].(string)
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "No hop ssh")
+		}
+		if hopSsh != "" {
+			hopSshValue = &hopSsh
+		}
+		hopInstance = &ansible.Instance{
+			Host: hopHost,
+			Port: &hopPort,
+		}
 	}
 
 	info := hop["info"]
-	if info != nil {
+	if info != nil && hopEnabled {
 		infoVal, ok := info.(map[string]any)
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to parse info")
@@ -788,10 +812,7 @@ func BackupInstance(
 			"vm_dir":        vmDir,
 			"snapshot_date": snapshotDate,
 		},
-		Hop: &ansible.Instance{
-			Host: hopHost,
-			Port: &hopPort,
-		},
+		Hop: hopInstance,
 	}
 	logger.Debug("Backup run", zap.Any("run", run))
 	create, err := client.Create(ctx, &ansible.CreateRunRequest{
@@ -816,20 +837,22 @@ func BackupInstance(
 	}, nil
 }
 
-func ExtractVMDir(s string) string {
+func ExtractVMDirAndDatastore(s string) (string, string) {
+	var datastore string
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "[") {
 		if i := strings.IndexRune(s, ']'); i >= 0 {
+			datastore = s[1:i]
 			s = strings.TrimSpace(s[i+1:])
 		}
 	}
 	s = strings.TrimSpace(s)
 	s = strings.TrimRight(s, "/")
 	if !strings.Contains(s, "/") {
-		return ""
+		return "", datastore
 	}
 	dir := path.Dir(s)
-	return strings.Trim(dir, "/")
+	return strings.Trim(dir, "/"), datastore
 }
 
 func CheckLinuxStats(
