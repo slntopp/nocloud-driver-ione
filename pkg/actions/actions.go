@@ -825,8 +825,8 @@ func BackupInstance(
 		return nil, fmt.Errorf("failed to poweroff vm: %w", err)
 	}
 	defer func() {
-		if err = oneClient.RebootVM(vm.ID, true); err != nil {
-			logger.Error("Failed to reboot vm", zap.Error(err))
+		if err = oneClient.ResumeVM(vm.ID); err != nil {
+			logger.Error("Failed to resume vm", zap.Error(err))
 		}
 	}()
 	logger.Debug("Waiting for vm poweroff", zap.Int("vm", vm.ID))
