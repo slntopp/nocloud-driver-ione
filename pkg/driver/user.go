@@ -77,6 +77,16 @@ func (c *ONeClient) waitForHotplugFinish(vmid int) {
 	}
 }
 
+func (c *ONeClient) WaitForPoweroff(vmid int) {
+	for {
+		vmState, _, _, _, _ := c.StateVM(vmid)
+		if vmState == int(vm.Poweroff) {
+			return
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
 // Check if user related to the Instance Group exists.
 //
 // If not, create a new user and change ownership of virtual machines to this user.

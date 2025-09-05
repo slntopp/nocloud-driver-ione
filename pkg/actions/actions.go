@@ -825,6 +825,12 @@ func BackupInstance(
 		Hop: hopInstance,
 	}
 	logger.Debug("Backup run", zap.Any("run", run))
+	if err = oneClient.PoweroffVM(vm.ID, true); err != nil {
+		return nil, fmt.Errorf("failed to poweroff vm: %w", err)
+	}
+	logger.Debug("Waiting for vm poweroff", zap.Int("vm", vm.ID))
+	oneClient.WaitForPoweroff(vm.ID)
+	logger.Debug("Poweroff complete", zap.Int("vm", vm.ID))
 	create, err := client.Create(ctx, &ansible.CreateRunRequest{
 		Run: run,
 	})
@@ -832,15 +838,20 @@ func BackupInstance(
 		return nil, fmt.Errorf("failed to create ansible run: %w", err)
 	}
 
-	_, err = client.Exec(ctx, &ansible.ExecRunRequest{
-		Uuid: create.GetUuid(),
+	_, err = client.Exec(context.Background(), &ansible.ExecRunRequest{
+		Uuid:       create.GetUuid(),
+		WaitFinish: true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to start execution of ansible run: %w", err)
+		return nil, fmt.Errorf("failed to execute ansible run: %w", err)
 	}
 
 	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
 	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+
+	if err = oneClient.RebootVM(vm.ID, true); err != nil {
+		return nil, fmt.Errorf("failed to reboot vm: %w", err)
+	}
 
 	return &ipb.InvokeResponse{
 		Result: true,
