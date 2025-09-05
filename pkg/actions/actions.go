@@ -707,10 +707,6 @@ func BackupInstance(
 	}
 
 	// Set all params
-	host, _, err := findInstanceHostPort(inst)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "No instance address")
-	}
 	vm, err := oneClient.FindVMByInstance(inst)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("Failed to get vm by instance: %s", err.Error()))
@@ -796,7 +792,7 @@ func BackupInstance(
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to parse info")
 		}
 
-		hostInfo, ok := infoVal[host].(map[string]any)
+		hostInfo, ok := infoVal[datastoreHost].(map[string]any)
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to host info")
 		}
