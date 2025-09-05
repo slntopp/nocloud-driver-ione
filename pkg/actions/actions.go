@@ -850,10 +850,6 @@ func BackupInstance(
 	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
 	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 
-	if err = oneClient.RebootVM(vm.ID, true); err != nil {
-		return nil, fmt.Errorf("failed to reboot vm: %w", err)
-	}
-
 	return &ipb.InvokeResponse{
 		Result: true,
 	}, nil
