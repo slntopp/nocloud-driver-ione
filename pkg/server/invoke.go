@@ -105,7 +105,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 			return nil, status.Errorf(codes.InvalidArgument, "No ansible config")
 		}
 		ansibleSecretValue := ansibleSecret.GetStructValue().AsMap()
-		return ansibleAction(s.ansibleCtx, s.ansibleClient, ansibleSecretValue, instance, req.GetParams())
+		return ansibleAction(s.ansibleCtx, s.ansibleClient, ansibleSecretValue, instance, req.GetParams(), sp)
 	}
 
 	return nil, status.Errorf(codes.PermissionDenied, "Action %s is not declared", method)
