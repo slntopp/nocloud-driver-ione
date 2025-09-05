@@ -838,7 +838,7 @@ func BackupInstance(
 		return nil, fmt.Errorf("failed to create ansible run: %w", err)
 	}
 
-	_, err = client.Exec(context.Background(), &ansible.ExecRunRequest{
+	_, err = client.Exec(context.WithoutCancel(ctx), &ansible.ExecRunRequest{
 		Uuid:       create.GetUuid(),
 		WaitFinish: true,
 	})
