@@ -42,6 +42,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	opennebulavm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 )
 
 type ServiceAction func(
@@ -821,8 +823,11 @@ func BackupInstance(
 		Hop: hopInstance,
 	}
 	logger.Debug("Backup run", zap.Any("run", run))
-	if err = oneClient.PoweroffVM(vm.ID, true); err != nil {
-		return nil, fmt.Errorf("failed to poweroff vm: %w", err)
+	vmState, _, _, _, _ := oneClient.StateVM(vm.ID)
+	if vmState != int(opennebulavm.Poweroff) {
+		if err = oneClient.PoweroffVM(vm.ID, true); err != nil {
+			return nil, fmt.Errorf("failed to poweroff vm: %w", err)
+		}
 	}
 	defer func() {
 		if err = oneClient.ResumeVM(vm.ID); err != nil {
