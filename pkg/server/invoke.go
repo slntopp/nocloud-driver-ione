@@ -52,6 +52,16 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
+	action, ok := actions.BillingActions[method]
+	if ok {
+		if method == "manual_renew" {
+			go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+			return &ipb.InvokeResponse{Result: true}, nil
+		} else {
+			return action(client, instance, req.GetParams())
+		}
+	}
+
 	// Check for running backup
 	runningPlaybook := instance.GetData()["running_playbook"].GetStringValue()
 	runningPlaybookStart := instance.GetData()["running_playbook_start"].GetNumberValue()
@@ -76,17 +86,6 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 				go datas.DataPublisher(datas.POST_INST_DATA)(instance.GetUuid(), instance.GetData())
 			}
 		}
-	}
-
-	action, ok := actions.BillingActions[method]
-	if ok {
-		if method == "manual_renew" {
-			go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
-			return &ipb.InvokeResponse{Result: true}, nil
-		} else {
-			return action(client, instance, req.GetParams())
-		}
-		return &ipb.InvokeResponse{Result: true}, err
 	}
 
 	if req.GetInstance().GetData()["freeze"].GetBoolValue() && req.GetMethod() != "unfreeze" {
