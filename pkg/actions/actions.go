@@ -42,6 +42,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	opennebulavm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 )
 
 type ServiceAction func(
@@ -821,8 +823,11 @@ func BackupInstance(
 		Hop: hopInstance,
 	}
 	logger.Debug("Backup run", zap.Any("run", run))
-	if err = oneClient.PoweroffVM(vm.ID, true); err != nil {
-		return nil, fmt.Errorf("failed to poweroff vm: %w", err)
+	vmState, _, _, _, _ := oneClient.StateVM(vm.ID)
+	if vmState != int(opennebulavm.Poweroff) {
+		if err = oneClient.PoweroffVM(vm.ID, true); err != nil {
+			return nil, fmt.Errorf("failed to poweroff vm: %w", err)
+		}
 	}
 	defer func() {
 		if err = oneClient.ResumeVM(vm.ID); err != nil {
@@ -839,16 +844,19 @@ func BackupInstance(
 		return nil, fmt.Errorf("failed to create ansible run: %w", err)
 	}
 
+	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
+	inst.Data["running_playbook_start"] = structpb.NewNumberValue(float64(time.Now().Unix()))
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	_, err = client.Exec(context.WithoutCancel(ctx), &ansible.ExecRunRequest{
 		Uuid:       create.GetUuid(),
 		WaitFinish: true,
 	})
 	if err != nil {
+		inst.Data["running_playbook"] = structpb.NewStringValue("")
+		inst.Data["running_playbook_start"] = structpb.NewNumberValue(0)
+		datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 		return nil, fmt.Errorf("failed to execute ansible run: %w", err)
 	}
-
-	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
-	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 
 	return &ipb.InvokeResponse{
 		Result: true,

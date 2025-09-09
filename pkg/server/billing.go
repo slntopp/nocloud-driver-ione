@@ -434,8 +434,8 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			last = created
 		}
 
-		handler, ok := handlers.Get(resource.Key)
-		if !ok {
+		handler, hOk := handlers.Get(resource.Key)
+		if !hOk {
 			log.Warn("Handler not found", zap.String("resource", resource.Key))
 			continue
 		}
@@ -561,6 +561,54 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		}
 	}
 
+	var sum float64
+	for _, rec := range resourceRecords {
+		sum += rec.GetTotal() * calculateResourcePrice(i, rec.Resource)
+	}
+	for _, rec := range productRecords {
+		if rec.Addon != "" {
+			sum += rec.GetTotal() * calculateAddonPrice(addons, i, rec.Addon)
+		} else {
+			sum += rec.GetTotal() * calculateProductPrice(i, rec.Product)
+		}
+	}
+
+	if sum > 0 && sum > *balance {
+		if state != "SUSPENDED" {
+
+			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
+				if err := client.SuspendVM(vmid); err != nil {
+					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+				}
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_suspended",
+					Data: map[string]*structpb.Value{},
+				})
+			} else {
+				log.Debug("Not suspending VM because it is forbidden by suspend rules")
+			}
+
+		}
+		return
+	}
+
+	*balance -= sum
+
+	go records(context.Background(), append(resourceRecords, productRecords...))
+	if len(productRecords) != 0 && state != "SUSPENDED" {
+		if !first_payment {
+			price := getInstancePrice(i)
+			go events(context.Background(), &epb.Event{
+				Uuid: i.GetUuid(),
+				Key:  "instance_renew",
+				Data: map[string]*structpb.Value{
+					"price": structpb.NewNumberValue(price),
+				},
+			})
+		}
+	}
+
 	if !isOnePayment {
 
 		log.Debug("Putting new Records", zap.Any("productRecords", productRecords), zap.Any("resourceRecords", resourceRecords))
@@ -636,53 +684,6 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 		}
 	}
 
-	var sum float64
-	for _, rec := range resourceRecords {
-		sum += rec.GetTotal() * calculateResourcePrice(i, rec.Resource)
-	}
-	for _, rec := range productRecords {
-		if rec.Addon != "" {
-			sum += rec.GetTotal() * calculateAddonPrice(addons, i, rec.Addon)
-		} else {
-			sum += rec.GetTotal() * calculateProductPrice(i, rec.Product)
-		}
-	}
-
-	if sum > 0 && sum > *balance {
-		if state != "SUSPENDED" {
-
-			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
-				if err := client.SuspendVM(vmid); err != nil {
-					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
-				}
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_suspended",
-					Data: map[string]*structpb.Value{},
-				})
-			} else {
-				log.Debug("Not suspending VM because it is forbidden by suspend rules")
-			}
-
-		}
-		return
-	}
-
-	*balance -= sum
-
-	go records(context.Background(), append(resourceRecords, productRecords...))
-	if len(productRecords) != 0 && state != "SUSPENDED" {
-		if !first_payment {
-			price := getInstancePrice(i)
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_renew",
-				Data: map[string]*structpb.Value{
-					"price": structpb.NewNumberValue(price),
-				},
-			})
-		}
-	}
 	go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
 }
 

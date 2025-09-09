@@ -23,6 +23,7 @@ import (
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
 	"google.golang.org/protobuf/types/known/structpb"
+	"time"
 
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
@@ -51,24 +52,6 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		return nil, status.Errorf(codes.PermissionDenied, "Action %s is admin action", method)
 	}
 
-	runningPlaybook := instance.GetData()["running_playbook"].GetStringValue()
-
-	if runningPlaybook != "" {
-		get, err := s.ansibleClient.Get(s.ansibleCtx, &ansible.GetRunRequest{
-			Uuid: runningPlaybook,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if get.GetStatus() == "running" {
-			return nil, errors.New("playbook still running")
-		}
-		if get.GetStatus() == "successful" || get.GetStatus() == "failed" || get.GetStatus() == "undefined" {
-			instance.Data["running_playbook"] = structpb.NewStringValue("")
-			go datas.DataPublisher(datas.POST_INST_DATA)(instance.GetUuid(), instance.GetData())
-		}
-	}
-
 	action, ok := actions.BillingActions[method]
 	if ok {
 		if method == "manual_renew" {
@@ -77,7 +60,32 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 		} else {
 			return action(client, instance, req.GetParams())
 		}
-		return &ipb.InvokeResponse{Result: true}, err
+	}
+
+	// Check for running backup
+	runningPlaybook := instance.GetData()["running_playbook"].GetStringValue()
+	runningPlaybookStart := instance.GetData()["running_playbook_start"].GetNumberValue()
+	if runningPlaybook != "" {
+		if runningPlaybookStart != 0 && int64(runningPlaybookStart)+86400*2 < time.Now().Unix() {
+			instance.Data["running_playbook"] = structpb.NewStringValue("")
+			instance.Data["running_playbook_start"] = structpb.NewNumberValue(0)
+			go datas.DataPublisher(datas.POST_INST_DATA)(instance.GetUuid(), instance.GetData())
+		} else {
+			get, err := s.ansibleClient.Get(s.ansibleCtx, &ansible.GetRunRequest{
+				Uuid: runningPlaybook,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if get.GetStatus() == "running" {
+				return nil, errors.New("backup still running")
+			}
+			if get.GetStatus() == "successful" || get.GetStatus() == "failed" || get.GetStatus() == "undefined" {
+				instance.Data["running_playbook"] = structpb.NewStringValue("")
+				instance.Data["running_playbook_start"] = structpb.NewNumberValue(0)
+				go datas.DataPublisher(datas.POST_INST_DATA)(instance.GetUuid(), instance.GetData())
+			}
+		}
 	}
 
 	if req.GetInstance().GetData()["freeze"].GetBoolValue() && req.GetMethod() != "unfreeze" {
