@@ -839,16 +839,19 @@ func BackupInstance(
 		return nil, fmt.Errorf("failed to create ansible run: %w", err)
 	}
 
+	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
+	inst.Data["running_playbook_start"] = structpb.NewNumberValue(float64(time.Now().Unix()))
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	_, err = client.Exec(context.WithoutCancel(ctx), &ansible.ExecRunRequest{
 		Uuid:       create.GetUuid(),
 		WaitFinish: true,
 	})
 	if err != nil {
+		inst.Data["running_playbook"] = structpb.NewStringValue("")
+		inst.Data["running_playbook_start"] = structpb.NewNumberValue(0)
+		datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 		return nil, fmt.Errorf("failed to execute ansible run: %w", err)
 	}
-
-	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
-	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 
 	return &ipb.InvokeResponse{
 		Result: true,
