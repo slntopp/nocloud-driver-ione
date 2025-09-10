@@ -823,9 +823,23 @@ func BackupInstance(
 		Hop: hopInstance,
 	}
 	logger.Debug("Backup run", zap.Any("run", run))
+	create, err := client.Create(ctx, &ansible.CreateRunRequest{
+		Run: run,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ansible run: %w", err)
+	}
+	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
+	inst.Data["running_playbook_start"] = structpb.NewNumberValue(float64(time.Now().Unix()))
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+
+	// Poweroff and wait for poweroff before start
 	vmState, _, _, _, _ := oneClient.StateVM(vm.ID)
 	if vmState != int(opennebulavm.Poweroff) {
 		if err = oneClient.PoweroffVM(vm.ID, true); err != nil {
+			inst.Data["running_playbook"] = structpb.NewStringValue("")
+			inst.Data["running_playbook_start"] = structpb.NewNumberValue(0)
+			datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 			return nil, fmt.Errorf("failed to poweroff vm: %w", err)
 		}
 	}
@@ -837,16 +851,7 @@ func BackupInstance(
 	logger.Debug("Waiting for vm poweroff", zap.Int("vm", vm.ID))
 	oneClient.WaitForPoweroff(vm.ID)
 	logger.Debug("Poweroff complete", zap.Int("vm", vm.ID))
-	create, err := client.Create(ctx, &ansible.CreateRunRequest{
-		Run: run,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ansible run: %w", err)
-	}
 
-	inst.Data["running_playbook"] = structpb.NewStringValue(create.GetUuid())
-	inst.Data["running_playbook_start"] = structpb.NewNumberValue(float64(time.Now().Unix()))
-	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 	_, err = client.Exec(context.WithoutCancel(ctx), &ansible.ExecRunRequest{
 		Uuid:       create.GetUuid(),
 		WaitFinish: true,
