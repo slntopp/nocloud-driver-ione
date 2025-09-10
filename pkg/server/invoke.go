@@ -16,8 +16,8 @@ limitations under the License.
 package server
 
 import (
+	"connectrpc.com/connect"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud-proto/ansible"
@@ -81,7 +81,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 				return nil, err
 			}
 			if get.GetStatus() == "running" || get.GetStatus() == "init" {
-				return nil, errors.New("backup still running")
+				return nil, connect.NewError(connect.CodeUnavailable, fmt.Errorf("backup still running"))
 			}
 			if get.GetStatus() == "successful" || get.GetStatus() == "failed" || get.GetStatus() == "undefined" {
 				instance.Data["running_playbook"] = structpb.NewStringValue("")
