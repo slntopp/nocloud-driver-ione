@@ -80,7 +80,7 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 			if err != nil {
 				return nil, err
 			}
-			if get.GetStatus() == "running" {
+			if get.GetStatus() == "running" || get.GetStatus() == "init" {
 				return nil, errors.New("backup still running")
 			}
 			if get.GetStatus() == "successful" || get.GetStatus() == "failed" || get.GetStatus() == "undefined" {
