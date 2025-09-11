@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/parameters"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
@@ -45,13 +46,25 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 	if err != nil {
 		return -1, err
 	}
-	public_pool, err := c.GetVNet(int(id.GetNumberValue()))
-	if err != nil {
-		return -1, err
-	}
+
 	user_pub_net_id, err := c.GetUserPublicVNet(u)
 	if err != nil {
 		user_pub_net_id = -1
+	}
+	if user_pub_net_id != -1 {
+		userVnet, uErr := c.GetVNet(user_pub_net_id)
+		if uErr != nil {
+			return -1, uErr
+		}
+		if userVnet.ParentNetworkID != "" && strconv.Itoa(int(id.GetNumberValue())) != userVnet.ParentNetworkID {
+			parentPoolId, _ := strconv.Atoi(userVnet.ParentNetworkID)
+			id = structpb.NewNumberValue(float64(parentPoolId))
+		}
+	}
+
+	public_pool, err := c.GetVNet(int(id.GetNumberValue()))
+	if err != nil {
+		return -1, err
 	}
 	for i := 0; i < n; i++ {
 		user_pub_net_id, err = c.ReserveVNet(
