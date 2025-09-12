@@ -17,7 +17,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	"github.com/slntopp/nocloud-proto/ansible"
@@ -63,9 +62,12 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	}
 
 	// Check for running backup
+	allowedActionsWhileBackup := map[string]bool{
+		"monitoring": true,
+	}
 	runningPlaybook := instance.GetData()["running_playbook"].GetStringValue()
 	runningPlaybookStart := instance.GetData()["running_playbook_start"].GetNumberValue()
-	if runningPlaybook != "" {
+	if allowed := allowedActionsWhileBackup[req.GetMethod()]; runningPlaybook != "" && !allowed {
 		if runningPlaybookStart != 0 && int64(runningPlaybookStart)+86400*2 < time.Now().Unix() {
 			instance.Data["running_playbook"] = structpb.NewStringValue("")
 			instance.Data["running_playbook_start"] = structpb.NewNumberValue(0)
@@ -77,8 +79,8 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 			if err != nil {
 				return nil, err
 			}
-			if get.GetStatus() == "running" {
-				return nil, errors.New("backup still running")
+			if get.GetStatus() == "running" || get.GetStatus() == "init" {
+				return nil, status.Error(codes.Unavailable, "backup is still running")
 			}
 			if get.GetStatus() == "successful" || get.GetStatus() == "failed" || get.GetStatus() == "undefined" {
 				instance.Data["running_playbook"] = structpb.NewStringValue("")
