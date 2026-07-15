@@ -3,13 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
-	sppb "github.com/slntopp/nocloud-proto/services_providers"
-	"github.com/slntopp/nocloud/pkg/nocloud/suspend_rules"
 	"math"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
+	"github.com/slntopp/nocloud/pkg/nocloud/suspend_rules"
 
 	epb "github.com/slntopp/nocloud-proto/events"
 
@@ -145,8 +146,6 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !freeze {
 			_, hasSuspendTime := data["suspend_time"]
 			suspendedManually := data["suspended_manually"].GetBoolValue()
-			// Auto-resume only billing suspends (suspend_time) or non-manual holds.
-			// Admin Suspend sets suspended_manually without suspend_time — do not resume until Unsuspend/Freeze.
 			if hasSuspendTime || !suspendedManually {
 				err := client.ResumeVM(vmid)
 				if err != nil {
