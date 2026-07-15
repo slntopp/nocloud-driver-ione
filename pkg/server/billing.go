@@ -132,6 +132,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 					log.Error("Failed to suspend vm", zap.Error(err))
 					return
 				}
+				i.Data["suspend_time"] = structpb.NewNumberValue(float64(now))
 				go events(context.Background(), &epb.Event{
 					Uuid: i.GetUuid(),
 					Key:  "instance_suspended",
@@ -142,17 +143,24 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			}
 
 		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !freeze {
-			err := client.ResumeVM(vmid)
-			if err != nil {
-				log.Error("Failed to resume vm", zap.Error(err))
-				return
+			_, hasSuspendTime := data["suspend_time"]
+			suspendedManually := data["suspended_manually"].GetBoolValue()
+			// Auto-resume only billing suspends (suspend_time) or non-manual holds.
+			// Admin Suspend sets suspended_manually without suspend_time — do not resume until Unsuspend/Freeze.
+			if hasSuspendTime || !suspendedManually {
+				err := client.ResumeVM(vmid)
+				if err != nil {
+					log.Error("Failed to resume vm", zap.Error(err))
+					return
+				}
+				delete(i.Data, "suspend_time")
+				delete(i.Data, "suspended_manually")
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_unsuspended",
+					Data: map[string]*structpb.Value{},
+				})
 			}
-			delete(i.Data, "suspended_manually")
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_unsuspended",
-				Data: map[string]*structpb.Value{},
-			})
 		}
 
 		plan := i.GetBillingPlan()
@@ -578,12 +586,14 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
 				if err := client.SuspendVM(vmid); err != nil {
 					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+				} else {
+					i.Data["suspend_time"] = structpb.NewNumberValue(float64(time.Now().Unix()))
+					go events(context.Background(), &epb.Event{
+						Uuid: i.GetUuid(),
+						Key:  "instance_suspended",
+						Data: map[string]*structpb.Value{},
+					})
 				}
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_suspended",
-					Data: map[string]*structpb.Value{},
-				})
 			} else {
 				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
@@ -641,7 +651,9 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 				}
 			}
 		} else {
-			if state == "SUSPENDED" && !i.GetData()["freeze"].GetBoolValue() {
+			_, hasSuspendTime := i.GetData()["suspend_time"]
+			suspendedManually := i.GetData()["suspended_manually"].GetBoolValue()
+			if state == "SUSPENDED" && !i.GetData()["freeze"].GetBoolValue() && (hasSuspendTime || !suspendedManually) {
 				if err := client.ResumeVM(vmid); err != nil {
 					log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
 				} else {
@@ -665,7 +677,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 		log.Debug("Next payment", zap.Any("p", i.Data["next_payment_date"]))
 
-		if state == "SUSPENDED" && !i.GetData()["freeze"].GetBoolValue() {
+		if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
 			handleSuspendEvent(i, events)
 		} else {
 			handleBillingEvent(i, events)
