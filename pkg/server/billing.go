@@ -124,8 +124,6 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
 		}
 
-		suspendedManually := data["suspended_manually"].GetBoolValue()
-
 		if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
 
 			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
@@ -143,12 +141,13 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
 
-		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !suspendedManually {
+		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !freeze {
 			err := client.ResumeVM(vmid)
 			if err != nil {
 				log.Error("Failed to resume vm", zap.Error(err))
 				return
 			}
+			delete(i.Data, "suspended_manually")
 			go events(context.Background(), &epb.Event{
 				Uuid: i.GetUuid(),
 				Key:  "instance_unsuspended",
@@ -642,18 +641,19 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 				}
 			}
 		} else {
-			if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
+			if state == "SUSPENDED" && !i.GetData()["freeze"].GetBoolValue() {
 				if err := client.ResumeVM(vmid); err != nil {
 					log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
+				} else {
+					delete(i.Data, "suspend_time")
+					delete(i.Data, "suspended_manually")
+
+					go events(context.Background(), &epb.Event{
+						Uuid: i.GetUuid(),
+						Key:  "instance_unsuspended",
+						Data: map[string]*structpb.Value{},
+					})
 				}
-
-				delete(i.Data, "suspend_time")
-
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_unsuspended",
-					Data: map[string]*structpb.Value{},
-				})
 			}
 		}
 
@@ -665,7 +665,7 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 
 		log.Debug("Next payment", zap.Any("p", i.Data["next_payment_date"]))
 
-		if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
+		if state == "SUSPENDED" && !i.GetData()["freeze"].GetBoolValue() {
 			handleSuspendEvent(i, events)
 		} else {
 			handleBillingEvent(i, events)
