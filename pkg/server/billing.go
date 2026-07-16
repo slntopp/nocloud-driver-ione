@@ -125,7 +125,11 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
 		}
 
-		if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
+		if now > lastMonitoringValue && state == "SUSPENDED" && !freeze && now >= immune_date_val {
+			if _, ok := data["suspend_time"]; !ok {
+				i.Data["suspend_time"] = structpb.NewNumberValue(float64(now))
+			}
+		} else if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
 
 			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
 				err := client.SuspendVM(vmid)
@@ -642,6 +646,9 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			}
 
 			if state == "SUSPENDED" {
+				if _, ok := i.Data["suspend_time"]; !ok {
+					i.Data["suspend_time"] = structpb.NewNumberValue(float64(time.Now().Unix()))
+				}
 				if _, ok := i.Data["last_monitoring"]; ok {
 					now := time.Now().Unix()
 					nowPb := structpb.NewNumberValue(float64(now))
