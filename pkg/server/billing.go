@@ -3,13 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
-	sppb "github.com/slntopp/nocloud-proto/services_providers"
-	"github.com/slntopp/nocloud/pkg/nocloud/suspend_rules"
 	"math"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	sppb "github.com/slntopp/nocloud-proto/services_providers"
+	"github.com/slntopp/nocloud/pkg/nocloud/suspend_rules"
 
 	epb "github.com/slntopp/nocloud-proto/events"
 
@@ -124,8 +125,6 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			log.Warn("Could not get state for VM ID", zap.Int("vmid", vmid))
 		}
 
-		suspendedManually := data["suspended_manually"].GetBoolValue()
-
 		if now > lastMonitoringValue && state != "SUSPENDED" && !freeze && now >= immune_date_val {
 
 			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
@@ -134,6 +133,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 					log.Error("Failed to suspend vm", zap.Error(err))
 					return
 				}
+				i.Data["suspend_time"] = structpb.NewNumberValue(float64(now))
 				go events(context.Background(), &epb.Event{
 					Uuid: i.GetUuid(),
 					Key:  "instance_suspended",
@@ -143,17 +143,23 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
 
-		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !suspendedManually {
-			err := client.ResumeVM(vmid)
-			if err != nil {
-				log.Error("Failed to resume vm", zap.Error(err))
-				return
+		} else if now <= lastMonitoringValue && state == "SUSPENDED" && !freeze {
+			_, hasSuspendTime := data["suspend_time"]
+			suspendedManually := data["suspended_manually"].GetBoolValue()
+			if hasSuspendTime || !suspendedManually {
+				err := client.ResumeVM(vmid)
+				if err != nil {
+					log.Error("Failed to resume vm", zap.Error(err))
+					return
+				}
+				delete(i.Data, "suspend_time")
+				delete(i.Data, "suspended_manually")
+				go events(context.Background(), &epb.Event{
+					Uuid: i.GetUuid(),
+					Key:  "instance_unsuspended",
+					Data: map[string]*structpb.Value{},
+				})
 			}
-			go events(context.Background(), &epb.Event{
-				Uuid: i.GetUuid(),
-				Key:  "instance_unsuspended",
-				Data: map[string]*structpb.Value{},
-			})
 		}
 
 		plan := i.GetBillingPlan()
@@ -579,12 +585,14 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 			if suspend_rules.SuspendAllowed(sp.GetSuspendRules(), time.Now().UTC()) {
 				if err := client.SuspendVM(vmid); err != nil {
 					log.Warn("Could not suspend VM with VMID", zap.Int("vmid", vmid))
+				} else {
+					i.Data["suspend_time"] = structpb.NewNumberValue(float64(time.Now().Unix()))
+					go events(context.Background(), &epb.Event{
+						Uuid: i.GetUuid(),
+						Key:  "instance_suspended",
+						Data: map[string]*structpb.Value{},
+					})
 				}
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_suspended",
-					Data: map[string]*structpb.Value{},
-				})
 			} else {
 				log.Debug("Not suspending VM because it is forbidden by suspend rules")
 			}
@@ -642,18 +650,21 @@ func handleInstanceBilling(logger *zap.Logger, records RecordsPublisherFunc, eve
 				}
 			}
 		} else {
-			if state == "SUSPENDED" && !i.GetData()["suspended_manually"].GetBoolValue() {
+			_, hasSuspendTime := i.GetData()["suspend_time"]
+			suspendedManually := i.GetData()["suspended_manually"].GetBoolValue()
+			if state == "SUSPENDED" && !i.GetData()["freeze"].GetBoolValue() && (hasSuspendTime || !suspendedManually) {
 				if err := client.ResumeVM(vmid); err != nil {
 					log.Warn("Could not resume VM with VMID", zap.Int("vmid", vmid))
+				} else {
+					delete(i.Data, "suspend_time")
+					delete(i.Data, "suspended_manually")
+
+					go events(context.Background(), &epb.Event{
+						Uuid: i.GetUuid(),
+						Key:  "instance_unsuspended",
+						Data: map[string]*structpb.Value{},
+					})
 				}
-
-				delete(i.Data, "suspend_time")
-
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "instance_unsuspended",
-					Data: map[string]*structpb.Value{},
-				})
 			}
 		}
 
