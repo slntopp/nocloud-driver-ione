@@ -54,11 +54,19 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	action, ok := actions.BillingActions[method]
 	if ok {
 		if method == "manual_renew" {
-			go handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+			go func() {
+				handleManualRenewBilling(s.log, s.HandlePublishRecords, instance)
+				s.resumeAfterRenew(client, instance)
+			}()
 			return &ipb.InvokeResponse{Result: true}, nil
-		} else {
-			return action(client, instance, req.GetParams())
 		}
+		resp, err := action(client, instance, req.GetParams())
+		// On a successful renewal, bring the VM back up immediately instead of
+		// waiting for the next monitoring tick to notice the moved dates.
+		if err == nil && resp.GetResult() && method == "free_renew" {
+			s.resumeAfterRenew(client, instance)
+		}
+		return resp, err
 	}
 
 	// Check for running backup
@@ -119,6 +127,59 @@ func (s *DriverServiceServer) Invoke(ctx context.Context, req *pb.InvokeRequest)
 	}
 
 	return nil, status.Errorf(codes.PermissionDenied, "Action %s is not declared", method)
+}
+
+// resumeAfterRenew powers a VM back on right after a renewal (free_renew /
+// manual_renew) if it is currently suspended for non-payment. Without this the
+// VM would stay down until the next monitoring tick re-evaluated the (now moved
+// forward) last_monitoring date. It mirrors the auto-resume condition used by
+// the monitoring billing handlers and does not read anything back from the DB —
+// it operates on the instance snapshot already in hand.
+func (s *DriverServiceServer) resumeAfterRenew(client one.IClient, inst *ipb.Instance) {
+	log := s.log.Named("resumeAfterRenew").Named(inst.GetUuid())
+
+	data := inst.GetData()
+	if data == nil || data["freeze"].GetBoolValue() {
+		return
+	}
+
+	vmid, err := one.GetVMIDFromData(client, inst)
+	if err != nil {
+		log.Warn("Skip auto-resume after renew: failed to get VM ID", zap.Error(err))
+		return
+	}
+
+	_, state, _, _, err := client.StateVM(vmid)
+	if err != nil {
+		log.Warn("Skip auto-resume after renew: could not get VM state", zap.Int("vmid", vmid), zap.Error(err))
+		return
+	}
+	if state != "SUSPENDED" {
+		return
+	}
+
+	_, hasSuspendTime := data["suspend_time"]
+	suspendedManually := data["suspended_manually"].GetBoolValue()
+	// Don't touch a VM an admin suspended by hand (manual suspend with no
+	// billing suspend_time). Auto-suspends always carry suspend_time.
+	if !hasSuspendTime && suspendedManually {
+		return
+	}
+
+	if err := client.ResumeVM(vmid); err != nil {
+		log.Error("Failed to resume VM after renew", zap.Int("vmid", vmid), zap.Error(err))
+		return
+	}
+
+	delete(inst.Data, "suspend_time")
+	delete(inst.Data, "suspended_manually")
+	go datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+	go s.HandlePublishEvents(context.Background(), &epb.Event{
+		Uuid: inst.GetUuid(),
+		Key:  "instance_unsuspended",
+		Data: map[string]*structpb.Value{},
+	})
+	log.Info("Auto-resumed VM after renew", zap.Int("vmid", vmid))
 }
 
 func (s *DriverServiceServer) SpInvoke(ctx context.Context, req *pb.SpInvokeRequest) (res *spb.InvokeResponse, err error) {

@@ -632,6 +632,10 @@ func CancelRenew(
 		}
 	}
 
+	// cancel_renew intentionally rolls last_monitoring / *_last_monitoring back
+	// by one period. Mark the payload authoritative so the core does not clamp
+	// these date keys to their previous (higher) values.
+	instData["_authoritative_dates"] = structpb.NewBoolValue(true)
 	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), instData)
 	return &ipb.InvokeResponse{Result: true}, nil
 }
