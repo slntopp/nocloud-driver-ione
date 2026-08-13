@@ -1365,7 +1365,7 @@ func handleStaticZeroBilling(log *zap.Logger, i *ipb.Instance, last int64, prior
 	return records, last
 }
 
-func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONeClient, publish RecordsPublisherFunc) {
+func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONeClient, publish RecordsPublisherFunc, events EventsPublisherFunc) {
 	now := time.Now().Unix()
 
 	var records []*billingpb.Record
@@ -1382,6 +1382,26 @@ func handleUpgradeBilling(log *zap.Logger, instances []*ipb.Instance, c *one.ONe
 		for _, diff := range diffSlice {
 			for _, res := range resources {
 				if diff.ResName == res.GetKey() {
+					if strings.HasPrefix(diff.ResName, "drive_") && diff.NewResCount < diff.OldResCount {
+						if inst.Data == nil {
+							inst.Data = make(map[string]*structpb.Value)
+						}
+						if events != nil && !inst.Data["drive_mismatch_ticket"].GetBoolValue() {
+							vmid, _ := one.GetVMIDFromData(c, inst)
+							go events(context.Background(), &epb.Event{
+								Uuid: inst.GetUuid(),
+								Key:  "drive_mismatch_ticket",
+								Data: map[string]*structpb.Value{
+									"nocloud_gb": structpb.NewNumberValue(diff.NewResCount),
+									"one_gb":     structpb.NewNumberValue(diff.OldResCount),
+									"vmid":       structpb.NewNumberValue(float64(vmid)),
+								},
+							})
+							inst.Data["drive_mismatch_ticket"] = structpb.NewBoolValue(true)
+							datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.Data)
+						}
+					}
+
 					log.Info("Billing res", zap.String("res", diff.ResName), zap.Float64("diff", diff.OldResCount))
 					instData := inst.GetData()
 					if instData == nil {
