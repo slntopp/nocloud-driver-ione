@@ -166,6 +166,10 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 			}
 		}
 
+		if shouldPublishOverdueTicket(now, lastMonitoringValue, i.Data) && events != nil {
+			go events(context.Background(), overdueTicketEvent(i.GetUuid(), lastMonitoringValue))
+		}
+
 		plan := i.GetBillingPlan()
 		product := plan.GetProducts()[i.GetProduct()]
 
