@@ -369,14 +369,7 @@ func handleNonRegularInstanceBilling(logger *zap.Logger, records RecordsPublishe
 		}
 
 		go records(context.Background(), append(resourceRecords, productRecords...))
-		price := getInstancePrice(i)
-		go events(context.Background(), &epb.Event{
-			Uuid: i.GetUuid(),
-			Key:  "instance_renew",
-			Data: map[string]*structpb.Value{
-				"price": structpb.NewNumberValue(price),
-			},
-		})
+		// No instance_renew: this branch runs only while last_monitoring is missing (first period).
 		go utils.SendActualMonitoringData(i.Data, i.Data, i.Uuid, datas.DataPublisher(datas.POST_INST_DATA))
 	}
 }
