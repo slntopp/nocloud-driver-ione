@@ -27,6 +27,7 @@ import (
 	"github.com/slntopp/nocloud-proto/ansible"
 	epb "github.com/slntopp/nocloud-proto/events"
 
+	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	redis "github.com/go-redis/redis/v8"
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
@@ -536,25 +537,39 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				log.Debug("send state", zap.Any("state", inst.State))
 				instStatePublisher(inst.GetUuid(), inst.State)
 			} else if !(metaAutoStart || cfgAutoStart) {
-				log.Debug("Instance pending")
-				if !inst.GetData()["pending_notification"].GetBoolValue() {
-					price := getInstancePrice(inst)
-					go s.HandlePublishEvents(ctx, &epb.Event{
-						Uuid: inst.GetUuid(),
-						Key:  "pending_notification",
-						Data: map[string]*structpb.Value{
-							"price": structpb.NewNumberValue(price),
-						},
-					})
-					inst.Data["pending_notification"] = structpb.NewBoolValue(true)
-					go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+				found, findErr := client.FindVMByInstance(inst)
+				if vmIsLive(found, findErr) {
+					log.Info("VM already exists, stale pending snapshot is not published",
+						zap.Int("vmid", found.ID), zap.String("vm_name", found.Name))
+				} else {
+					log.Debug("Instance pending")
+					if !inst.GetData()["pending_notification"].GetBoolValue() {
+						price := getInstancePrice(inst)
+						go s.HandlePublishEvents(ctx, &epb.Event{
+							Uuid: inst.GetUuid(),
+							Key:  "pending_notification",
+							Data: map[string]*structpb.Value{
+								"price": structpb.NewNumberValue(price),
+							},
+						})
+						inst.Data["pending_notification"] = structpb.NewBoolValue(true)
+						go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+					}
+					instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
+					instDataPublisher := datas.DataPublisher(datas.POST_INST_DATA)
+					instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
+					instDataPublisher(inst.GetUuid(), inst.GetData())
 				}
-				instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
-				instDataPublisher := datas.DataPublisher(datas.POST_INST_DATA)
-				instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
-				instDataPublisher(inst.GetUuid(), inst.GetData())
 			} else {
 				log.Debug("Instance active")
+				if _, idErr := one.GetVMIDFromData(client, inst); idErr != nil {
+					found, findErr := client.FindVMByInstance(inst)
+					if vmIsLive(found, findErr) {
+						rememberLiveVM(inst, found.ID, found.Name)
+						log.Info("Linked instance to existing VM",
+							zap.Int("vmid", found.ID), zap.String("vm_name", found.Name))
+					}
+				}
 				if !inst.GetData()["creation_notification"].GetBoolValue() {
 					networking, ok := inst.GetState().GetMeta()["networking"]
 					if ok {
@@ -623,4 +638,29 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 
 	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil
+}
+
+func vmIsLive(found *onevm.VM, lookupErr error) bool {
+	if lookupErr != nil || found == nil {
+		return false
+	}
+	st, _, err := found.State()
+	if err != nil || st == onevm.Done {
+		return false
+	}
+	return true
+}
+
+func rememberLiveVM(inst *ipb.Instance, id int, name string) {
+	if inst.Data == nil {
+		inst.Data = map[string]*structpb.Value{}
+	}
+	if _, ok := inst.Data["vmid"]; !ok {
+		inst.Data["vmid"] = structpb.NewNumberValue(float64(id))
+	}
+	if name != "" {
+		if _, ok := inst.Data["vm_name"]; !ok {
+			inst.Data["vm_name"] = structpb.NewStringValue(name)
+		}
+	}
 }

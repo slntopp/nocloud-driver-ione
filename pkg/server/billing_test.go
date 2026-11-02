@@ -14,6 +14,7 @@ import (
 	ipb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
 	"github.com/slntopp/nocloud/pkg/nocloud"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type TestClock struct {
@@ -241,5 +242,93 @@ func TestHandleIPBilling(t *testing.T) {
 		if wantSum != sum {
 			t.Errorf("Total sums don't match. Wanted %f, got %f", wantSum, sum)
 		}
+	}
+}
+
+func TestVMIsLive(t *testing.T) {
+	t.Parallel()
+
+	running := &vm.VM{ID: 6788, Name: "9eca09b0-69d5-4e0c-877d-c315d1e85d1c", StateRaw: int(vm.Active), LCMStateRaw: int(vm.Running)}
+	finished := &vm.VM{ID: 6788, Name: "9eca09b0-69d5-4e0c-877d-c315d1e85d1c", StateRaw: int(vm.Done), LCMStateRaw: int(vm.LcmInit)}
+	unknown := &vm.VM{ID: 1, StateRaw: -1, LCMStateRaw: int(vm.LcmInit)}
+
+	if !vmIsLive(running, nil) {
+		t.Fatal("running VM must count as live")
+	}
+	if vmIsLive(finished, nil) {
+		t.Fatal("finished VM must not count as live")
+	}
+	if vmIsLive(unknown, nil) {
+		t.Fatal("VM with an unreadable state must not count as live")
+	}
+	if vmIsLive(nil, nil) {
+		t.Fatal("missing VM must not count as live")
+	}
+	if vmIsLive(running, errors.New("not found")) {
+		t.Fatal("lookup error must not count as live")
+	}
+}
+
+func TestRememberLiveVMKeepsExistingData(t *testing.T) {
+	t.Parallel()
+
+	inst := &ipb.Instance{
+		Uuid: "9eca09b0-69d5-4e0c-877d-c315d1e85d1c",
+		Data: map[string]*structpb.Value{
+			"last_monitoring":      structpb.NewNumberValue(100),
+			"pending_notification": structpb.NewBoolValue(true),
+		},
+	}
+
+	rememberLiveVM(inst, 6788, inst.Uuid)
+
+	if got := int(inst.Data["vmid"].GetNumberValue()); got != 6788 {
+		t.Fatalf("vmid = %d, want 6788", got)
+	}
+	if got := inst.Data["vm_name"].GetStringValue(); got != inst.Uuid {
+		t.Fatalf("vm_name = %q, want instance uuid", got)
+	}
+	if got := inst.Data["last_monitoring"].GetNumberValue(); got != 100 {
+		t.Fatalf("last_monitoring = %v, want 100", got)
+	}
+	if !inst.Data["pending_notification"].GetBoolValue() {
+		t.Fatal("pending_notification was dropped")
+	}
+}
+
+func TestRememberLiveVMDoesNotReplaceLink(t *testing.T) {
+	t.Parallel()
+
+	inst := &ipb.Instance{
+		Data: map[string]*structpb.Value{
+			"vmid":    structpb.NewNumberValue(1),
+			"vm_name": structpb.NewStringValue("kept"),
+		},
+	}
+
+	rememberLiveVM(inst, 6788, "9eca09b0-69d5-4e0c-877d-c315d1e85d1c")
+
+	if got := int(inst.Data["vmid"].GetNumberValue()); got != 1 {
+		t.Fatalf("vmid = %d, want existing 1", got)
+	}
+	if got := inst.Data["vm_name"].GetStringValue(); got != "kept" {
+		t.Fatalf("vm_name = %q, want kept", got)
+	}
+}
+
+func TestRememberLiveVMInitializesData(t *testing.T) {
+	t.Parallel()
+
+	inst := &ipb.Instance{}
+	rememberLiveVM(inst, 6788, "")
+
+	if inst.Data == nil {
+		t.Fatal("data map was not created")
+	}
+	if got := int(inst.Data["vmid"].GetNumberValue()); got != 6788 {
+		t.Fatalf("vmid = %d, want 6788", got)
+	}
+	if _, ok := inst.Data["vm_name"]; ok {
+		t.Fatal("empty VM name must not be stored")
 	}
 }
