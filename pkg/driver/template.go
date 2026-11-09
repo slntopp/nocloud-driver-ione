@@ -29,6 +29,13 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func instanceData(instance *pb.Instance) map[string]*structpb.Value {
+	if instance.Data == nil {
+		instance.Data = make(map[string]*structpb.Value)
+	}
+	return instance.Data
+}
+
 func (c *ONeClient) GetTemplate(id int) (*tmpl.Template, error) {
 	tc := c.ctrl.Template(id)
 	return tc.Info(true, true)
@@ -48,7 +55,7 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.Inst
 	group_data := ig.GetData()
 	resources := instance.GetResources()
 	tmpl := vm.NewTemplate()
-	data := make(map[string]*structpb.Value)
+	data := instanceData(instance)
 	conf := instance.GetConfig()
 	bp := instance.GetBillingPlan()
 
@@ -190,8 +197,6 @@ func (c *ONeClient) InstantiateTemplateHelper(instance *pb.Instance, ig *pb.Inst
 		return -1, err
 	}
 	data[DATA_VM_ID] = structpb.NewNumberValue(float64(vmid))
-
-	instance.Data = data
 	return vmid, nil
 }
 

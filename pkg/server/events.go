@@ -22,6 +22,6 @@ func handleInstEvents(ctx context.Context, resp *one.CheckInstancesGroupResponse
 			Data: map[string]*structpb.Value{},
 		})
 		inst.Data["deleted_notification"] = structpb.NewBoolValue(true)
-		datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.Data)
+		datas.PublishInstanceDataPatch(inst.GetUuid(), inst.Data, "deleted_notification")
 	}
 }

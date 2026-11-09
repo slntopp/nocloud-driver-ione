@@ -388,7 +388,7 @@ func (c *ONeClient) FindVMByInstance(inst *pb.Instance) (*vm.VM, error) {
 
 	st, _, err = VM.State()
 	if err != nil {
-		goto byName
+		return VM, nil
 	}
 
 	if st != vm.Done {
@@ -545,7 +545,6 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 	data := ig.GetData()
 	userid := int(data["userid"].GetNumberValue())
 
-	instDatasPublisher := datas.DataPublisher(datas.POST_INST_DATA)
 	igDatasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
 
 	successResp := CheckInstancesGroupResponse{
@@ -596,7 +595,7 @@ func (c *ONeClient) CheckInstancesGroupResponseProcess(resp *CheckInstancesGroup
 
 		created[i].Data["creation"] = structpb.NewNumberValue(float64(time.Now().Unix()))
 
-		go instDatasPublisher(created[i].Uuid, created[i].Data)
+		datas.PublishInstanceDataPatch(created[i].Uuid, created[i].Data, DATA_VM_ID, DATA_VM_NAME, DATA_LOGO, "creation")
 		successResp.ToBeCreated = append(successResp.ToBeCreated, created[i])
 	}
 

@@ -258,8 +258,8 @@ func TestVMIsLive(t *testing.T) {
 	if vmIsLive(finished, nil) {
 		t.Fatal("finished VM must not count as live")
 	}
-	if vmIsLive(unknown, nil) {
-		t.Fatal("VM with an unreadable state must not count as live")
+	if !vmIsLive(unknown, nil) {
+		t.Fatal("VM with an unreadable LCM state must still count as live")
 	}
 	if vmIsLive(nil, nil) {
 		t.Fatal("missing VM must not count as live")
@@ -280,7 +280,9 @@ func TestRememberLiveVMKeepsExistingData(t *testing.T) {
 		},
 	}
 
-	rememberLiveVM(inst, 6788, inst.Uuid)
+	if !rememberLiveVM(inst, 6788, inst.Uuid) {
+		t.Fatal("first bind must report a link write")
+	}
 
 	if got := int(inst.Data["vmid"].GetNumberValue()); got != 6788 {
 		t.Fatalf("vmid = %d, want 6788", got)
@@ -306,7 +308,9 @@ func TestRememberLiveVMDoesNotReplaceLink(t *testing.T) {
 		},
 	}
 
-	rememberLiveVM(inst, 6788, "9eca09b0-69d5-4e0c-877d-c315d1e85d1c")
+	if rememberLiveVM(inst, 6788, "9eca09b0-69d5-4e0c-877d-c315d1e85d1c") {
+		t.Fatal("existing vmid/vm_name must not be replaced")
+	}
 
 	if got := int(inst.Data["vmid"].GetNumberValue()); got != 1 {
 		t.Fatalf("vmid = %d, want existing 1", got)
@@ -320,7 +324,9 @@ func TestRememberLiveVMInitializesData(t *testing.T) {
 	t.Parallel()
 
 	inst := &ipb.Instance{}
-	rememberLiveVM(inst, 6788, "")
+	if !rememberLiveVM(inst, 6788, "") {
+		t.Fatal("vmid write must report a link write")
+	}
 
 	if inst.Data == nil {
 		t.Fatal("data map was not created")

@@ -54,11 +54,14 @@ func (c *ONeClient) ReservePublicIP(u, n int) (pool_id int, err error) {
 	if user_pub_net_id != -1 {
 		userVnet, uErr := c.GetVNet(user_pub_net_id)
 		if uErr != nil {
-			return -1, uErr
-		}
-		if userVnet.ParentNetworkID != "" && strconv.Itoa(int(id.GetNumberValue())) != userVnet.ParentNetworkID {
+			user_pub_net_id = -1
+		} else if userVnet.ParentNetworkID != "" && strconv.Itoa(int(id.GetNumberValue())) != userVnet.ParentNetworkID {
 			parentPoolId, _ := strconv.Atoi(userVnet.ParentNetworkID)
-			id = structpb.NewNumberValue(float64(parentPoolId))
+			if _, pErr := c.GetVNet(parentPoolId); pErr != nil {
+				user_pub_net_id = -1
+			} else {
+				id = structpb.NewNumberValue(float64(parentPoolId))
+			}
 		}
 	}
 

@@ -32,6 +32,7 @@ import (
 	"github.com/slntopp/nocloud-driver-ione/pkg/actions"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	"github.com/slntopp/nocloud-driver-ione/pkg/ops"
 	"github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	pb "github.com/slntopp/nocloud-proto/drivers/instance/vanilla"
 	ipb "github.com/slntopp/nocloud-proto/instances"
@@ -462,46 +463,57 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 			log.Error("Error Checking Orphan User of Instance Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
 		}
 
-		resp, err := client.CheckInstancesGroup(ig)
-		if err != nil {
-			log.Error("Error Checking Instances Group", zap.String("ig", ig.GetUuid()), zap.Error(err))
-		} else {
-			log.Debug("Check Instances Group Response", zap.Any("resp", resp))
-			datasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
-
-			toBeDeleted := client.HandleDeletedInstances(resp.ToBeDeleted)
-
-			if len(resp.ToBeCreated) > 0 {
-				group := secrets["group"].GetNumberValue()
-
-				data := ig.GetData()
-				if data == nil {
-					data = make(map[string]*structpb.Value)
-					ig.Data = data
-				}
-
-				data, err = s.PrepareService(ctx, sp, ig, client, group)
-				if data != nil {
-					ig.Data = data
-					go datasPublisher(ig.Uuid, ig.Data)
-				}
-				if err != nil {
-					log.Error("Error Preparing Service", zap.Any("group", ig), zap.Error(err))
-					continue
-				}
-
+		var toCreate, toDelete []*ipb.Instance
+		for _, inst := range ig.GetInstances() {
+			if inst.GetData() == nil {
+				inst.Data = map[string]*structpb.Value{}
 			}
-
-			if len(resp.ToBeUpdated) != 0 {
-				go handleUpgradeBilling(log.Named("Upgrade billing"), resp.ToBeUpdated, client, s.HandlePublishRecords, s.HandlePublishEvents)
+			if inst.GetStatus() == statuspb.NoCloudStatus_DEL {
+				if ops.HasVMID(inst) {
+					toDelete = append(toDelete, inst)
+				}
+				continue
 			}
-
-			_ = client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
-			successResp := &one.CheckInstancesGroupResponse{
-				ToBeDeleted: toBeDeleted,
+			if ops.AutoStart(inst) && !ops.HasVMID(inst) {
+				toCreate = append(toCreate, inst)
 			}
-			log.Debug("Events instances", zap.Any("resp", successResp))
-			go handleInstEvents(ctx, successResp, s.HandlePublishEvents)
+		}
+
+		datasPublisher := datas.DataPublisher(datas.POST_IG_DATA)
+		if len(toCreate) > 0 {
+			data := ig.GetData()
+			if data == nil {
+				data = make(map[string]*structpb.Value)
+				ig.Data = data
+			}
+			data, prepErr := s.PrepareService(ctx, sp, ig, client, group)
+			if data != nil {
+				ig.Data = data
+				go datasPublisher(ig.Uuid, ig.Data)
+			}
+			if prepErr != nil {
+				log.Error("Error Preparing Service", zap.Any("group", ig), zap.Error(prepErr))
+			} else {
+				for _, inst := range toCreate {
+					inst.Data[ops.Creating] = structpb.NewBoolValue(true)
+					datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, ops.Creating)
+				}
+				resp := &one.CheckInstancesGroupResponse{ToBeCreated: toCreate}
+				_ = client.CheckInstancesGroupResponseProcess(resp, ig, int(group), creationBalance)
+				for _, inst := range toCreate {
+					if !ops.HasVMID(inst) {
+						continue
+					}
+					delete(inst.Data, ops.Creating)
+					ops.SetApplied(inst)
+					inst.Data["applied_hash"] = structpb.NewStringValue(inst.GetHash())
+					datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, ops.Creating, ops.AppliedKey, "applied_hash")
+				}
+			}
+		}
+		if len(toDelete) > 0 {
+			toBeDeleted := client.HandleDeletedInstances(toDelete)
+			go handleInstEvents(ctx, &one.CheckInstancesGroupResponse{ToBeDeleted: toBeDeleted}, s.HandlePublishEvents)
 		}
 
 		igStatus := ig.GetStatus()
@@ -524,6 +536,19 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				inst.Data = map[string]*structpb.Value{}
 			}
 
+			if inst.GetStatus() != statuspb.NoCloudStatus_DEL && ops.HasVMID(inst) {
+				committed, aerr := client.ApplyPendingOps(ig, inst)
+				if aerr != nil {
+					log.Error("Error applying pending ops", zap.Error(aerr))
+				}
+				if committed != nil {
+					billCommittedOp(log, inst, committed, s.HandlePublishRecords)
+					datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, ops.Key, ops.AppliedKey, "applied_hash")
+				} else if len(ops.Parse(inst.Data)) > 0 {
+					datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, ops.Key)
+				}
+			}
+
 			cfgAutoStart := cfg["auto_start"].GetBoolValue()
 			metaAutoStart := meta["auto_start"].GetBoolValue()
 
@@ -537,11 +562,7 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				log.Debug("send state", zap.Any("state", inst.State))
 				instStatePublisher(inst.GetUuid(), inst.State)
 			} else if !(metaAutoStart || cfgAutoStart) {
-				found, findErr := client.FindVMByInstance(inst)
-				if vmIsLive(found, findErr) {
-					log.Info("VM already exists, stale pending snapshot is not published",
-						zap.Int("vmid", found.ID), zap.String("vm_name", found.Name))
-				} else {
+				if !syncLiveVM(log, client, inst) {
 					log.Debug("Instance pending")
 					if !inst.GetData()["pending_notification"].GetBoolValue() {
 						price := getInstancePrice(inst)
@@ -553,23 +574,15 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 							},
 						})
 						inst.Data["pending_notification"] = structpb.NewBoolValue(true)
-						go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+						datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, "pending_notification")
 					}
-					instStatePublisher := datas.StatePublisher(datas.POST_INST_STATE)
-					instDataPublisher := datas.DataPublisher(datas.POST_INST_DATA)
-					instStatePublisher(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
-					instDataPublisher(inst.GetUuid(), inst.GetData())
+					if inst.GetState().GetState() != stpb.NoCloudState_PENDING {
+						datas.StatePublisher(datas.POST_INST_STATE)(inst.GetUuid(), &stpb.State{State: stpb.NoCloudState_PENDING, Meta: map[string]*structpb.Value{}})
+					}
 				}
 			} else {
 				log.Debug("Instance active")
-				if _, idErr := one.GetVMIDFromData(client, inst); idErr != nil {
-					found, findErr := client.FindVMByInstance(inst)
-					if vmIsLive(found, findErr) {
-						rememberLiveVM(inst, found.ID, found.Name)
-						log.Info("Linked instance to existing VM",
-							zap.Int("vmid", found.ID), zap.String("vm_name", found.Name))
-					}
-				}
+				_ = syncLiveVM(log, client, inst)
 				if !inst.GetData()["creation_notification"].GetBoolValue() {
 					networking, ok := inst.GetState().GetMeta()["networking"]
 					if ok {
@@ -585,15 +598,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 								},
 							})
 							inst.Data["creation_notification"] = structpb.NewBoolValue(true)
-							go datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
+							datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, "creation_notification")
 						}
 					}
 				}
-				_, err = actions.StatusesClient(client, inst, inst.Data, &ipb.InvokeResponse{Result: true})
-				if err != nil {
-					log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
-				}
-				datas.DataPublisher(datas.POST_INST_DATA)(inst.Uuid, inst.Data)
 			}
 			instConfig := inst.GetConfig()
 			autoRenew := false
@@ -622,22 +630,45 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 		s.rdb.HDel(ctx, redisKey, igKeys...)
 	}
 
-	datasPublisher := datas.DataPublisher(datas.POST_SP_PUBLIC_DATA)
-	statePublisher := datas.StatePublisher(datas.POST_SP_STATE)
-
-	st, pd, err := client.MonitorLocation(sp)
-	if err != nil {
-		log.Error("Error Monitoring Location(ServicesProvider)", zap.String("sp", sp.GetUuid()), zap.Error(err))
-		return &pb.MonitoringResponse{}, nil
+	locKey := fmt.Sprintf("%s-LOC-%s", MONITORING_REDIS, sp.GetUuid())
+	n, _ := s.rdb.Incr(ctx, locKey).Result()
+	if n == 1 || n%12 == 0 {
+		datasPublisher := datas.DataPublisher(datas.POST_SP_PUBLIC_DATA)
+		statePublisher := datas.StatePublisher(datas.POST_SP_STATE)
+		st, pd, locErr := client.MonitorLocation(sp)
+		if locErr != nil {
+			log.Error("Error Monitoring Location(ServicesProvider)", zap.String("sp", sp.GetUuid()), zap.Error(locErr))
+		} else {
+			log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
+			go statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
+			go datasPublisher(pd.Uuid, pd.PublicData)
+		}
 	}
-
-	log.Debug("Location Monitoring", zap.Any("state", st), zap.Any("public_data", pd))
-
-	go statePublisher(st.Uuid, &stpb.State{State: st.State, Meta: st.Meta})
-	go datasPublisher(pd.Uuid, pd.PublicData)
 
 	log.Info("Routine Done", zap.String("sp", sp.GetUuid()))
 	return &pb.MonitoringResponse{}, nil
+}
+
+func syncLiveVM(log *zap.Logger, client one.IClient, inst *ipb.Instance) bool {
+	found, findErr := client.FindVMByInstance(inst)
+	if !vmIsLive(found, findErr) {
+		return false
+	}
+	linked := rememberLiveVM(inst, found.ID, found.Name)
+	if linked {
+		log.Info("Linked instance to existing VM",
+			zap.Int("vmid", found.ID), zap.String("vm_name", found.Name))
+	}
+	_, err := actions.StatusesClient(client, inst, inst.Data, &ipb.InvokeResponse{Result: true})
+	if err != nil {
+		log.Error("Error Monitoring Instance", zap.Any("instance", inst), zap.Error(err))
+	}
+	keys := []string{"ips_history"}
+	if linked {
+		keys = append([]string{"vmid", "vm_name"}, keys...)
+	}
+	datas.PublishInstanceDataPatch(inst.GetUuid(), inst.GetData(), keys...)
+	return true
 }
 
 func vmIsLive(found *onevm.VM, lookupErr error) bool {
@@ -645,22 +676,27 @@ func vmIsLive(found *onevm.VM, lookupErr error) bool {
 		return false
 	}
 	st, _, err := found.State()
-	if err != nil || st == onevm.Done {
-		return false
+	if err != nil {
+		// goca (May 2023) rejects newer LCM states; the VM is still there.
+		return true
 	}
-	return true
+	return st != onevm.Done
 }
 
-func rememberLiveVM(inst *ipb.Instance, id int, name string) {
+func rememberLiveVM(inst *ipb.Instance, id int, name string) bool {
 	if inst.Data == nil {
 		inst.Data = map[string]*structpb.Value{}
 	}
+	linked := false
 	if _, ok := inst.Data["vmid"]; !ok {
 		inst.Data["vmid"] = structpb.NewNumberValue(float64(id))
+		linked = true
 	}
 	if name != "" {
 		if _, ok := inst.Data["vm_name"]; !ok {
 			inst.Data["vm_name"] = structpb.NewStringValue(name)
+			linked = true
 		}
 	}
+	return linked
 }

@@ -82,7 +82,7 @@ func StatusesClient(
 
 	var interfaces []*stpb.Interface
 
-	networking, ok := inst.GetState().GetMeta()["networking"]
+	networking, ok := par.Meta["networking"]
 	if ok {
 		networkingValue := networking.GetStructValue().AsMap()
 		publicIps, ok := networkingValue["public"].([]interface{})
@@ -107,7 +107,10 @@ func StatusesClient(
 		historyVal, _ = structpb.NewStruct(map[string]interface{}{})
 	}
 	history := historyVal.AsMap()
-	networkingValue := networking.GetStructValue().AsMap()
+	var networkingValue map[string]interface{}
+	if networking != nil {
+		networkingValue = networking.GetStructValue().AsMap()
+	}
 	publicHistory, ok := history["public"].([]interface{})
 	if !ok {
 		publicHistory = []interface{}{}
@@ -137,6 +140,10 @@ func StatusesClient(
 	historyVal, _ = structpb.NewStruct(history)
 	if data != nil {
 		data[ipsHistoryKey] = structpb.NewStructValue(historyVal)
+	}
+
+	if request.State != nil {
+		inst.State = request.State
 	}
 
 	_, err = datas.StIPub(request)

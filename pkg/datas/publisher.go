@@ -13,6 +13,39 @@ const (
 	POST_SP_PUBLIC_DATA = "POST_SP_PUBLIC_DATA"
 )
 
+const PatchFlagKey = "_patch"
+
+func BuildInstanceDataPatch(data map[string]*structpb.Value, keys ...string) map[string]*structpb.Value {
+	if data == nil {
+		return nil
+	}
+	patch := make(map[string]*structpb.Value, len(keys)+1)
+	for _, k := range keys {
+		if k == "" || k == PatchFlagKey {
+			continue
+		}
+		if v, ok := data[k]; ok {
+			patch[k] = v
+		}
+	}
+	if len(patch) == 0 {
+		return nil
+	}
+	patch[PatchFlagKey] = structpb.NewBoolValue(true)
+	return patch
+}
+
+func PublishInstanceDataPatch(uuid string, data map[string]*structpb.Value, keys ...string) {
+	if uuid == "" {
+		return
+	}
+	patch := BuildInstanceDataPatch(data, keys...)
+	if patch == nil {
+		return
+	}
+	DataPublisher(POST_INST_DATA)(uuid, patch)
+}
+
 func DataPublisher(pubType string) func(string, map[string]*structpb.Value) {
 	if pubType == POST_INST_DATA {
 		return postInstData

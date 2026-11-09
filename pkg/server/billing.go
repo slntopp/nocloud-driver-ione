@@ -18,6 +18,7 @@ import (
 	onevm "github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
 	one "github.com/slntopp/nocloud-driver-ione/pkg/driver"
+	"github.com/slntopp/nocloud-driver-ione/pkg/ops"
 	"github.com/slntopp/nocloud-driver-ione/pkg/utils"
 	billingpb "github.com/slntopp/nocloud-proto/billing"
 	apb "github.com/slntopp/nocloud-proto/billing/addons"
@@ -1472,4 +1473,46 @@ func getInstancePrice(i *ipb.Instance) float64 {
 	}
 
 	return price
+}
+
+func billCommittedOp(log *zap.Logger, inst *ipb.Instance, op *ops.Op, publish RecordsPublisherFunc) {
+	if inst == nil || op == nil || publish == nil {
+		return
+	}
+	plan := inst.GetBillingPlan()
+	if plan == nil {
+		return
+	}
+	resName := op.Field
+	if op.Name == ops.Disk {
+		resName = "drive_" + strings.ToLower(inst.GetResources()["drive_type"].GetStringValue())
+	}
+	now := time.Now().Unix()
+	for _, res := range plan.GetResources() {
+		if res.GetKey() != resName || res.Kind != billingpb.Kind_PREPAID {
+			continue
+		}
+		key := fmt.Sprintf("%s_last_monitoring", resName)
+		lastMonitoring, ok := inst.GetData()[key]
+		if !ok {
+			return
+		}
+		timeDiff := int64(lastMonitoring.GetNumberValue()) - now
+		total := (float64(timeDiff) / float64(res.GetPeriod())) * (op.To - op.From)
+		total = math.Round(total*100) / 100.0
+		if resName == "ips_public" && op.To != op.From {
+			total /= op.To - op.From
+			if op.To-op.From < 0 {
+				total *= -1
+			}
+		}
+		publish(context.Background(), []*billingpb.Record{{
+			Start: now, End: int64(lastMonitoring.GetNumberValue()), Exec: now,
+			Priority: billingpb.Priority_ADDITIONAL,
+			Instance: inst.GetUuid(),
+			Resource: resName,
+			Total:    total,
+		}})
+		return
+	}
 }
