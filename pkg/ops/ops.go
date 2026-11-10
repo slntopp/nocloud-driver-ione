@@ -99,10 +99,7 @@ func Store(data map[string]*structpb.Value, list []Op) {
 		}
 		vals = append(vals, structpb.NewStructValue(st))
 	}
-	lv, err := structpb.NewValue(vals)
-	if err != nil {
-		return
-	}
+	lv := structpb.NewListValue(&structpb.ListValue{Values: vals})
 	data[Key] = lv
 }
 
