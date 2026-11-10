@@ -541,8 +541,10 @@ func (s *DriverServiceServer) Monitoring(ctx context.Context, req *pb.Monitoring
 				if aerr != nil {
 					log.Error("Error applying pending ops", zap.Error(aerr))
 				}
-				if committed != nil {
-					billCommittedOp(log, inst, committed, s.HandlePublishRecords)
+				if len(committed) > 0 {
+					for i := range committed {
+						billCommittedOp(log, inst, &committed[i], s.HandlePublishRecords)
+					}
 					datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, ops.Key, ops.AppliedKey, "applied_hash")
 				} else if len(ops.Parse(inst.Data)) > 0 {
 					datas.PublishInstanceDataPatch(inst.Uuid, inst.Data, ops.Key)

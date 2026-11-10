@@ -12,45 +12,51 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// ApplyPendingOps runs at most one queued op. done=true means the op finished this tick.
-func (c *ONeClient) ApplyPendingOps(ig *ipb.InstancesGroup, inst *ipb.Instance) (committed *ops.Op, err error) {
+// ApplyPendingOps tries every queued op in this tick. A failed op stays queued and does not block the rest.
+func (c *ONeClient) ApplyPendingOps(ig *ipb.InstancesGroup, inst *ipb.Instance) (committed []ops.Op, err error) {
 	if inst.Data == nil {
 		return nil, nil
 	}
 	ops.EnsureFromSpec(inst)
 	list := ops.Parse(inst.Data)
-	cur := ops.Next(list)
-	if cur == nil {
+	if ops.Next(list) == nil {
 		return nil, nil
 	}
-	cur.Status = "running"
 	vmid, err := GetVMIDFromData(c, inst)
 	if err != nil {
 		return nil, err
 	}
-	done, err := c.applyOp(ig, inst, vmid, *cur)
-	if err != nil {
-		c.log.Error("apply op", zap.String("op", cur.Name), zap.Error(err))
-		cur.Status = "queued"
-		ops.Store(inst.Data, list)
-		return nil, err
-	}
-	if !done {
-		ops.Store(inst.Data, list)
-		return nil, nil
-	}
-	cur.Status = "done"
 	left := make([]ops.Op, 0, len(list))
-	for _, op := range list {
-		if op.ID == cur.ID {
+	var firstErr error
+	for i := range list {
+		cur := list[i]
+		if cur.Status != "" && cur.Status != "queued" && cur.Status != "running" {
+			left = append(left, cur)
 			continue
 		}
-		left = append(left, op)
+		cur.Status = "running"
+		done, aerr := c.applyOp(ig, inst, vmid, cur)
+		if aerr != nil {
+			c.log.Error("apply op", zap.String("op", cur.Name), zap.String("id", cur.ID), zap.Error(aerr))
+			cur.Status = "queued"
+			left = append(left, cur)
+			if firstErr == nil {
+				firstErr = aerr
+			}
+			continue
+		}
+		if !done {
+			left = append(left, cur)
+			continue
+		}
+		committed = append(committed, cur)
 	}
 	ops.Store(inst.Data, left)
-	ops.SetApplied(inst)
-	inst.Data["applied_hash"] = structpb.NewStringValue(inst.GetHash())
-	return cur, nil
+	if len(committed) > 0 {
+		ops.SetApplied(inst)
+		inst.Data["applied_hash"] = structpb.NewStringValue(inst.GetHash())
+	}
+	return committed, firstErr
 }
 
 func (c *ONeClient) applyOp(ig *ipb.InstancesGroup, inst *ipb.Instance, vmid int, op ops.Op) (bool, error) {
@@ -77,11 +83,23 @@ func (c *ONeClient) applyCompute(vmid int, inst *ipb.Instance, op ops.Op) (bool,
 		return false, err
 	}
 	tmpl := vm.NewTemplate()
-	if op.Name == ops.CPU || inst.Resources["cpu"].GetNumberValue() > 0 {
-		tmpl.VCPU(int(inst.Resources["cpu"].GetNumberValue()))
+	wantCPU := int(inst.Resources["cpu"].GetNumberValue())
+	wantRAM := int(inst.Resources["ram"].GetNumberValue())
+	if op.Name == ops.CPU || wantCPU > 0 {
+		tmpl.VCPU(wantCPU)
 	}
-	if op.Name == ops.RAM || inst.Resources["ram"].GetNumberValue() > 0 {
-		tmpl.Memory(int(inst.Resources["ram"].GetNumberValue()))
+	if op.Name == ops.RAM || wantRAM > 0 {
+		tmpl.Memory(wantRAM)
+	}
+	haveCPU, cpuErr := VM.Template.GetVCPU()
+	haveRAM, ramErr := VM.Template.GetMemory()
+	cpuDone := op.Name == ops.CPU && cpuErr == nil && haveCPU == wantCPU
+	ramDone := op.Name == ops.RAM && ramErr == nil && haveRAM == wantRAM
+	if cpuDone || ramDone {
+		c.log.Info("compute already matches, skipping resize",
+			zap.String("op", op.Name), zap.Int("have_cpu", haveCPU), zap.Int("want_cpu", wantCPU),
+			zap.Int("have_ram", haveRAM), zap.Int("want_ram", wantRAM))
+		return true, nil
 	}
 	if lcm == vm.Running {
 		if err := vmc.Poweroff(); err != nil {
@@ -101,7 +119,21 @@ func (c *ONeClient) applyCompute(vmid int, inst *ipb.Instance, op ops.Op) (bool,
 
 func (c *ONeClient) applyDisk(vmid int, inst *ipb.Instance) (bool, error) {
 	vmc := c.ctrl.VM(vmid)
-	err := vmc.Disk(0).Resize(strconv.Itoa(int(inst.Resources["drive_size"].GetNumberValue())))
+	want := int(inst.Resources["drive_size"].GetNumberValue())
+	if VM, err := vmc.Info(true); err == nil {
+		if disk, derr := VM.Template.GetVector("DISK"); derr == nil {
+			if have, serr := disk.GetInt("SIZE"); serr == nil && have >= want {
+				c.log.Info("disk already at least requested size, skipping resize",
+					zap.Int("have", have), zap.Int("want", want), zap.Int("vmid", vmid))
+				return true, nil
+			}
+		}
+	}
+	err := vmc.Disk(0).Resize(strconv.Itoa(want))
+	if err != nil && strings.Contains(err.Error(), "greater than current") {
+		c.log.Info("disk resize refused because size is already applied", zap.Int("want", want), zap.Int("vmid", vmid))
+		return true, nil
+	}
 	return err == nil, err
 }
 
