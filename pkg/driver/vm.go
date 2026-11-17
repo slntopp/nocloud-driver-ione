@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	dyn "github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
@@ -99,7 +100,7 @@ func diskFits(imageMB, diskMB int) error {
 	return nil
 }
 
-func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, driveType string) error {
+func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, password, driveType string) error {
 	if templateID <= 0 {
 		return c.Reinstall(vmid)
 	}
@@ -199,12 +200,90 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, dr
 	if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
 		return err
 	}
-	if username != "" && usernameOK(username) {
-		if err := vmc.UpdateConf(fmt.Sprintf("CONTEXT=[USERNAME=\"%s\"]", username)); err != nil {
-			c.log.Warn("reinstall username context", zap.Error(err))
+	fresh, err := c.GetVM(vmid)
+	if err != nil {
+		return err
+	}
+	if conf := reinstallContext(&fresh.Template, username, password); conf != nil {
+		if err := vmc.UpdateConf(conf.String()); err != nil {
+			c.log.Warn("reinstall context", zap.Error(err))
 		}
 	}
 	return c.ResumeVM(vmid)
+}
+
+func reinstallContext(base *vm.Template, username, password string) *dyn.Template {
+	if base == nil {
+		return nil
+	}
+	out := dyn.NewTemplate()
+	ctx := out.AddVector("CONTEXT")
+	kept := map[string]struct{}{}
+	add := func(key, val string) {
+		if key == "" || val == "" {
+			return
+		}
+		if _, ok := kept[key]; ok {
+			return
+		}
+		if err := ctx.AddPair(key, val); err != nil {
+			return
+		}
+		kept[key] = struct{}{}
+	}
+
+	if old, err := base.GetVector("CONTEXT"); err == nil {
+		for _, p := range old.Pairs {
+			key := p.Key()
+			if key == "DISK_ID" || key == "TARGET" || key == "USERNAME" || key == "PASSWORD" {
+				continue
+			}
+			add(key, p.Value)
+		}
+	}
+	for _, nic := range base.GetNICs() {
+		idx := 0
+		if id, err := nic.ID(); err == nil && id >= 0 {
+			idx = id
+		}
+		prefix := fmt.Sprintf("ETH%d_", idx)
+		copyFromNIC := func(ctxKey, nicKey string) {
+			if _, ok := kept[ctxKey]; ok {
+				return
+			}
+			val, err := nic.GetStr(nicKey)
+			if err != nil {
+				return
+			}
+			add(ctxKey, val)
+		}
+		copyFromNIC(prefix+"IP", "IP")
+		copyFromNIC(prefix+"MAC", "MAC")
+		copyFromNIC(prefix+"GATEWAY", "GATEWAY")
+		copyFromNIC(prefix+"MASK", "NETWORK_MASK")
+		copyFromNIC(prefix+"DNS", "DNS")
+		copyFromNIC(prefix+"VLAN_ID", "VLAN_ID")
+		copyFromNIC(prefix+"MTU", "MTU")
+		copyFromNIC(prefix+"NETWORK", "NETWORK_ADDRESS")
+	}
+	if usernameOK(username) {
+		add("USERNAME", username)
+	} else if old, err := base.GetVector("CONTEXT"); err == nil {
+		if p, err := old.GetPair("USERNAME"); err == nil {
+			add("USERNAME", p.Value)
+		}
+	}
+	if password != "" {
+		add("PASSWORD", password)
+	} else if old, err := base.GetVector("CONTEXT"); err == nil {
+		if p, err := old.GetPair("PASSWORD"); err == nil {
+			add("PASSWORD", p.Value)
+		}
+	}
+	if len(ctx.Pairs) == 0 {
+		return nil
+	}
+	return out
 }
 
 func poweroffLike(st vm.State) bool {
