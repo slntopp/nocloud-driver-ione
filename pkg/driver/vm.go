@@ -148,7 +148,7 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, pa
 					return err
 				}
 			}
-			if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+			if err := c.waitPoweroffIdle(vmid, reinstallIdleTimeout); err != nil {
 				return err
 			}
 		} else {
@@ -173,7 +173,7 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, pa
 		if err := vmc.Disk(diskID).Detach(); err != nil {
 			return err
 		}
-		if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+		if err := c.waitPoweroffIdle(vmid, reinstallIdleTimeout); err != nil {
 			return err
 		}
 	}
@@ -189,7 +189,7 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, pa
 	}
 	if err := vmc.DiskAttach(attach.String()); err != nil {
 		if oldImage > 0 {
-			_ = c.waitPoweroffIdle(vmid, 2*time.Minute)
+			_ = c.waitPoweroffIdle(vmid, reinstallIdleTimeout)
 			restore := vm.NewTemplate()
 			d := restore.AddDisk()
 			d.Add(shared.ImageID, oldImage)
@@ -197,7 +197,7 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, pa
 		}
 		return err
 	}
-	if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+	if err := c.waitPoweroffIdle(vmid, reinstallIdleTimeout); err != nil {
 		return err
 	}
 	fresh, err := c.GetVM(vmid)
@@ -285,6 +285,9 @@ func reinstallContext(base *vm.Template, username, password string) *dyn.Templat
 	}
 	return out
 }
+
+// A vCenter disk copy stays in HOTPLUG_PROLOG_POWEROFF for longer than two minutes.
+const reinstallIdleTimeout = 15 * time.Minute
 
 func poweroffLike(st vm.State) bool {
 	return st == vm.Poweroff || st == vm.Stopped || st == vm.Undeployed
