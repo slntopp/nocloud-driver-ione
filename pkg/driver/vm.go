@@ -136,34 +136,45 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, dr
 	if len(live.Template.GetVectors("SNAPSHOT")) > 0 {
 		return errors.New("delete snapshots before reinstall")
 	}
-	st, _, err := live.State()
+	st, lcm, err := live.State()
 	if err != nil {
 		return err
 	}
-	switch st {
-	case vm.Poweroff, vm.Stopped, vm.Undeployed:
-	case vm.Active, vm.Suspended:
-		if err := c.PoweroffVM(vmid, false); err != nil {
-			return err
+	if !poweroffLike(vm.State(st)) || lcm != 0 {
+		if vm.State(st) == vm.Active || vm.State(st) == vm.Suspended || poweroffLike(vm.State(st)) {
+			if vm.State(st) == vm.Active || vm.State(st) == vm.Suspended {
+				if err := c.PoweroffVM(vmid, false); err != nil {
+					return err
+				}
+			}
+			if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("vm state %s does not allow reinstall", st)
 		}
-		if err := c.waitState(vmid, vm.Poweroff, 2*time.Minute); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("vm state %s does not allow reinstall", st)
 	}
 
+	live, err = c.GetVM(vmid)
+	if err != nil {
+		return err
+	}
 	vmc := c.ctrl.VM(vmid)
-	diskID := 0
 	oldImage := 0
 	if ds := live.Template.GetDisks(); len(ds) > 0 {
-		if id, err := ds[0].ID(); err == nil {
+		diskID := 0
+		if id, idErr := ds[0].ID(); idErr == nil {
 			diskID = id
 		}
 		oldImage, _ = ds[0].GetInt(string(shared.ImageID))
-	}
-	if err := vmc.Disk(diskID).Detach(); err != nil {
-		return err
+		// Detach is accepted at once. OpenNebula then stays in HOTPLUG_EPILOG_POWEROFF
+		// until the disk is gone, and attach during that state is rejected.
+		if err := vmc.Disk(diskID).Detach(); err != nil {
+			return err
+		}
+		if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+			return err
+		}
 	}
 
 	attach := vm.NewTemplate()
@@ -177,11 +188,15 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, dr
 	}
 	if err := vmc.DiskAttach(attach.String()); err != nil {
 		if oldImage > 0 {
+			_ = c.waitPoweroffIdle(vmid, 2*time.Minute)
 			restore := vm.NewTemplate()
 			d := restore.AddDisk()
 			d.Add(shared.ImageID, oldImage)
 			_ = vmc.DiskAttach(restore.String())
 		}
+		return err
+	}
+	if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
 		return err
 	}
 	if username != "" && usernameOK(username) {
@@ -190,6 +205,10 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, dr
 		}
 	}
 	return c.ResumeVM(vmid)
+}
+
+func poweroffLike(st vm.State) bool {
+	return st == vm.Poweroff || st == vm.Stopped || st == vm.Undeployed
 }
 
 func usernameOK(name string) bool {
@@ -204,18 +223,18 @@ func usernameOK(name string) bool {
 	return true
 }
 
-func (c *ONeClient) waitState(vmid int, want vm.State, timeout time.Duration) error {
+func (c *ONeClient) waitPoweroffIdle(vmid int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
-		st, _, _, _, err := c.StateVM(vmid)
+		st, _, lcm, lcmStr, err := c.StateVM(vmid)
 		if err != nil {
 			return err
 		}
-		if vm.State(st) == want {
+		if poweroffLike(vm.State(st)) && lcm == 0 {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("vm %d stayed in state %d, wanted %s", vmid, st, want)
+			return fmt.Errorf("vm %d stayed in state %d lcm %s", vmid, st, lcmStr)
 		}
 		time.Sleep(2 * time.Second)
 	}
