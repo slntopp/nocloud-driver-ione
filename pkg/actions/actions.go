@@ -193,14 +193,19 @@ func Reinstall(
 	}
 	if tid > 0 {
 		user := data["username"].GetStringValue()
-		if user == "" {
+		if user == "" && inst.GetConfig()["username"] != nil {
 			user = inst.GetConfig()["username"].GetStringValue()
+		}
+		password := ""
+		if inst.GetConfig()["password"] != nil {
+			password = inst.GetConfig()["password"].GetStringValue()
 		}
 		err = client.ReinstallTemplate(
 			vmid,
 			tid,
 			int(inst.GetResources()["drive_size"].GetNumberValue()),
 			user,
+			password,
 			inst.GetResources()["drive_type"].GetStringValue(),
 		)
 		if err == nil {
