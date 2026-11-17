@@ -212,9 +212,12 @@ func Reinstall(
 				inst.Config["username"] = structpb.NewStringValue(user)
 			}
 			if tmpl, tmplErr := client.GetTemplate(tid); tmplErr == nil {
-				if pair, pairErr := tmpl.Template.GetPair("LOGO"); pairErr == nil && inst.Data != nil {
+				if pair, pairErr := tmpl.Template.GetPair("LOGO"); pairErr == nil {
+					if inst.Data == nil {
+						inst.Data = map[string]*structpb.Value{}
+					}
 					inst.Data["logo"] = structpb.NewStringValue(pair.Value)
-					datas.PublishInstanceDataPatch(inst.GetUuid(), inst.Data, "logo")
+					datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 				}
 			}
 		}
