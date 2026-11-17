@@ -281,11 +281,11 @@ func MonitorTemplates(log *zap.Logger, c *ONeClient) (res *structpb.Value, err e
 			state["is_public"] = false
 		}
 
-		userInputs, _ := tmpl.Template.GetVector("USER_INPUTS")
 		var inputs []interface{}
-
-		for _, input := range userInputs.Pairs {
-			inputs = append(inputs, input.Key())
+		if userInputs, err := tmpl.Template.GetVector("USER_INPUTS"); err == nil {
+			for _, input := range userInputs.Pairs {
+				inputs = append(inputs, input.Key())
+			}
 		}
 
 		state["inputs"] = inputs
