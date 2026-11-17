@@ -27,6 +27,7 @@ import (
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
+	driver_shared "github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	"github.com/slntopp/nocloud-proto/hasher"
 	pb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
@@ -89,6 +90,154 @@ func (c *ONeClient) Reinstall(vmid int) error {
 	vm := c.ctrl.VM(vmid)
 	err := vm.RecoverDeleteRecreate()
 	return err
+}
+
+func diskFits(imageMB, diskMB int) error {
+	if imageMB > 0 && diskMB > 0 && imageMB > diskMB {
+		return fmt.Errorf("image needs %d MB, instance disk is %d MB", imageMB, diskMB)
+	}
+	return nil
+}
+
+func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, driveType string) error {
+	if templateID <= 0 {
+		return c.Reinstall(vmid)
+	}
+	vmTmpl, err := c.GetTemplate(templateID)
+	if err != nil {
+		return err
+	}
+	if pair, err := vmTmpl.Template.GetPair("NOCLOUD_ENABLED"); err == nil && strings.EqualFold(pair.Value, "FALSE") {
+		return errors.New("template is disabled")
+	}
+	disks := vmTmpl.Template.GetDisks()
+	if len(disks) == 0 {
+		return errors.New("template has no disk")
+	}
+	imgID, err := disks[0].GetInt(string(shared.ImageID))
+	if err != nil || imgID <= 0 {
+		return errors.New("template has no image")
+	}
+	img, err := c.GetImage(imgID)
+	if err != nil {
+		return err
+	}
+	if err := diskFits(img.Size, diskMB); err != nil {
+		return err
+	}
+	if diskMB < img.Size {
+		diskMB = img.Size
+	}
+
+	live, err := c.GetVM(vmid)
+	if err != nil {
+		return err
+	}
+	if len(live.Template.GetVectors("SNAPSHOT")) > 0 {
+		return errors.New("delete snapshots before reinstall")
+	}
+	st, lcm, err := live.State()
+	if err != nil {
+		return err
+	}
+	if !poweroffLike(vm.State(st)) || lcm != 0 {
+		if vm.State(st) == vm.Active || vm.State(st) == vm.Suspended || poweroffLike(vm.State(st)) {
+			if vm.State(st) == vm.Active || vm.State(st) == vm.Suspended {
+				if err := c.PoweroffVM(vmid, false); err != nil {
+					return err
+				}
+			}
+			if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("vm state %s does not allow reinstall", st)
+		}
+	}
+
+	live, err = c.GetVM(vmid)
+	if err != nil {
+		return err
+	}
+	vmc := c.ctrl.VM(vmid)
+	oldImage := 0
+	if ds := live.Template.GetDisks(); len(ds) > 0 {
+		diskID := 0
+		if id, idErr := ds[0].ID(); idErr == nil {
+			diskID = id
+		}
+		oldImage, _ = ds[0].GetInt(string(shared.ImageID))
+		// Detach is accepted at once. OpenNebula then stays in HOTPLUG_EPILOG_POWEROFF
+		// until the disk is gone, and attach during that state is rejected.
+		if err := vmc.Disk(diskID).Detach(); err != nil {
+			return err
+		}
+		if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+			return err
+		}
+	}
+
+	attach := vm.NewTemplate()
+	disk := attach.AddDisk()
+	disk.Add(shared.ImageID, imgID)
+	if diskMB > 0 {
+		disk.Add(shared.Size, diskMB)
+	}
+	if driveType != "" {
+		disk.Add(driver_shared.DRIVE_TYPE, driveType)
+	}
+	if err := vmc.DiskAttach(attach.String()); err != nil {
+		if oldImage > 0 {
+			_ = c.waitPoweroffIdle(vmid, 2*time.Minute)
+			restore := vm.NewTemplate()
+			d := restore.AddDisk()
+			d.Add(shared.ImageID, oldImage)
+			_ = vmc.DiskAttach(restore.String())
+		}
+		return err
+	}
+	if err := c.waitPoweroffIdle(vmid, 2*time.Minute); err != nil {
+		return err
+	}
+	if username != "" && usernameOK(username) {
+		if err := vmc.UpdateConf(fmt.Sprintf("CONTEXT=[USERNAME=\"%s\"]", username)); err != nil {
+			c.log.Warn("reinstall username context", zap.Error(err))
+		}
+	}
+	return c.ResumeVM(vmid)
+}
+
+func poweroffLike(st vm.State) bool {
+	return st == vm.Poweroff || st == vm.Stopped || st == vm.Undeployed
+}
+
+func usernameOK(name string) bool {
+	if name == "" || len(name) > 32 {
+		return false
+	}
+	for _, r := range name {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *ONeClient) waitPoweroffIdle(vmid int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		st, _, lcm, lcmStr, err := c.StateVM(vmid)
+		if err != nil {
+			return err
+		}
+		if poweroffLike(vm.State(st)) && lcm == 0 {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("vm %d stayed in state %d lcm %s", vmid, st, lcmStr)
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func (c *ONeClient) Monitoring(vmid int) (*vm.Monitoring, error) {

@@ -185,7 +185,45 @@ func Reinstall(
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
 
-	err = client.Reinstall(vmid)
+	tid := int(data["template_id"].GetNumberValue())
+	if tid == 0 && data["template_id"].GetStringValue() != "" {
+		if n, convErr := strconv.Atoi(data["template_id"].GetStringValue()); convErr == nil {
+			tid = n
+		}
+	}
+	if tid > 0 {
+		user := data["username"].GetStringValue()
+		if user == "" {
+			user = inst.GetConfig()["username"].GetStringValue()
+		}
+		err = client.ReinstallTemplate(
+			vmid,
+			tid,
+			int(inst.GetResources()["drive_size"].GetNumberValue()),
+			user,
+			inst.GetResources()["drive_type"].GetStringValue(),
+		)
+		if err == nil {
+			if inst.Config == nil {
+				inst.Config = map[string]*structpb.Value{}
+			}
+			inst.Config["template_id"] = structpb.NewNumberValue(float64(tid))
+			if user != "" {
+				inst.Config["username"] = structpb.NewStringValue(user)
+			}
+			if tmpl, tmplErr := client.GetTemplate(tid); tmplErr == nil {
+				if pair, pairErr := tmpl.Template.GetPair("LOGO"); pairErr == nil {
+					if inst.Data == nil {
+						inst.Data = map[string]*structpb.Value{}
+					}
+					inst.Data["logo"] = structpb.NewStringValue(pair.Value)
+					datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
+				}
+			}
+		}
+	} else {
+		err = client.Reinstall(vmid)
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't Reinstall VM, error: %v", err)
 	}
