@@ -173,6 +173,20 @@ func SnapRevert(
 	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
 }
 
+func templateID(v *structpb.Value) int {
+	if v == nil {
+		return 0
+	}
+	if n := int(v.GetNumberValue()); n > 0 {
+		return n
+	}
+	parsed, err := strconv.Atoi(v.GetStringValue())
+	if err != nil || parsed <= 0 {
+		return 0
+	}
+	return parsed
+}
+
 // Remove VM and create with same specs and user
 func Reinstall(
 	client one.IClient,
@@ -185,55 +199,48 @@ func Reinstall(
 		return nil, status.Error(codes.InvalidArgument, "VM ID is not present or can't be gathered by name")
 	}
 
-	tid := int(data["template_id"].GetNumberValue())
-	if tid == 0 && data["template_id"].GetStringValue() != "" {
-		if n, convErr := strconv.Atoi(data["template_id"].GetStringValue()); convErr == nil {
-			tid = n
-		}
+	var requested *structpb.Value
+	if data != nil {
+		requested = data["template_id"]
 	}
-	if tid > 0 {
-		user := data["username"].GetStringValue()
-		if user == "" && inst.GetConfig()["username"] != nil {
-			user = inst.GetConfig()["username"].GetStringValue()
-		}
-		password := ""
-		if inst.GetConfig()["password"] != nil {
-			password = inst.GetConfig()["password"].GetStringValue()
-		}
-		err = client.ReinstallTemplate(
-			vmid,
-			tid,
-			int(inst.GetResources()["drive_size"].GetNumberValue()),
-			user,
-			password,
-			inst.GetResources()["drive_type"].GetStringValue(),
-		)
-		if err == nil {
-			if inst.Config == nil {
-				inst.Config = map[string]*structpb.Value{}
-			}
-			inst.Config["template_id"] = structpb.NewNumberValue(float64(tid))
-			if user != "" {
-				inst.Config["username"] = structpb.NewStringValue(user)
-			}
-			if tmpl, tmplErr := client.GetTemplate(tid); tmplErr == nil {
-				if pair, pairErr := tmpl.Template.GetPair("LOGO"); pairErr == nil {
-					if inst.Data == nil {
-						inst.Data = map[string]*structpb.Value{}
-					}
-					inst.Data["logo"] = structpb.NewStringValue(pair.Value)
-					datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
-				}
-			}
-		}
-	} else {
-		err = client.Reinstall(vmid)
+	tid := templateID(requested)
+	if tid == 0 {
+		tid = templateID(inst.GetConfig()["template_id"])
 	}
+	if tid == 0 {
+		return nil, status.Error(codes.InvalidArgument, "template_id is not saved on the instance")
+	}
+	autoStart := inst.GetConfig()["auto_start"].GetBoolValue()
+	if inst.GetBillingPlan().GetMeta()["auto_start"].GetBoolValue() {
+		autoStart = true
+	}
+	if !autoStart {
+		return nil, status.Error(codes.FailedPrecondition, "auto_start is off, the driver will not create the VM")
+	}
+	err = client.ReinstallTemplate(
+		vmid,
+		tid,
+		int(inst.GetResources()["drive_size"].GetNumberValue()),
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Can't Reinstall VM, error: %v", err)
 	}
+	if inst.Config == nil {
+		inst.Config = map[string]*structpb.Value{}
+	}
+	inst.Config["template_id"] = structpb.NewNumberValue(float64(tid))
+	if inst.Data == nil {
+		inst.Data = map[string]*structpb.Value{}
+	}
+	delete(inst.Data, "vmid")
+	if tmpl, tmplErr := client.GetTemplate(tid); tmplErr == nil {
+		if pair, pairErr := tmpl.Template.GetPair("LOGO"); pairErr == nil {
+			inst.Data["logo"] = structpb.NewStringValue(pair.Value)
+		}
+	}
+	datas.DataPublisher(datas.POST_INST_DATA)(inst.GetUuid(), inst.GetData())
 
-	return StatusesClient(client, inst, data, &ipb.InvokeResponse{Result: true})
+	return &ipb.InvokeResponse{Result: true}, nil
 }
 
 // Powers off a running VM

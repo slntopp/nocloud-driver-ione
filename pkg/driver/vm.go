@@ -22,13 +22,11 @@ import (
 	"strings"
 	"time"
 
-	dyn "github.com/OpenNebula/one/src/oca/go/src/goca/dynamic"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/shared"
 
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm"
 	"github.com/OpenNebula/one/src/oca/go/src/goca/schemas/vm/keys"
 	"github.com/slntopp/nocloud-driver-ione/pkg/datas"
-	driver_shared "github.com/slntopp/nocloud-driver-ione/pkg/shared"
 	"github.com/slntopp/nocloud-proto/hasher"
 	pb "github.com/slntopp/nocloud-proto/instances"
 	stpb "github.com/slntopp/nocloud-proto/states"
@@ -88,9 +86,7 @@ func (c *ONeClient) SnapDelete(snapId, vmid int) error {
 }
 
 func (c *ONeClient) Reinstall(vmid int) error {
-	vm := c.ctrl.VM(vmid)
-	err := vm.RecoverDeleteRecreate()
-	return err
+	return c.deleteVMForRecreate(vmid)
 }
 
 func diskFits(imageMB, diskMB int) error {
@@ -100,9 +96,9 @@ func diskFits(imageMB, diskMB int) error {
 	return nil
 }
 
-func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, password, driveType string) error {
+func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int) error {
 	if templateID <= 0 {
-		return c.Reinstall(vmid)
+		return errors.New("template_id is not saved on the instance")
 	}
 	vmTmpl, err := c.GetTemplate(templateID)
 	if err != nil {
@@ -126,9 +122,6 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, pa
 	if err := diskFits(img.Size, diskMB); err != nil {
 		return err
 	}
-	if diskMB < img.Size {
-		diskMB = img.Size
-	}
 
 	live, err := c.GetVM(vmid)
 	if err != nil {
@@ -137,186 +130,68 @@ func (c *ONeClient) ReinstallTemplate(vmid, templateID, diskMB int, username, pa
 	if len(live.Template.GetVectors("SNAPSHOT")) > 0 {
 		return errors.New("delete snapshots before reinstall")
 	}
-	st, lcm, err := live.State()
-	if err != nil {
-		return err
-	}
-	if !poweroffLike(vm.State(st)) || lcm != 0 {
-		if vm.State(st) == vm.Active || vm.State(st) == vm.Suspended || poweroffLike(vm.State(st)) {
-			if vm.State(st) == vm.Active || vm.State(st) == vm.Suspended {
-				if err := c.PoweroffVM(vmid, false); err != nil {
-					return err
-				}
-			}
-			if err := c.waitPoweroffIdle(vmid, reinstallIdleTimeout); err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("vm state %s does not allow reinstall", st)
-		}
-	}
-
-	live, err = c.GetVM(vmid)
-	if err != nil {
-		return err
-	}
-	vmc := c.ctrl.VM(vmid)
-	oldImage := 0
-	if ds := live.Template.GetDisks(); len(ds) > 0 {
-		diskID := 0
-		if id, idErr := ds[0].ID(); idErr == nil {
-			diskID = id
-		}
-		oldImage, _ = ds[0].GetInt(string(shared.ImageID))
-		// Detach is accepted at once. OpenNebula then stays in HOTPLUG_EPILOG_POWEROFF
-		// until the disk is gone, and attach during that state is rejected.
-		if err := vmc.Disk(diskID).Detach(); err != nil {
-			return err
-		}
-		if err := c.waitPoweroffIdle(vmid, reinstallIdleTimeout); err != nil {
-			return err
-		}
-	}
-
-	attach := vm.NewTemplate()
-	disk := attach.AddDisk()
-	disk.Add(shared.ImageID, imgID)
-	if diskMB > 0 {
-		disk.Add(shared.Size, diskMB)
-	}
-	if driveType != "" {
-		disk.Add(driver_shared.DRIVE_TYPE, driveType)
-	}
-	if err := vmc.DiskAttach(attach.String()); err != nil {
-		if oldImage > 0 {
-			_ = c.waitPoweroffIdle(vmid, reinstallIdleTimeout)
-			restore := vm.NewTemplate()
-			d := restore.AddDisk()
-			d.Add(shared.ImageID, oldImage)
-			_ = vmc.DiskAttach(restore.String())
-		}
-		return err
-	}
-	if err := c.waitPoweroffIdle(vmid, reinstallIdleTimeout); err != nil {
-		return err
-	}
-	fresh, err := c.GetVM(vmid)
-	if err != nil {
-		return err
-	}
-	if conf := reinstallContext(&fresh.Template, username, password); conf != nil {
-		if err := vmc.UpdateConf(conf.String()); err != nil {
-			c.log.Warn("reinstall context", zap.Error(err))
-		}
-	}
-	return c.ResumeVM(vmid)
+	return c.deleteVMForRecreate(vmid)
 }
 
-func reinstallContext(base *vm.Template, username, password string) *dyn.Template {
-	if base == nil {
-		return nil
-	}
-	out := dyn.NewTemplate()
-	ctx := out.AddVector("CONTEXT")
-	kept := map[string]struct{}{}
-	add := func(key, val string) {
-		if key == "" || val == "" {
-			return
-		}
-		if _, ok := kept[key]; ok {
-			return
-		}
-		if err := ctx.AddPair(key, val); err != nil {
-			return
-		}
-		kept[key] = struct{}{}
-	}
-
-	if old, err := base.GetVector("CONTEXT"); err == nil {
-		for _, p := range old.Pairs {
-			key := p.Key()
-			if key == "DISK_ID" || key == "TARGET" || key == "USERNAME" || key == "PASSWORD" {
-				continue
-			}
-			add(key, p.Value)
-		}
-	}
-	for _, nic := range base.GetNICs() {
-		idx := 0
-		if id, err := nic.ID(); err == nil && id >= 0 {
-			idx = id
-		}
-		prefix := fmt.Sprintf("ETH%d_", idx)
-		copyFromNIC := func(ctxKey, nicKey string) {
-			if _, ok := kept[ctxKey]; ok {
-				return
-			}
-			val, err := nic.GetStr(nicKey)
-			if err != nil {
-				return
-			}
-			add(ctxKey, val)
-		}
-		copyFromNIC(prefix+"IP", "IP")
-		copyFromNIC(prefix+"MAC", "MAC")
-		copyFromNIC(prefix+"GATEWAY", "GATEWAY")
-		copyFromNIC(prefix+"MASK", "NETWORK_MASK")
-		copyFromNIC(prefix+"DNS", "DNS")
-		copyFromNIC(prefix+"VLAN_ID", "VLAN_ID")
-		copyFromNIC(prefix+"MTU", "MTU")
-		copyFromNIC(prefix+"NETWORK", "NETWORK_ADDRESS")
-	}
-	if usernameOK(username) {
-		add("USERNAME", username)
-	} else if old, err := base.GetVector("CONTEXT"); err == nil {
-		if p, err := old.GetPair("USERNAME"); err == nil {
-			add("USERNAME", p.Value)
-		}
-	}
-	if password != "" {
-		add("PASSWORD", password)
-	} else if old, err := base.GetVector("CONTEXT"); err == nil {
-		if p, err := old.GetPair("PASSWORD"); err == nil {
-			add("PASSWORD", p.Value)
-		}
-	}
-	if len(ctx.Pairs) == 0 {
-		return nil
-	}
-	return out
-}
-
-// A vCenter disk copy stays in HOTPLUG_PROLOG_POWEROFF for longer than two minutes.
+// terminate-hard, then delete the record. A DONE VM keeps its name and blocks recreate.
 const reinstallIdleTimeout = 15 * time.Minute
 
-func poweroffLike(st vm.State) bool {
-	return st == vm.Poweroff || st == vm.Stopped || st == vm.Undeployed
-}
-
-func usernameOK(name string) bool {
-	if name == "" || len(name) > 32 {
-		return false
+func (c *ONeClient) deleteVMForRecreate(vmid int) error {
+	vmc := c.ctrl.VM(vmid)
+	live, err := vmc.Info(true)
+	if err != nil {
+		return err
 	}
-	for _, r := range name {
-		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
-			return false
+	name := live.Name
+	st, _, err := live.State()
+	if err != nil {
+		return err
+	}
+	if vm.State(st) != vm.Done {
+		if err := vmc.TerminateHard(); err != nil {
+			return err
+		}
+		if err := c.waitVMState(vmid, vm.Done, reinstallIdleTimeout); err != nil {
+			return err
 		}
 	}
-	return true
+	if err := vmc.RecoverDelete(); err != nil {
+		if actErr := vmc.Action("delete"); actErr != nil {
+			return fmt.Errorf("delete vm: %v; action delete: %w", err, actErr)
+		}
+	}
+	return c.waitVMNameGone(name, reinstallIdleTimeout)
 }
 
-func (c *ONeClient) waitPoweroffIdle(vmid int, timeout time.Duration) error {
+func (c *ONeClient) waitVMState(vmid int, want vm.State, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
-		st, _, lcm, lcmStr, err := c.StateVM(vmid)
+		st, _, _, lcmStr, err := c.StateVM(vmid)
 		if err != nil {
 			return err
 		}
-		if poweroffLike(vm.State(st)) && lcm == 0 {
+		if vm.State(st) == want {
 			return nil
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("vm %d stayed in state %d lcm %s", vmid, st, lcmStr)
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func (c *ONeClient) waitVMNameGone(name string, timeout time.Duration) error {
+	if name == "" {
+		return errors.New("vm has no name")
+	}
+	deadline := time.Now().Add(timeout)
+	for {
+		_, err := c.GetVMByName(name)
+		if err != nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("vm %s is still in the pool", name)
 		}
 		time.Sleep(2 * time.Second)
 	}
