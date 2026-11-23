@@ -47,6 +47,28 @@ var notificationsPeriods = []ExpiryDiff{
 	{2592000, 30},
 }
 
+// nextExpiryNotice chooses the single tightest warning that still lies ahead.
+// See nocloud-driver-virtual for why a pass must not walk into wider windows:
+// that walk, plus the next pass, turned one expiry into three letters.
+func nextExpiryNotice(diff, productPeriod, stored int64, hasStored bool, periods []ExpiryDiff) (days int64, send, store bool) {
+	for _, val := range periods {
+		if diff > val.Timestamp {
+			continue
+		}
+		if productPeriod >= 0 && val.Timestamp == productPeriod {
+			return 0, false, false
+		}
+		if val.Days == 0 {
+			return 0, false, true
+		}
+		if hasStored && stored == val.Days {
+			return val.Days, false, false
+		}
+		return val.Days, true, true
+	}
+	return 0, false, false
+}
+
 var suspendNotificationsPeriods = []ExpiryDiff{
 	{604800, 7},
 	{259200, 3},
@@ -845,42 +867,25 @@ func handleBillingEvent(i *ipb.Instance, events EventsPublisherFunc) {
 
 	unix := time.Unix(expirationDate, 0)
 	year, month, day := unix.Date()
-	for _, val := range notificationsPeriods {
-		if diff <= val.Timestamp {
-
-			if val.Timestamp == period {
-				break
-			}
-
-			notification_period, ok := data["notification_period"]
-			if !ok {
-				data["notification_period"] = structpb.NewNumberValue(float64(val.Days))
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "expiry_notification",
-					Data: map[string]*structpb.Value{
-						"period":  structpb.NewNumberValue(float64(val.Days)),
-						"product": structpb.NewStringValue(i.GetProduct()),
-						"date":    structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
-					},
-				})
-				continue
-			}
-
-			if val.Days != int64(notification_period.GetNumberValue()) {
-				data["notification_period"] = structpb.NewNumberValue(float64(val.Days))
-				go events(context.Background(), &epb.Event{
-					Uuid: i.GetUuid(),
-					Key:  "expiry_notification",
-					Data: map[string]*structpb.Value{
-						"period":  structpb.NewNumberValue(float64(val.Days)),
-						"product": structpb.NewStringValue(i.GetProduct()),
-						"date":    structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
-					},
-				})
-			}
-			break
-		}
+	storedVal, hasStored := data["notification_period"]
+	var stored int64
+	if hasStored {
+		stored = int64(storedVal.GetNumberValue())
+	}
+	days, send, store := nextExpiryNotice(diff, period, stored, hasStored, notificationsPeriods)
+	if store {
+		data["notification_period"] = structpb.NewNumberValue(float64(days))
+	}
+	if send {
+		go events(context.Background(), &epb.Event{
+			Uuid: i.GetUuid(),
+			Key:  "expiry_notification",
+			Data: map[string]*structpb.Value{
+				"period":  structpb.NewNumberValue(float64(days)),
+				"product": structpb.NewStringValue(i.GetProduct()),
+				"date":    structpb.NewStringValue(fmt.Sprintf("%d/%d/%d", day, month, year)),
+			},
+		})
 	}
 	i.Data = data
 }
